@@ -1,0 +1,18 @@
+[package]
+name = "beatrijs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Dewaeq"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# [profile.release]
+# lto = "fat"
+# codegen-units = 1
+# debug = false
+# split-debuginfo = '...'  # Platform-specific.
+# debug-assertions = false
+# overflow-checks = false
+# panic = 'unwind'
+# incremental = false
+# rpath = false
