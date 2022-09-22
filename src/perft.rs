@@ -1,9 +1,11 @@
-use std::time::Instant;
+#![allow(dead_code)]
 
+use std::time::Instant;
 use crate::{bitmove::BitMove, board::Board, movelist::MoveList};
 
 #[derive(Debug)]
 pub struct PerftResult {
+    pub time: f64,
     pub nodes: u64,
     pub captures: u64,
     pub en_passants: u64,
@@ -15,6 +17,7 @@ pub struct PerftResult {
 
 pub fn perft_all(board: &mut Board, depth: u8) -> PerftResult {
     let mut perft = PerftResult {
+        time: 0f64,
         nodes: 0,
         captures: 0,
         en_passants: 0,
@@ -24,7 +27,11 @@ pub fn perft_all(board: &mut Board, depth: u8) -> PerftResult {
         check_mates: 0,
     };
 
+    let start = Instant::now();
     inner_perft_all(board, depth, &mut perft);
+    let end = start.elapsed();
+
+    perft.time = end.as_secs_f64() * 1000f64;
 
     perft
 }
@@ -35,11 +42,11 @@ pub fn perft(board: &mut Board, depth: u8) -> u64 {
     let end = start.elapsed();
 
     println!("\n=================================\n");
-    println!("Total time (s):   {}", end.as_secs_f64());
-    println!("Num moves     :   {}", MoveList::legal(board).size());
-    println!("Num nodes     :   {}", nodes);
+    println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
+    println!("Num moves      :   {}", MoveList::legal(board).size());
+    println!("Num nodes      :   {}", nodes);
     println!(
-        "Nodes/s       :   {}",
+        "Nodes/s        :   {}",
         (nodes as f64 / end.as_secs_f64()) as u64
     );
 
@@ -52,6 +59,7 @@ fn inner_perft_all(board: &mut Board, depth: u8, perft: &mut PerftResult) {
     if depth == 0 {
         perft.nodes += 1;
         if board.in_check() {
+            perft.checks += 1;
             if moves.is_empty() {
                 perft.check_mates += 1;
             }
@@ -73,9 +81,11 @@ fn inner_perft_all(board: &mut Board, depth: u8, perft: &mut PerftResult) {
                 }
             }
 
-            let mut b = board.clone();
-            b.make_move(m);
-            inner_perft_all(&mut b, depth - 1, perft);
+            // let new_board = &mut Board::uninit();
+            let new_board = &mut board.clone();
+            board.make_move(m, new_board);
+
+            inner_perft_all(new_board, depth - 1, perft);
         }
     }
 }
@@ -90,13 +100,14 @@ fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
     }
 
     for m in moves {
-        let b = &mut board.clone();
-        b.make_move(m);
+        // let new_board = &mut Board::uninit();
+        let new_board = &mut board.clone();
+        board.make_move(m, new_board);
 
         let add = if depth == 2 {
-            MoveList::legal(b).size() as u64
+            MoveList::legal(new_board).size() as u64
         } else {
-            inner_perft(false, b, depth - 1)
+            inner_perft(false, new_board, depth - 1)
         };
 
         count += add;
@@ -108,4 +119,49 @@ fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
     }
 
     count
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{board::Board, perft::perft_all};
+
+    fn perft_all_test(
+        fen: &str,
+        depth: u8,
+        nodes: u64,
+        captures: u64,
+        en_passants: u64,
+        castles: u64,
+        promotions: u64,
+        checks: u64,
+        check_mates: u64,
+    ) {
+        println!("Testing {} at depth {}", fen, depth);
+
+        let mut board = Board::from_fen(fen);
+        let result = perft_all(&mut board, depth);
+
+        assert_eq!(result.nodes, nodes);
+        assert_eq!(result.captures, captures);
+        assert_eq!(result.en_passants, en_passants);
+        assert_eq!(result.castles, castles);
+        assert_eq!(result.promotions, promotions);
+        assert_eq!(result.checks, checks);
+        assert_eq!(result.check_mates, check_mates);
+    }
+
+    #[test]
+    fn perft_all_position_1() {
+        perft_all_test(
+            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+            4,
+            4085603,
+            757163,
+            1929,
+            128013,
+            15172,
+            25523,
+            43,
+        )
+    }
 }

@@ -1,12 +1,83 @@
 use crate::{
     bitboard::BitBoard,
-    defs::{Player, DIRS},
+    defs::{Dir, Player, Square, DIRS, PieceType},
+    gen::ray::ray,
     utils::{b_max, coord_from_square, is_in_board},
 };
 
 pub const KING_ATK: [u64; 64] = gen_king();
 pub const KNIGHT_ATK: [u64; 64] = gen_knight();
 pub const PAWN_ATK: [[u64; 64]; 2] = gen_pawn();
+
+/// Attacks for a given piece on a given square
+#[inline]
+pub const fn attacks(piece_type: PieceType, sq: Square, occ: u64, side: Player) -> u64 {
+    match piece_type {
+        PieceType::Pawn => pawn_attacks(sq, side),
+        PieceType::Knight => knight_attacks(sq),
+        PieceType::Bishop => bishop_attacks(sq, occ),
+        PieceType::Rook => rook_attacks(sq, occ),
+        PieceType::Queen => bishop_attacks(sq, occ) | rook_attacks(sq, occ),
+        PieceType::King => king_attacks(sq),
+        _ => 0,
+    }
+}
+
+#[inline]
+pub const fn knight_attacks(sq: Square) -> u64 {
+    KNIGHT_ATK[sq as usize]
+}
+
+#[inline]
+pub const fn king_attacks(sq: Square) -> u64 {
+    KING_ATK[sq as usize]
+}
+
+#[inline]
+pub const fn pawn_attacks(sq: Square, side: Player) -> u64 {
+    PAWN_ATK[side.as_usize()][sq as usize]
+}
+
+#[inline]
+const fn ray_attacks(sq: Square, occ: u64, dir_idx: usize) -> u64 {
+    let attacks = ray(dir_idx, sq);
+    let blockers = attacks & occ;
+
+    let bit_idx = match dir_idx {
+        Dir::NORTH_WEST | Dir::NORTH | Dir::NORTH_EAST | Dir::EAST => {
+            BitBoard::bit_scan_forward(blockers)
+        }
+        _ => BitBoard::bit_scan_reverse(blockers),
+    };
+
+    attacks ^ ray(dir_idx, bit_idx)
+}
+
+#[inline]
+pub const fn bishop_attacks(sq: Square, occ: u64) -> u64 {
+    let mut moves = BitBoard::EMPTY;
+    let mut dir_idx = 4;
+
+    while dir_idx < 8 {
+        moves |= ray_attacks(sq, occ, dir_idx);
+        dir_idx += 1;
+    }
+
+    moves
+}
+
+#[inline]
+pub const fn rook_attacks(sq: Square, occ: u64) -> u64 {
+    let mut moves = BitBoard::EMPTY;
+    let mut dir_idx = 0;
+
+    while dir_idx < 4 {
+        moves |= ray_attacks(sq, occ, dir_idx);
+        dir_idx += 1;
+    }
+
+    moves
+}
 
 const fn gen_king() -> [u64; 64] {
     let mut king_atk: [u64; 64] = [0; 64];

@@ -2,53 +2,16 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     board::Board,
-    defs::{Dir, GenType, PieceType, Player, Square},
+    defs::{GenType, PieceType, Player, Square},
     gen::{
-        attack::{KING_ATK, KNIGHT_ATK, PAWN_ATK},
+        attack::{
+            attacks, bishop_attacks, king_attacks, knight_attacks, pawn_attacks, rook_attacks,
+        },
         between::between,
-        ray::ray,
     },
     movelist::MoveList,
     utils::adjacent_files,
 };
-
-const fn ray_attacks(sq: Square, occ: u64, dir_idx: usize) -> u64 {
-    let attacks = ray(dir_idx, sq);
-    let blockers = attacks & occ;
-
-    let bit_idx = match dir_idx {
-        Dir::NORTH_WEST | Dir::NORTH | Dir::NORTH_EAST | Dir::EAST => {
-            BitBoard::bit_scan_forward(blockers)
-        }
-        _ => BitBoard::bit_scan_reverse(blockers),
-    };
-
-    attacks ^ ray(dir_idx, bit_idx)
-}
-
-const fn bishop_attacks(sq: Square, occ: u64) -> u64 {
-    let mut moves = BitBoard::EMPTY;
-    let mut dir_idx = 4;
-
-    while dir_idx < 8 {
-        moves |= ray_attacks(sq, occ, dir_idx);
-        dir_idx += 1;
-    }
-
-    moves
-}
-
-const fn rook_attacks(sq: Square, occ: u64) -> u64 {
-    let mut moves = BitBoard::EMPTY;
-    let mut dir_idx = 0;
-
-    while dir_idx < 4 {
-        moves |= ray_attacks(sq, occ, dir_idx);
-        dir_idx += 1;
-    }
-
-    moves
-}
 
 /* pub fn xray_bishop_attacks(square: u8, mut blockers: u64, occ: u64) -> u64 {
     let attacks = bishop_attacks(square, occ);
@@ -62,32 +25,8 @@ pub fn xray_rook_attacks(square: u8, mut blockers: u64, occ: u64) -> u64 {
     attacks ^ rook_attacks(square, occ ^ blockers)
 } */
 
-const fn knight_attacks(sq: Square) -> u64 {
-    KNIGHT_ATK[sq as usize]
-}
-
-const fn king_attacks(sq: Square) -> u64 {
-    KING_ATK[sq as usize]
-}
-
-const fn pawn_attacks(sq: Square, side: Player) -> u64 {
-    PAWN_ATK[side.as_usize()][sq as usize]
-}
-
-/// Attacks for a given piece on a given square
-pub const fn attacks(piece_type: PieceType, sq: Square, occ: u64, side: Player) -> u64 {
-    match piece_type {
-        PieceType::Pawn => pawn_attacks(sq, side),
-        PieceType::Knight => knight_attacks(sq),
-        PieceType::Bishop => bishop_attacks(sq, occ),
-        PieceType::Rook => rook_attacks(sq, occ),
-        PieceType::Queen => bishop_attacks(sq, occ) | rook_attacks(sq, occ),
-        PieceType::King => king_attacks(sq),
-        _ => 0,
-    }
-}
-
 /// Bitboard of all the pieces that are attacking `square`
+#[inline]
 pub const fn attackers_to(board: &Board, sq: Square, occupied: u64) -> u64 {
     pawn_attacks(sq, Player::White) & board.player_piece_bb(Player::Black, PieceType::Pawn)
         | pawn_attacks(sq, Player::Black) & board.player_piece_bb(Player::White, PieceType::Pawn)
@@ -148,6 +87,7 @@ fn make_promotions(
     }
 }
 
+#[inline]
 const fn pawn_push(pawns: u64, player: Player) -> u64 {
     match player {
         Player::White => pawns << 8,
@@ -155,6 +95,7 @@ const fn pawn_push(pawns: u64, player: Player) -> u64 {
     }
 }
 
+#[inline]
 const fn double_pawn_push(pawns: u64, player: Player) -> u64 {
     match player {
         Player::White => pawns << 16,
@@ -162,6 +103,7 @@ const fn double_pawn_push(pawns: u64, player: Player) -> u64 {
     }
 }
 
+#[inline]
 const fn pawn_cap_east(pawns: u64, player: Player) -> u64 {
     match player {
         Player::White => (pawns & !BitBoard::FILE_H) << 9,
@@ -169,6 +111,7 @@ const fn pawn_cap_east(pawns: u64, player: Player) -> u64 {
     }
 }
 
+#[inline]
 const fn pawn_cap_west(pawns: u64, player: Player) -> u64 {
     match player {
         Player::White => (pawns & !BitBoard::FILE_A) << 7,
@@ -246,7 +189,7 @@ fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mu
         }
 
         if board.can_ep() {
-            let ep_file = board.pos.ep_square % 8;
+            let ep_file = board.ep_file();
             let ep_pawn_sq = board.pos.ep_square - pawn_dir;
 
             let mut m3 = pwn_not_rank_7 & BitBoard::rank_bb(ep_pawn_sq) & adjacent_files(ep_file);
@@ -365,7 +308,7 @@ fn generate_all(board: &Board, gen_type: GenType, move_list: &mut MoveList) {
         }
 
         // Castling
-        if board.pos.checkers_bb == 0 {
+        if !board.in_check() && board.can_castle(board.turn) {
             let occ = board.occ_bb();
             if board.can_castle_king(board.turn)
                 && !BitBoard::contains(occ, king_sq + 1)

@@ -1,15 +1,15 @@
-use crate::{gen::{between::between, ray::line}, defs::Square};
+use crate::{defs::Square, gen::ray::line};
 
 #[rustfmt::skip]
 const INDEX_64: [Square; 64] = [
-    0, 47,  1, 56, 48, 27,  2, 60,
+    0,  47,  1, 56, 48, 27,  2, 60,
     57, 49, 41, 37, 28, 16,  3, 61,
     54, 58, 35, 52, 50, 42, 21, 44,
     38, 32, 29, 23, 17, 11,  4, 62,
     46, 55, 26, 59, 40, 36, 15, 53,
     34, 51, 20, 43, 31, 22, 10, 45,
     25, 39, 14, 33, 19, 30,  9, 24,
-    13, 18,  8, 12,  7,  6,  5, 63
+    13, 18,  8, 12,  7,  6,  5, 63,
 ];
 
 const DEBRUIJN_64: u64 = 0x03f7_9d71_b4cb_0a89;
@@ -30,9 +30,8 @@ impl BitBoard {
 }
 
 impl BitBoard {
-
     pub const fn from_sq(sq: Square) -> u64 {
-        (1u64).wrapping_shl(sq as u32)
+        1 << sq
     }
 
     pub const fn file_bb(sq: Square) -> u64 {
@@ -75,10 +74,6 @@ impl BitBoard {
         }
     }
 
-    pub const fn aligned(a: Square, b: Square) -> bool {
-        between(a, b) != 0
-    }
-
     pub const fn triple_aligned(a: Square, b: Square, c: Square) -> bool {
         line(a, b) & BitBoard::from_sq(c) != 0
     }
@@ -93,7 +88,7 @@ impl BitBoard {
             return 64;
         }
 
-        INDEX_64[(bb ^ (bb - 1)).wrapping_mul(DEBRUIJN_64).wrapping_shr(58) as usize]
+        INDEX_64[(((bb ^ (bb - 1)) * DEBRUIJN_64) >> 58) as usize]
     }
 
     /// Get the index of the most significant bit.
@@ -111,9 +106,10 @@ impl BitBoard {
         bb |= bb >> 16;
         bb |= bb >> 32;
 
-        INDEX_64[bb.wrapping_mul(DEBRUIJN_64).wrapping_shr(58) as usize]
+        INDEX_64[((bb * DEBRUIJN_64) >> 58) as usize]
     }
 
+    #[allow(dead_code)]
     pub fn print_bitboard(bb: u64) {
         let mut output = String::new();
         for y in 0..8 {

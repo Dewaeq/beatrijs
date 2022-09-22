@@ -1,6 +1,6 @@
 use crate::defs::{Castling, PieceType, Square, NUM_PIECES, NUM_SIDES};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Position {
     /// Castling state.
     ///
@@ -11,12 +11,13 @@ pub struct Position {
     pub castling: u8,
     /// 50 move rule counter
     pub rule_fifty: u8,
-    /// Ply at this position
+    /// Ply at this position, starting from zero
     pub ply: u16,
-    /// Zobrist key
-    pub key: u64,
     /// Square behind the pawn, 64 if none
     pub ep_square: Square,
+
+    /// Zobrist key
+    pub key: u64,
     /// Bitboard of all the pieces giving check
     pub checkers_bb: u64,
     /// Per player, bitboard of all the pieces blocking check on that player's king
@@ -31,7 +32,7 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Position {
             castling: Castling::NONE,
             rule_fifty: 0,
@@ -40,24 +41,8 @@ impl Position {
             ep_square: 64,
             checkers_bb: 0,
             king_blockers: [0; NUM_SIDES],
-            // pinners_bb: [0; NUM_SIDES],
             check_squares: [0; NUM_PIECES],
             captured_piece: PieceType::None,
         }
     }
-
-    /* pub fn partial_clone(&self) -> Position {
-        Position {
-            // prev: self.prev.as_ref().cloned(),
-            castling: self.castling,
-            rule_fifty: self.rule_fifty,
-            ply: self.ply,
-            key: self.key,
-            ep_square: self.ep_square,
-            checkers_bb: 0,
-            king_blockers: [0; NUM_SIDES],
-            check_squares: [0; NUM_PIECES],
-            captured_piece: self.captured_piece,
-        }
-    } */
 }

@@ -58,6 +58,7 @@ impl BitMove {
         }
     }
 
+    #[allow(dead_code)]
     pub fn print_move(bitmove: u16) {
         let src = BitMove::src(bitmove);
         let dest = BitMove::dest(bitmove);
@@ -104,6 +105,7 @@ impl BitMove {
 /// See <https://www.chessprogramming.org/Encoding_Moves#From-To_Based>
 pub struct MoveFlag;
 
+#[allow(dead_code)]
 impl MoveFlag {
     pub const QUIET: u8 = 0;
     pub const DOUBLE_PAWN_PUSH: u8 = 1;

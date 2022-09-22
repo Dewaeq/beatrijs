@@ -47,9 +47,8 @@ impl Iterator for MoveList {
         self.current += 1;
 
         if self.current <= self.count {
-            Some(self.moves[self.current - 1])
+            Some(self.get(self.current - 1))
         } else {
-            // self.current = 0;
             None
         }
     }

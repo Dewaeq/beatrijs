@@ -5,10 +5,11 @@ use crate::{
         Castling, PieceType, Player, Square, BLACK_IDX, FEN_START_STRING, NUM_PIECES, NUM_SIDES,
         NUM_SQUARES, WHITE_IDX,
     },
-    gen::between::between,
-    movegen::{attackers_to, attacks},
+    gen::{attack::attacks, between::between},
+    movegen::attackers_to,
     position::Position,
     utils::square_from_string,
+    zobrist::Zobrist,
 };
 
 #[derive(Clone, Copy)]
@@ -18,7 +19,6 @@ pub struct Board {
     pub side_bb: [u64; NUM_SIDES],
     pub pieces: [PieceType; NUM_SQUARES],
     pub pos: Position,
-    // pub history: History,
 }
 
 /// Getter methods
@@ -64,18 +64,6 @@ impl Board {
         piece_bb & side_bb
     }
 
-    pub const fn sliding_bb(&self) -> u64 {
-        self.piece_bb(PieceType::Bishop)
-            | self.piece_bb(PieceType::Rook)
-            | self.piece_bb(PieceType::Queen)
-    }
-
-    pub const fn player_sliding_bb(&self, side: Player) -> u64 {
-        let sliding_bb = self.sliding_bb();
-        let side_bb = self.player_bb(side);
-        sliding_bb & side_bb
-    }
-
     pub const fn cur_king_square(&self) -> Square {
         let bb = self.player_piece_bb(self.turn, PieceType::King);
         BitBoard::bit_scan_forward(bb)
@@ -94,24 +82,28 @@ impl Board {
         self.pos.ep_square < 64
     }
 
+    pub const fn ep_file(&self) -> Square {
+        self.pos.ep_square % 8
+    }
+
     pub const fn can_castle_queen(&self, side: Player) -> bool {
         match side {
-            Player::White => self.pos.castling & 0b0001 != 0,
-            Player::Black => self.pos.castling & 0b0100 != 0,
+            Player::White => self.pos.castling & Castling::WQ != 0,
+            Player::Black => self.pos.castling & Castling::BQ != 0,
         }
     }
 
     pub const fn can_castle_king(&self, side: Player) -> bool {
         match side {
-            Player::White => self.pos.castling & 0b0010 != 0,
-            Player::Black => self.pos.castling & 0b1000 != 0,
+            Player::White => self.pos.castling & Castling::WK != 0,
+            Player::Black => self.pos.castling & Castling::BK != 0,
         }
     }
 
     pub const fn can_castle(&self, side: Player) -> bool {
         match side {
-            Player::White => self.pos.castling & 0b0011 != 0,
-            Player::Black => self.pos.castling & 0b1100 != 0,
+            Player::White => self.pos.castling & Castling::WHITE_ALL != 0,
+            Player::Black => self.pos.castling & Castling::BLACK_ALL != 0,
         }
     }
 
@@ -126,7 +118,6 @@ impl Board {
             & self.player_piece_like_bb(opp, PieceType::Bishop)
             | attacks(PieceType::Rook, sq, opp_bb, opp)
                 & self.player_piece_like_bb(opp, PieceType::Rook);
-        // let mut pinners = rook_attacks(sq, occ) & boar
         let mut pinned_bb = BitBoard::EMPTY;
 
         while pinners != 0 {
@@ -176,7 +167,17 @@ impl Board {
             | self.pos.check_squares[PieceType::Rook.as_usize()];
     }
 
-    pub fn make_move(&mut self, m: u16) {
+    /// Removes castling permissions for the given side
+    pub fn disable_castling(&mut self, side: Player) {
+        match side {
+            Player::White => self.pos.castling &= Castling::BLACK_ALL,
+            Player::Black => self.pos.castling &= Castling::WHITE_ALL,
+        }
+    }
+
+    pub fn make_move(&self, m: u16, target: &mut Board) {
+        *target = *self;
+
         let src = BitMove::src(m);
         let dest = BitMove::dest(m);
         let flag = BitMove::flag(m);
@@ -191,26 +192,33 @@ impl Board {
 
         // Remove all castling rights for the moving side when a king move occurs
         if piece_type == PieceType::King {
-            self.set_castling_for_side(self.turn);
+            target.disable_castling(self.turn);
         }
 
         // Normal captures
         if is_cap && !is_ep {
             let cap_pt = self.piece_type(dest);
-            self.pos.captured_piece = cap_pt;
-            self.remove_piece(opp, cap_pt, dest);
+            target.pos.captured_piece = cap_pt;
+            target.remove_piece(opp, cap_pt, dest);
+
+            // target.pos.key ^= Zobrist::piece(opp, cap_pt, dest);
         }
 
         // EP capture
-        if is_ep {
-            let ep_pawn_sq = self.pos.ep_square - self.turn.pawn_dir();
-            self.remove_piece(opp, PieceType::Pawn, ep_pawn_sq);
+        if self.can_ep() {
+            if is_ep {
+                let ep_pawn_sq = self.pos.ep_square - self.turn.pawn_dir();
+                target.remove_piece(opp, PieceType::Pawn, ep_pawn_sq);
+                // target.pos.key ^= Zobrist::piece(opp, PieceType::Pawn, dest);
+            }
+
+            // target.pos.key ^= Zobrist::ep(self.ep_file());
+            target.clear_ep();
         }
 
-        self.clear_ep();
-
         if flag == MoveFlag::DOUBLE_PAWN_PUSH {
-            self.set_ep(dest - self.turn.pawn_dir());
+            target.set_ep(dest - self.turn.pawn_dir());
+            // target.pos.key ^= Zobrist::ep(self.ep_file());
         }
 
         // Castling
@@ -226,31 +234,35 @@ impl Board {
                 rook_target_sq = self.turn.castle_queen_sq() + 1;
             }
 
-            self.remove_piece(self.turn, PieceType::Rook, rook_sq);
-            self.add_piece(self.turn, PieceType::Rook, rook_target_sq);
+            target.remove_piece(self.turn, PieceType::Rook, rook_sq);
+            target.add_piece(self.turn, PieceType::Rook, rook_target_sq);
+
+            // target.pos.key ^= Zobrist::piece(self.turn, PieceType::Rook, rook_sq);
+            // target.pos.key ^= Zobrist::piece(self.turn, PieceType::Rook, rook_target_sq);
         }
 
         // Promotion
         if is_prom {
             let prom_type = BitMove::prom_piece_type(flag);
-            self.add_piece(self.turn, prom_type, dest);
+            target.add_piece(self.turn, prom_type, dest);
+            // target.pos.key ^= Zobrist::piece(self.turn, prom_type, dest);
+        } else {
+            target.add_piece(self.turn, piece_type, dest);
+            // target.pos.key ^= Zobrist::piece(self.turn, piece_type, dest);
         }
 
-        if !is_prom {
-            self.add_piece(self.turn, piece_type, dest);
+        if self.pos.castling != target.pos.castling {
+            target.pos.key ^= Zobrist::castle(target.pos.castling);
         }
 
-        self.remove_piece(self.turn, piece_type, src);
-        self.set_castling_from_move(m);
-        self.turn = self.turn.opp();
-        self.set_check_info();
-    }
+        target.pos.key ^= Zobrist::side();
+        // target.pos.key ^= Zobrist::piece(self.turn, piece_type, src);
 
-    fn set_castling_for_side(&mut self, side: Player) {
-        match side {
-            Player::White => self.pos.castling &= 0b1100,
-            Player::Black => self.pos.castling &= 0b0011,
-        }
+        target.remove_piece(self.turn, piece_type, src);
+        target.set_castling_from_move(m);
+        target.turn = self.turn.opp();
+        target.pos.ply += 1;
+        target.set_check_info();
     }
 
     pub fn set_castling_from_move(&mut self, m: u16) {
@@ -279,18 +291,52 @@ impl Board {
     /// TODO: investigate this further
     pub fn set_ep(&mut self, ep_square: Square) {
         self.pos.ep_square = ep_square;
+        self.pos.key ^= Zobrist::ep(self.ep_file());
     }
 
     /// It's faster to call this function even if the ep_square is already cleared,
     /// instead of checking for that
     /// TODO: investigate this further
     pub fn clear_ep(&mut self) {
+        self.pos.key ^= Zobrist::ep(self.ep_file());
         self.pos.ep_square = 64;
+    }
+
+    pub fn add_piece(&mut self, side: Player, piece_type: PieceType, sq: Square) {
+        assert!(piece_type != PieceType::None);
+
+        self.pos.key ^= Zobrist::piece(side, piece_type, sq);
+        self.pieces[sq as usize] = piece_type;
+
+        let piece_bb = &mut self.piece_bb[piece_type.as_usize()];
+        let side_bb = match side {
+            Player::White => &mut self.side_bb[WHITE_IDX],
+            _ => &mut self.side_bb[BLACK_IDX],
+        };
+
+        BitBoard::set_bit(piece_bb, sq);
+        BitBoard::set_bit(side_bb, sq);
+    }
+
+    pub fn remove_piece(&mut self, side: Player, piece_type: PieceType, sq: Square) {
+        assert!(piece_type != PieceType::None);
+
+        self.pieces[sq as usize] = PieceType::None;
+        self.pos.key ^= Zobrist::piece(side, piece_type, sq);
+
+        let piece_bb = &mut self.piece_bb[piece_type.as_usize()];
+        let side_bb = match side {
+            Player::White => &mut self.side_bb[WHITE_IDX],
+            _ => &mut self.side_bb[BLACK_IDX],
+        };
+
+        BitBoard::pop_bit(piece_bb, sq);
+        BitBoard::pop_bit(side_bb, sq);
     }
 }
 
 impl Board {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Board {
             turn: Player::White,
             piece_bb: [BitBoard::EMPTY; NUM_PIECES],
@@ -299,6 +345,15 @@ impl Board {
             pos: Position::new(),
         }
     }
+
+    /* #[allow(invalid_value)]
+    /// Returns a mutable reference to an uninitialized board structure
+    /// Not true anymore, this somehow only works in release mode
+    /// temporary fix is just returning a new board
+    pub fn uninit() -> Self {
+        // unsafe { &mut *std::mem::MaybeUninit::<Board>::uninit().as_mut_ptr() }
+        unsafe { *std::mem::MaybeUninit::<Board>::uninit().as_mut_ptr() }
+    } */
 
     pub fn start_pos() -> Board {
         Board::from_fen(FEN_START_STRING)
@@ -317,12 +372,14 @@ impl Board {
         let half_move_str = sections[4];
         let full_move_str = sections[5];
 
+        // Turn to move
         board.turn = match turn_str {
             "w" => Player::White,
             "b" => Player::Black,
             _ => panic!(),
         };
 
+        // Castling permissions
         if !castle_str.contains("-") {
             for symbol in castle_str.split("") {
                 if symbol.is_empty() {
@@ -333,13 +390,14 @@ impl Board {
                     "Q" => Castling::WQ,
                     "k" => Castling::BK,
                     "q" => Castling::BQ,
-                    _ => panic!(),
+                    _ => panic!("Invalid castling values in FEN string"),
                 }
             }
         }
 
+        // EP-square
         if !ep_str.contains("-") {
-            board.pos.ep_square = square_from_string(ep_str);
+            board.set_ep(square_from_string(ep_str));
         }
 
         board.pos.rule_fifty = half_move_str.parse::<u8>().unwrap();
@@ -348,6 +406,7 @@ impl Board {
         let mut file = 0;
         let mut rank = 7;
 
+        // Piece locations
         for symbol in pieces_str.split("") {
             if symbol.is_empty() {
                 continue;
@@ -385,36 +444,13 @@ impl Board {
         }
 
         board.set_check_info();
+        board.pos.key ^= Zobrist::castle(board.pos.castling);
+
+        if board.turn == Player::Black {
+            board.pos.key ^= Zobrist::side();
+        }
 
         board
-    }
-
-    pub fn add_piece(&mut self, side: Player, piece_type: PieceType, square: Square) {
-        // assert!(piece_type != PieceType::None);
-
-        self.pieces[square as usize] = piece_type;
-
-        let piece_bb = &mut self.piece_bb[piece_type.as_usize()];
-        let side_bb = match side {
-            Player::White => &mut self.side_bb[WHITE_IDX],
-            _ => &mut self.side_bb[BLACK_IDX],
-        };
-
-        BitBoard::set_bit(piece_bb, square);
-        BitBoard::set_bit(side_bb, square);
-    }
-
-    pub fn remove_piece(&mut self, side: Player, piece_type: PieceType, square: Square) {
-        self.pieces[square as usize] = PieceType::None;
-
-        let piece_bb = &mut self.piece_bb[piece_type.as_usize()];
-        let side_bb = match side {
-            Player::White => &mut self.side_bb[WHITE_IDX],
-            _ => &mut self.side_bb[BLACK_IDX],
-        };
-
-        BitBoard::pop_bit(piece_bb, square);
-        BitBoard::pop_bit(side_bb, square);
     }
 
     pub fn pretty_string(&self) -> String {

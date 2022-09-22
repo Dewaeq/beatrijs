@@ -1,35 +1,34 @@
-/* use crate::{defs::MAX_GAME_LENGTH, position::Position};
+/* use crate::position::Position;
 
 /// Array-based wrapper of game history,
 /// so that we can quickly undo moves
-#[derive(Clone)]
 pub struct History {
-    list: [Position; MAX_GAME_LENGTH],
+    list: Vec<Position>,
     count: usize,
 }
 
 impl History {
     pub fn new() -> Self {
         History {
-            list: [Position::new(); MAX_GAME_LENGTH],
+            list: vec![],
             count: 0,
         }
     }
 
     /// Add a position at `count`
     pub fn push(&mut self, pos: Position) {
-        self.list[self.count] = pos;
+        self.list.push(pos);
         self.count += 1;
     }
 
     /// Decrease `count` by one
     pub fn pop(&mut self) {
+        self.list.pop();
         self.count -= 1;
     }
 
-    pub fn current(self) -> Position {
-        // *self.list[self.count]
-        *self.list.get(0).unwrap()
+    pub fn current(&self) -> Position {
+        self.list[self.count - 1].clone()
     }
 }
  */

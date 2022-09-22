@@ -1,0 +1,125 @@
+    pub fn make_move(&mut self, m: u16) {
+        let src = BitMove::src(m);
+        let dest = BitMove::dest(m);
+        let flag = BitMove::flag(m);
+        let is_cap = BitMove::is_cap(m);
+        let is_prom = BitMove::is_prom(m);
+        let is_castle = BitMove::is_castle(m);
+        let is_ep = BitMove::is_ep(m);
+        let piece_type = self.pieces[src as usize];
+        let opp = self.turn.opp();
+
+        assert!(piece_type != PieceType::None);
+
+        // self.history.push(self.pos.clone());
+
+        // let prev = self.pos.clone();
+        // std::mem::swap(&mut self.pos.prev, &mut Some(Box::new(prev)));
+
+        // Remove all castling rights for the moving side when a king move occurs
+        if piece_type == PieceType::King {
+            self.set_castling_for_side(self.turn);
+        }
+
+        // Normal captures
+        if is_cap && !is_ep {
+            let cap_pt = self.piece_type(dest);
+            self.pos.captured_piece = cap_pt;
+            self.remove_piece(opp, cap_pt, dest);
+        }
+
+        // EP capture
+        if is_ep {
+            let ep_pawn_sq = self.pos.ep_square - self.turn.pawn_dir();
+            self.remove_piece(opp, PieceType::Pawn, ep_pawn_sq);
+        }
+
+        self.clear_ep();
+
+        if flag == MoveFlag::DOUBLE_PAWN_PUSH {
+            self.set_ep(dest - self.turn.pawn_dir());
+        }
+
+        // Castling
+        if is_castle {
+            let rook_sq;
+            let rook_target_sq;
+
+            if flag == MoveFlag::CASTLE_KING {
+                rook_sq = self.turn.castle_king_sq() + 1;
+                rook_target_sq = self.turn.castle_king_sq() - 1;
+            } else {
+                rook_sq = self.turn.castle_queen_sq() - 2;
+                rook_target_sq = self.turn.castle_queen_sq() + 1;
+            }
+
+            self.remove_piece(self.turn, PieceType::Rook, rook_sq);
+            self.add_piece(self.turn, PieceType::Rook, rook_target_sq);
+        }
+
+        // Promotion
+        if is_prom {
+            let prom_type = BitMove::prom_piece_type(flag);
+            self.add_piece(self.turn, prom_type, dest);
+        } else {
+            self.add_piece(self.turn, piece_type, dest);
+        }
+
+        self.remove_piece(self.turn, piece_type, src);
+        self.set_castling_from_move(m);
+        self.turn = self.turn.opp();
+        self.pos.ply += 1;
+        self.set_check_info();
+    }
+
+    pub fn unmake_move(&mut self, m: u16) {
+        let src = BitMove::src(m);
+        let dest = BitMove::dest(m);
+        let flag = BitMove::flag(m);
+        let is_cap = BitMove::is_cap(m);
+        let is_prom = BitMove::is_prom(m);
+        let is_castle = BitMove::is_castle(m);
+        let is_ep = BitMove::is_ep(m);
+        let piece_type = self.pieces[dest as usize];
+        let cap_piece_type = self.pos.captured_piece;
+        self.turn = self.turn.opp();
+
+        if is_prom {
+            self.remove_piece(self.turn, piece_type, dest);
+            self.add_piece(self.turn, PieceType::Pawn, src);
+        } else if is_castle {
+            let rook_sq;
+            let rook_target_sq;
+
+            if flag == MoveFlag::CASTLE_KING {
+                rook_sq = self.turn.castle_king_sq() + 1;
+                rook_target_sq = self.turn.castle_king_sq() - 1;
+            } else {
+                rook_sq = self.turn.castle_queen_sq() - 2;
+                rook_target_sq = self.turn.castle_queen_sq() + 1;
+            }
+            self.remove_piece(self.turn, piece_type, dest);
+            self.add_piece(self.turn, piece_type, src);
+
+            self.remove_piece(self.turn, PieceType::Rook, rook_target_sq);
+            self.add_piece(self.turn, PieceType::Rook, rook_sq);
+        } else {
+            self.remove_piece(self.turn, piece_type, dest);
+            self.add_piece(self.turn, piece_type, src);
+
+            if is_ep {
+                self.add_piece(
+                    self.turn.opp(),
+                    PieceType::Pawn,
+                    dest - self.turn.pawn_dir(),
+                );
+            } else if is_cap {
+                self.add_piece(self.turn.opp(), cap_piece_type, dest);
+            }
+        }
+
+        // self.pos = self.history.current();
+        // self.history.pop();
+
+        // self.pos = *self.pos.prev.as_ref().unwrap().clone();
+    }

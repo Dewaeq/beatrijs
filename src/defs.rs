@@ -1,11 +1,10 @@
-use std::ops::{Index, IndexMut};
 use crate::bitboard::BitBoard;
+use std::ops::{Index, IndexMut};
 
 pub const WHITE_IDX: usize = 0;
 pub const BLACK_IDX: usize = 1;
 
 pub const MAX_MOVES: usize = 256;
-pub const MAX_GAME_LENGTH: usize = 1;
 pub const NUM_PIECES: usize = 6;
 pub const NUM_SIDES: usize = 2;
 pub const NUM_SQUARES: usize = 64;
@@ -26,10 +25,9 @@ impl Castling {
     pub const WHITE_ALL: u8 = 3;
     pub const BLACK_ALL: u8 = 12;
     pub const NONE: u8 = 0;
-    pub const ALL: u8 = 15;
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Player {
     White,
     Black,
@@ -138,7 +136,7 @@ impl IndexMut<PieceType> for [u64; NUM_PIECES] {
     }
 }
 
-#[derive(Clone, Copy)]
+/* #[derive(Clone, Copy)]
 pub enum Piece {
     WhitePawn,
     BlackPawn,
@@ -204,6 +202,7 @@ impl Piece {
         }
     }
 }
+ */
 
 /// Rook directions are 0-3
 ///
