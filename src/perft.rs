@@ -1,7 +1,5 @@
-#![allow(dead_code)]
-
-use std::time::Instant;
 use crate::{bitmove::BitMove, board::Board, movelist::MoveList};
+use std::time::Instant;
 
 #[derive(Debug)]
 pub struct PerftResult {
@@ -81,9 +79,8 @@ fn inner_perft_all(board: &mut Board, depth: u8, perft: &mut PerftResult) {
                 }
             }
 
-            // let new_board = &mut Board::uninit();
-            let new_board = &mut board.clone();
-            board.make_move(m, new_board);
+            let new_board = &mut *board;
+            new_board.make_move(m);
 
             inner_perft_all(new_board, depth - 1, perft);
         }
@@ -100,9 +97,8 @@ fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
     }
 
     for m in moves {
-        // let new_board = &mut Board::uninit();
         let new_board = &mut board.clone();
-        board.make_move(m, new_board);
+        new_board.make_move(m);
 
         let add = if depth == 2 {
             MoveList::legal(new_board).size() as u64

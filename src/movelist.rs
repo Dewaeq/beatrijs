@@ -22,6 +22,12 @@ impl MoveList {
         move_list
     }
 
+    pub fn quiet(board: &mut Board) -> Self {
+        let mut move_list = MoveList::new();
+        generate_legal(board, &mut move_list);
+        move_list
+    }
+
     pub fn push(&mut self, m: u16) {
         self.moves[self.count] = m;
         self.count += 1;

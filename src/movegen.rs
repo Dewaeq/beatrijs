@@ -352,6 +352,19 @@ pub fn generate_legal(board: &mut Board, move_list: &mut MoveList) {
     }
 }
 
+pub fn generate_quiet(board: &mut Board, move_list: &mut MoveList) {
+    let mut pseudo = MoveList::new();
+
+    generate_all(board, GenType::Captures, &mut pseudo);
+    generate_all(board, GenType::QuietChecks, &mut pseudo);
+
+    for m in pseudo {
+        if is_legal_move(board, m) {
+            move_list.push(m);
+        }
+    }
+}
+
 const fn is_legal_move(board: &Board, m: u16) -> bool {
     let blockers = board.blockers(board.turn);
     let flag = BitMove::flag(m);

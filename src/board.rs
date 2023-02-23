@@ -175,9 +175,7 @@ impl Board {
         }
     }
 
-    pub fn make_move(&self, m: u16, target: &mut Board) {
-        *target = *self;
-
+    pub fn make_move(&mut self, m: u16) {
         let src = BitMove::src(m);
         let dest = BitMove::dest(m);
         let flag = BitMove::flag(m);
@@ -192,14 +190,14 @@ impl Board {
 
         // Remove all castling rights for the moving side when a king move occurs
         if piece_type == PieceType::King {
-            target.disable_castling(self.turn);
+            self.disable_castling(self.turn);
         }
 
         // Normal captures
         if is_cap && !is_ep {
             let cap_pt = self.piece_type(dest);
-            target.pos.captured_piece = cap_pt;
-            target.remove_piece(opp, cap_pt, dest);
+            self.pos.captured_piece = cap_pt;
+            self.remove_piece(opp, cap_pt, dest);
 
             // target.pos.key ^= Zobrist::piece(opp, cap_pt, dest);
         }
@@ -208,16 +206,16 @@ impl Board {
         if self.can_ep() {
             if is_ep {
                 let ep_pawn_sq = self.pos.ep_square - self.turn.pawn_dir();
-                target.remove_piece(opp, PieceType::Pawn, ep_pawn_sq);
+                self.remove_piece(opp, PieceType::Pawn, ep_pawn_sq);
                 // target.pos.key ^= Zobrist::piece(opp, PieceType::Pawn, dest);
             }
 
             // target.pos.key ^= Zobrist::ep(self.ep_file());
-            target.clear_ep();
+            self.clear_ep();
         }
 
         if flag == MoveFlag::DOUBLE_PAWN_PUSH {
-            target.set_ep(dest - self.turn.pawn_dir());
+            self.set_ep(dest - self.turn.pawn_dir());
             // target.pos.key ^= Zobrist::ep(self.ep_file());
         }
 
@@ -234,8 +232,8 @@ impl Board {
                 rook_target_sq = self.turn.castle_queen_sq() + 1;
             }
 
-            target.remove_piece(self.turn, PieceType::Rook, rook_sq);
-            target.add_piece(self.turn, PieceType::Rook, rook_target_sq);
+            self.remove_piece(self.turn, PieceType::Rook, rook_sq);
+            self.add_piece(self.turn, PieceType::Rook, rook_target_sq);
 
             // target.pos.key ^= Zobrist::piece(self.turn, PieceType::Rook, rook_sq);
             // target.pos.key ^= Zobrist::piece(self.turn, PieceType::Rook, rook_target_sq);
@@ -244,25 +242,25 @@ impl Board {
         // Promotion
         if is_prom {
             let prom_type = BitMove::prom_piece_type(flag);
-            target.add_piece(self.turn, prom_type, dest);
+            self.add_piece(self.turn, prom_type, dest);
             // target.pos.key ^= Zobrist::piece(self.turn, prom_type, dest);
         } else {
-            target.add_piece(self.turn, piece_type, dest);
+            self.add_piece(self.turn, piece_type, dest);
             // target.pos.key ^= Zobrist::piece(self.turn, piece_type, dest);
         }
 
-        if self.pos.castling != target.pos.castling {
-            target.pos.key ^= Zobrist::castle(target.pos.castling);
+        if self.pos.castling != self.pos.castling {
+            self.pos.key ^= Zobrist::castle(self.pos.castling);
         }
 
-        target.pos.key ^= Zobrist::side();
+        self.pos.key ^= Zobrist::side();
         // target.pos.key ^= Zobrist::piece(self.turn, piece_type, src);
 
-        target.remove_piece(self.turn, piece_type, src);
-        target.set_castling_from_move(m);
-        target.turn = self.turn.opp();
-        target.pos.ply += 1;
-        target.set_check_info();
+        self.remove_piece(self.turn, piece_type, src);
+        self.set_castling_from_move(m);
+        self.turn = self.turn.opp();
+        self.pos.ply += 1;
+        self.set_check_info();
     }
 
     pub fn set_castling_from_move(&mut self, m: u16) {
