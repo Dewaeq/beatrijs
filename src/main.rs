@@ -1,6 +1,22 @@
 #![allow(unused)]
 
-use beatrijs::{board::Board, perft::{perft, perft_all}, search::{Searcher, evaluate}};
+use crate::board::Board;
+use crate::perft::perft;
+
+mod gen;
+mod bitboard;
+mod bitmove;
+mod board;
+mod defs;
+mod history;
+mod makemove;
+mod movegen;
+mod movelist;
+mod perft;
+mod position;
+mod search;
+mod utils;
+mod zobrist;
 
 fn main() {
     let mut board = &mut Board::start_pos();
