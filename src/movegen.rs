@@ -434,3 +434,40 @@ const fn is_legal_move(board: &Board, m: u16) -> bool {
         }
     }
 }
+
+pub const fn smallest_attacker(board: &Board, sq: Square, side: Player) -> (PieceType, Square) {
+    let pawns = pawn_attacks(sq, side) & board.player_piece_bb(side, PieceType::Pawn);
+    if pawns != 0 {
+        return (PieceType::Pawn, BitBoard::bit_scan_forward(pawns));
+    }
+    let knights = knight_attacks(sq) & board.player_piece_bb(side, PieceType::Knight);
+    if knights != 0 {
+        return (PieceType::Knight, BitBoard::bit_scan_forward(knights));
+    }
+
+    let occ = board.occ_bb();
+
+    let bishop_moves = bishop_attacks(sq, occ);
+    let bishops = bishop_moves & board.player_piece_bb(side, PieceType::Bishop);
+    if bishops != 0 {
+        return (PieceType::Bishop, BitBoard::bit_scan_forward(bishops));
+    }
+
+    let rook_moves = rook_attacks(sq, occ);
+    let rooks = rook_moves & board.player_piece_bb(side, PieceType::Rook);
+    if rooks != 0 {
+        return (PieceType::Rook, BitBoard::bit_scan_forward(rooks));
+    }
+
+    let queens = (bishop_moves | rook_moves) & board.player_piece_bb(side, PieceType::Queen);
+    if queens != 0 {
+        return (PieceType::Queen, BitBoard::bit_scan_forward(queens));
+    }
+
+    let king = king_attacks(sq) & board.player_piece_bb(side, PieceType::King);
+    if king != 0 {
+        return (PieceType::King, BitBoard::bit_scan_forward(king));
+    }
+
+    (PieceType::None, 64)
+}

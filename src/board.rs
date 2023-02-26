@@ -1,12 +1,14 @@
+use std::cmp;
+
 use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
-        Castling, PieceType, Player, Square, BLACK_IDX, FEN_START_STRING, NUM_PIECES, NUM_SIDES,
-        NUM_SQUARES, WHITE_IDX,
+        Castling, PieceType, Player, Square, Value, BLACK_IDX, FEN_START_STRING, NUM_PIECES,
+        NUM_SIDES, NUM_SQUARES, WHITE_IDX,
     },
     gen::{attack::attacks, between::between},
-    movegen::attackers_to,
+    movegen::{attackers_to, smallest_attacker},
     position::Position,
     utils::square_from_string,
     zobrist::Zobrist,
@@ -266,6 +268,44 @@ impl Board {
         self.set_check_info();
     }
 
+    pub fn see_capture(&self, m: u16) -> i32 {
+        if !BitMove::is_cap(m) {
+            return 0;
+        }
+
+        let captured = self.piece_type(BitMove::src(m));
+
+        let mut new_board = *self;
+        new_board.make_move(m);
+
+        Value::piece_value(captured) - new_board.see(BitMove::dest(m))
+    }
+
+    fn see(&mut self, dest: Square) -> i32 {
+        let captured = self.piece_type(dest);
+        let (attacker, src) = smallest_attacker(&self, dest, self.turn);
+
+        if attacker != PieceType::None {
+            self.move_piece_cheap(src, dest, attacker, captured);
+            cmp::max(0, Value::piece_value(captured) - self.see(dest))
+        } else {
+            0
+        }
+    }
+
+    fn move_piece_cheap(
+        &mut self,
+        src: Square,
+        dest: Square,
+        piece_type: PieceType,
+        captured: PieceType,
+    ) {
+        self.remove_piece(self.turn, piece_type, src);
+        self.remove_piece(self.turn.opp(), captured, dest);
+        self.add_piece(self.turn, piece_type, dest);
+        self.turn = self.turn.opp();
+    }
+
     pub fn set_castling_from_move(&mut self, m: u16) {
         let src = BitMove::src(m);
         let dest = BitMove::dest(m);
@@ -516,6 +556,10 @@ impl std::fmt::Debug for Board {
         writeln!(f, "Key        : {}", self.pos.key)?;
         writeln!(f, "Castling   : {:b}", self.pos.castling)?;
         writeln!(f, "EP Square  : {}", self.pos.ep_square);
-        writeln!(f, "Checkers   :\n{}", BitBoard::pretty_string(self.pos.checkers_bb))
+        writeln!(
+            f,
+            "Checkers   :\n{}",
+            BitBoard::pretty_string(self.pos.checkers_bb)
+        )
     }
 }
