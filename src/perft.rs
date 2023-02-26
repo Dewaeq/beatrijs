@@ -79,10 +79,10 @@ fn inner_perft_all(board: &mut Board, depth: u8, perft: &mut PerftResult) {
                 }
             }
 
-            let new_board = &mut *board;
+            let mut new_board = board.clone();
             new_board.make_move(m);
 
-            inner_perft_all(new_board, depth - 1, perft);
+            inner_perft_all(&mut new_board, depth - 1, perft);
         }
     }
 }
