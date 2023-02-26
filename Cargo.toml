@@ -13,13 +13,8 @@ fastrand = "1.7.0"
 [profile.dev]
 overflow-checks = false
 
-# [profile.release]
-# lto = "fat"
-# codegen-units = 1
-# debug = false
-# split-debuginfo = '...'  # Platform-specific.
-# debug-assertions = false
-# overflow-checks = false
-# panic = 'unwind'
-# incremental = false
-# rpath = false
+[profile.release]
+lto = "fat"
+debug = false
+debug-assertions = false
+overflow-checks = false

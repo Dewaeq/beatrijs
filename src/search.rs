@@ -95,10 +95,6 @@ impl Searcher {
 
         let mut moves = MoveList::quiet(&mut self.board);
 
-        if moves.is_empty() {
-            return evaluate(&self.board);
-        }
-
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
             let m = moves.get(i);
