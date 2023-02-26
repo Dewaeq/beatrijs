@@ -82,6 +82,10 @@ fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board) {
         score = KILLER_1_BONUS;
     } else if board.pos.killers[1][ply] == m {
         score = KILLER_2_BONUS;
+    } else {
+        let piece = board.piece_type(BitMove::src(m));
+        let dest = BitMove::dest(m) as usize;
+        score = board.pos.history[piece.as_usize()][dest];
     }
 
     move_list.push(m, score);

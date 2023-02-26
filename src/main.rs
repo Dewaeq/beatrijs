@@ -34,7 +34,7 @@ fn main() {
     let start = Instant::now();
 
     let mut searcher = Searcher::new(board.clone());
-    let score = searcher.search(8);
+    let score = searcher.search(9);
     let end = start.elapsed();
 
     println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);

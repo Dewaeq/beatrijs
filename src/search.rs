@@ -63,6 +63,7 @@ impl Searcher {
             self.board.make_move(m);
             let score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha);
             old_board.pos.killers = self.board.pos.killers;
+            old_board.pos.history = self.board.pos.history;
             self.board = old_board;
 
             if score >= beta {
@@ -76,6 +77,12 @@ impl Searcher {
             }
             if score > alpha {
                 alpha = score;
+
+                if ! BitMove::is_cap(m) {
+                    let piece = self.board.piece_type(BitMove::src(m));
+                    let dest = BitMove::dest(m) as usize;
+                    self.board.pos.history[piece.as_usize()][dest] += depth as i32;
+                }
             }
         }
 

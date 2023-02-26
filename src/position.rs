@@ -1,4 +1,4 @@
-use crate::defs::{Castling, PieceType, Square, MAX_MOVES, NUM_PIECES, NUM_SIDES};
+use crate::defs::{Castling, PieceType, Square, MAX_MOVES, NUM_PIECES, NUM_SIDES, NUM_SQUARES};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Position {
@@ -31,6 +31,8 @@ pub struct Position {
     pub captured_piece: PieceType,
     /// Quiet moves that caused a beta-cutoff, used for ordering
     pub killers: [[u16; MAX_MOVES]; 2],
+    /// Quiet moves that raised alpha, used for ordering
+    pub history: [[i32; NUM_SQUARES]; NUM_PIECES],
 }
 
 impl Position {
@@ -46,6 +48,7 @@ impl Position {
             check_squares: [0; NUM_PIECES],
             captured_piece: PieceType::None,
             killers: [[0; MAX_MOVES]; 2],
+            history: [[0; NUM_SQUARES]; NUM_PIECES],
         }
     }
 }
