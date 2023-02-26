@@ -26,7 +26,11 @@ impl Searcher {
         self.negamax(depth, 0, i32::MIN + 1, i32::MAX - 1)
     }
 
-    fn negamax(&mut self, depth: u8, ply_from_root: u8, mut alpha: i32, mut beta: i32) -> i32 {
+    fn negamax(&mut self, mut depth: u8, ply_from_root: u8, mut alpha: i32, mut beta: i32) -> i32 {
+        if depth == 0 {
+            return self.quiesence(alpha, beta);
+        }
+        
         self.num_nodes += 1;
 
         if ply_from_root > 0 {
@@ -40,11 +44,14 @@ impl Searcher {
 
         let mut moves = MoveList::legal(&mut self.board);
         if moves.is_empty() {
-            return -IMMEDIATE_MATE_SCORE + ply_from_root as i32;
+            if self.board.in_check() {
+                return -IMMEDIATE_MATE_SCORE + ply_from_root as i32;
+            }
+            return 0;
         }
 
-        if depth == 0 {
-            return self.quiesence(alpha, beta);
+        if self.board.in_check() {
+            depth += 1;
         }
 
         order_moves(&mut moves, &self.board);
@@ -80,7 +87,7 @@ impl Searcher {
         let mut moves = MoveList::quiet(&mut self.board);
 
         if moves.is_empty() {
-            return -IMMEDIATE_MATE_SCORE;
+            return evaluate(&self.board);
         }
 
         order_moves(&mut moves, &self.board);
