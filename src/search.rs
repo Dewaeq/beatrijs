@@ -1,7 +1,8 @@
 use crate::{
     board::Board,
-    defs::{PieceType, Player},
+    defs::{PieceType, Player, Value},
     movelist::MoveList,
+    order::order_moves,
 };
 use std::cmp;
 
@@ -37,7 +38,7 @@ impl Searcher {
             }
         }
 
-        let moves = MoveList::legal(&mut self.board);
+        let mut moves = MoveList::legal(&mut self.board);
         if moves.is_empty() {
             return -IMMEDIATE_MATE_SCORE + ply_from_root as i32;
         }
@@ -46,12 +47,12 @@ impl Searcher {
             return self.quiesence(alpha, beta);
         }
 
+        order_moves(&mut moves, &self.board);
+
         for m in moves {
-            let old_board = *&self.board;
+            let old_board = self.board.clone();
             self.board.make_move(m);
-
             let score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha);
-
             self.board = old_board;
 
             if score >= beta {
@@ -76,9 +77,16 @@ impl Searcher {
             alpha = stand_pat;
         }
 
-        let moves = MoveList::quiet(&mut self.board);
+        let mut moves = MoveList::quiet(&mut self.board);
+
+        if moves.is_empty() {
+            return -IMMEDIATE_MATE_SCORE;
+        }
+
+        order_moves(&mut moves, &self.board);
+
         for m in moves {
-            let old_board = *&self.board;
+            let old_board = self.board.clone();
             self.board.make_move(m);
             let score = -self.quiesence(-beta, -alpha);
             self.board = old_board;
@@ -110,11 +118,11 @@ pub fn evaluate(board: &Board) -> i32 {
 
 fn count_material(board: &Board, side: Player) -> i32 {
     let mut score = 0;
-    score += board.player_piece_bb(side, PieceType::Pawn).count_ones() * 100;
-    score += board.player_piece_bb(side, PieceType::Knight).count_ones() * 300;
-    score += board.player_piece_bb(side, PieceType::Bishop).count_ones() * 320;
-    score += board.player_piece_bb(side, PieceType::Rook).count_ones() * 520;
-    score += board.player_piece_bb(side, PieceType::Queen).count_ones() * 900;
+    score += board.player_piece_bb(side, PieceType::Pawn).count_ones() as i32 * Value::PAWN;
+    score += board.player_piece_bb(side, PieceType::Knight).count_ones() as i32 * Value::KNIGHT;
+    score += board.player_piece_bb(side, PieceType::Bishop).count_ones() as i32 * Value::BISHOP;
+    score += board.player_piece_bb(side, PieceType::Rook).count_ones() as i32 * Value::ROOK;
+    score += board.player_piece_bb(side, PieceType::Queen).count_ones() as i32 * Value::QUEEN;
 
     score as i32
 }
