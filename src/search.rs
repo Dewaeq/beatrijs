@@ -1,9 +1,9 @@
 use crate::{
     bitmove::BitMove,
     board::Board,
-    defs::{PieceType, Player, Value},
+    defs::{Piece, Player, Value},
     movelist::MoveList,
-    order::pick_next_move,
+    order::pick_next_move, bitboard::BitBoard,
 };
 use std::cmp;
 
@@ -131,11 +131,12 @@ pub fn evaluate(board: &Board) -> i32 {
 
 fn count_material(board: &Board, side: Player) -> i32 {
     let mut score = 0;
-    score += board.player_piece_bb(side, PieceType::Pawn).count_ones() as i32 * Value::PAWN;
-    score += board.player_piece_bb(side, PieceType::Knight).count_ones() as i32 * Value::KNIGHT;
-    score += board.player_piece_bb(side, PieceType::Bishop).count_ones() as i32 * Value::BISHOP;
-    score += board.player_piece_bb(side, PieceType::Rook).count_ones() as i32 * Value::ROOK;
-    score += board.player_piece_bb(side, PieceType::Queen).count_ones() as i32 * Value::QUEEN;
+
+    score += BitBoard::count(board.player_piece_bb(side, Piece::Pawn)) as i32 * Value::PAWN;
+    score += BitBoard::count(board.player_piece_bb(side, Piece::Knight)) as i32 * Value::KNIGHT;
+    score += BitBoard::count(board.player_piece_bb(side, Piece::Bishop)) as i32 * Value::BISHOP;
+    score += BitBoard::count(board.player_piece_bb(side, Piece::Rook)) as i32 * Value::ROOK;
+    score += BitBoard::count(board.player_piece_bb(side, Piece::Queen)) as i32 * Value::QUEEN;
 
     score as i32
 }

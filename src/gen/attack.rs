@@ -1,6 +1,6 @@
 use crate::{
     bitboard::BitBoard,
-    defs::{Dir, Player, Square, DIRS, PieceType},
+    defs::{Dir, Player, Square, DIRS, Piece},
     gen::ray::ray,
     utils::{b_max, coord_from_square, is_in_board},
 };
@@ -11,14 +11,14 @@ pub const PAWN_ATK: [[u64; 64]; 2] = gen_pawn();
 
 /// Attacks for a given piece on a given square
 #[inline]
-pub const fn attacks(piece_type: PieceType, sq: Square, occ: u64, side: Player) -> u64 {
-    match piece_type {
-        PieceType::Pawn => pawn_attacks(sq, side),
-        PieceType::Knight => knight_attacks(sq),
-        PieceType::Bishop => bishop_attacks(sq, occ),
-        PieceType::Rook => rook_attacks(sq, occ),
-        PieceType::Queen => bishop_attacks(sq, occ) | rook_attacks(sq, occ),
-        PieceType::King => king_attacks(sq),
+pub const fn attacks(piece: Piece, sq: Square, occ: u64, side: Player) -> u64 {
+    match piece {
+        Piece::Pawn => pawn_attacks(sq, side),
+        Piece::Knight => knight_attacks(sq),
+        Piece::Bishop => bishop_attacks(sq, occ),
+        Piece::Rook => rook_attacks(sq, occ),
+        Piece::Queen => bishop_attacks(sq, occ) | rook_attacks(sq, occ),
+        Piece::King => king_attacks(sq),
         _ => 0,
     }
 }

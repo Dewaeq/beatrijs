@@ -109,6 +109,16 @@ impl BitBoard {
         unsafe { *INDEX_64.get_unchecked(((bb * DEBRUIJN_64) >> 58) as usize) }
     }
 
+    pub const fn count(mut bb: u64) -> u32 {
+        let mut count = 0;
+        while bb != 0 {
+            bb &= bb - 1;
+            count += 1;
+        }
+
+        count
+    }
+
     #[allow(dead_code)]
     pub fn pretty_string(bb: u64) -> String {
         let mut output = String::new();

@@ -2,7 +2,7 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     board::Board,
-    defs::{GenType, PieceType, Player, Square},
+    defs::{GenType, Piece, Player, Square},
     gen::{
         attack::{
             attacks, bishop_attacks, king_attacks, knight_attacks, pawn_attacks, rook_attacks,
@@ -21,12 +21,12 @@ const KILLER_2_BONUS: i32 = 800_000;
 /// Bitboard of all the pieces that are attacking `square`
 #[inline]
 pub const fn attackers_to(board: &Board, sq: Square, occupied: u64) -> u64 {
-    pawn_attacks(sq, Player::White) & board.player_piece_bb(Player::Black, PieceType::Pawn)
-        | pawn_attacks(sq, Player::Black) & board.player_piece_bb(Player::White, PieceType::Pawn)
-        | knight_attacks(sq) & board.piece_bb(PieceType::Knight)
-        | bishop_attacks(sq, occupied) & board.piece_like_bb(PieceType::Bishop)
-        | rook_attacks(sq, occupied) & board.piece_like_bb(PieceType::Rook)
-        | king_attacks(sq) & board.piece_bb(PieceType::King)
+    pawn_attacks(sq, Player::White) & board.player_piece_bb(Player::Black, Piece::Pawn)
+        | pawn_attacks(sq, Player::Black) & board.player_piece_bb(Player::White, Piece::Pawn)
+        | knight_attacks(sq) & board.piece_bb(Piece::Knight)
+        | bishop_attacks(sq, occupied) & board.piece_like_bb(Piece::Bishop)
+        | rook_attacks(sq, occupied) & board.piece_like_bb(Piece::Rook)
+        | king_attacks(sq) & board.piece_bb(Piece::King)
 }
 
 pub const fn is_square_attacked(
@@ -88,8 +88,8 @@ fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board) {
 }
 
 fn add_capture_move(m: u16, move_list: &mut MoveList, board: &Board) {
-    let move_piece = board.piece_type(BitMove::src(m));
-    let cap_piece = board.piece_type(BitMove::dest(m));
+    let move_piece = board.piece(BitMove::src(m));
+    let cap_piece = board.piece(BitMove::dest(m));
 
     let score = MVV_LVA[move_piece.as_usize()][cap_piece.as_usize()] + CAPTURE_BONUS;
     move_list.push(m, score);
@@ -167,7 +167,7 @@ fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mu
     let rank_3 = board.turn.rank_3();
     let rank_7 = board.turn.rank_7();
 
-    let pawns = board.player_piece_bb(board.turn, PieceType::Pawn);
+    let pawns = board.player_piece_bb(board.turn, Piece::Pawn);
     let pwn_rank_7 = pawns & rank_7;
     let pwn_not_rank_7 = pawns & !rank_7;
 
@@ -278,22 +278,22 @@ fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mu
 // Generate sliding and knight moves
 fn gen_piece_moves(
     board: &Board,
-    piece_type: PieceType,
+    piece: Piece,
     target: u64,
     checks: bool,
     move_list: &mut MoveList,
 ) {
-    let mut piece_bb = board.player_piece_bb(board.turn, piece_type);
+    let mut piece_bb = board.player_piece_bb(board.turn, piece);
     while piece_bb != 0 {
         let sq = BitBoard::pop_lsb(&mut piece_bb);
-        let mut bb = attacks(piece_type, sq, board.occ_bb(), board.turn) & target;
+        let mut bb = attacks(piece, sq, board.occ_bb(), board.turn) & target;
 
         if checks {
             // Moving a blocker also causes check
-            if piece_type == PieceType::Queen
+            if piece == Piece::Queen
                 || board.pos.king_blockers[board.turn.opp().as_usize()] & BitBoard::from_sq(sq) == 0
             {
-                bb &= board.pos.check_squares[piece_type.as_usize()];
+                bb &= board.pos.check_squares[piece.as_usize()];
             }
         }
 
@@ -323,10 +323,10 @@ fn generate_all(board: &Board, gen_type: GenType, move_list: &mut MoveList) {
         };
 
         gen_pawn_moves(board, target_bb, &gen_type, move_list);
-        gen_piece_moves(board, PieceType::Knight, target_bb, checks, move_list);
-        gen_piece_moves(board, PieceType::Bishop, target_bb, checks, move_list);
-        gen_piece_moves(board, PieceType::Rook, target_bb, checks, move_list);
-        gen_piece_moves(board, PieceType::Queen, target_bb, checks, move_list);
+        gen_piece_moves(board, Piece::Knight, target_bb, checks, move_list);
+        gen_piece_moves(board, Piece::Bishop, target_bb, checks, move_list);
+        gen_piece_moves(board, Piece::Rook, target_bb, checks, move_list);
+        gen_piece_moves(board, Piece::Queen, target_bb, checks, move_list);
     }
 
     if !checks || BitBoard::contains(board.blockers(board.turn.opp()), king_sq) {
@@ -470,8 +470,8 @@ const fn is_legal_move(board: &Board, m: u16) -> bool {
             let cap_sq = board.pos.ep_square - board.turn.pawn_dir();
             let occ = board.occ_bb() ^ BitBoard::from_sq(src) ^ BitBoard::from_sq(cap_sq)
                 | BitBoard::from_sq(dest);
-            let bishop_like_bb = board.player_piece_like_bb(board.turn.opp(), PieceType::Bishop);
-            let rook_like_bb = board.player_piece_like_bb(board.turn.opp(), PieceType::Rook);
+            let bishop_like_bb = board.player_piece_like_bb(board.turn.opp(), Piece::Bishop);
+            let rook_like_bb = board.player_piece_like_bb(board.turn.opp(), Piece::Rook);
 
             bishop_attacks(king_sq, occ) & bishop_like_bb == 0
                 && rook_attacks(king_sq, occ) & rook_like_bb == 0
@@ -483,39 +483,39 @@ const fn is_legal_move(board: &Board, m: u16) -> bool {
     }
 }
 
-pub const fn smallest_attacker(board: &Board, sq: Square, side: Player) -> (PieceType, Square) {
-    let pawns = pawn_attacks(sq, side) & board.player_piece_bb(side, PieceType::Pawn);
+pub const fn smallest_attacker(board: &Board, sq: Square, side: Player) -> (Piece, Square) {
+    let pawns = pawn_attacks(sq, side) & board.player_piece_bb(side, Piece::Pawn);
     if pawns != 0 {
-        return (PieceType::Pawn, BitBoard::bit_scan_forward(pawns));
+        return (Piece::Pawn, BitBoard::bit_scan_forward(pawns));
     }
-    let knights = knight_attacks(sq) & board.player_piece_bb(side, PieceType::Knight);
+    let knights = knight_attacks(sq) & board.player_piece_bb(side, Piece::Knight);
     if knights != 0 {
-        return (PieceType::Knight, BitBoard::bit_scan_forward(knights));
+        return (Piece::Knight, BitBoard::bit_scan_forward(knights));
     }
 
     let occ = board.occ_bb();
 
     let bishop_moves = bishop_attacks(sq, occ);
-    let bishops = bishop_moves & board.player_piece_bb(side, PieceType::Bishop);
+    let bishops = bishop_moves & board.player_piece_bb(side, Piece::Bishop);
     if bishops != 0 {
-        return (PieceType::Bishop, BitBoard::bit_scan_forward(bishops));
+        return (Piece::Bishop, BitBoard::bit_scan_forward(bishops));
     }
 
     let rook_moves = rook_attacks(sq, occ);
-    let rooks = rook_moves & board.player_piece_bb(side, PieceType::Rook);
+    let rooks = rook_moves & board.player_piece_bb(side, Piece::Rook);
     if rooks != 0 {
-        return (PieceType::Rook, BitBoard::bit_scan_forward(rooks));
+        return (Piece::Rook, BitBoard::bit_scan_forward(rooks));
     }
 
-    let queens = (bishop_moves | rook_moves) & board.player_piece_bb(side, PieceType::Queen);
+    let queens = (bishop_moves | rook_moves) & board.player_piece_bb(side, Piece::Queen);
     if queens != 0 {
-        return (PieceType::Queen, BitBoard::bit_scan_forward(queens));
+        return (Piece::Queen, BitBoard::bit_scan_forward(queens));
     }
 
-    let king = king_attacks(sq) & board.player_piece_bb(side, PieceType::King);
+    let king = king_attacks(sq) & board.player_piece_bb(side, Piece::King);
     if king != 0 {
-        return (PieceType::King, BitBoard::bit_scan_forward(king));
+        return (Piece::King, BitBoard::bit_scan_forward(king));
     }
 
-    (PieceType::None, 64)
+    (Piece::None, 64)
 }

@@ -83,7 +83,7 @@ impl Player {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum PieceType {
+pub enum Piece {
     Pawn,
     Knight,
     Bishop,
@@ -93,88 +93,20 @@ pub enum PieceType {
     None,
 }
 
-impl PieceType {
+impl Piece {
     /// Constant function to use PieceType as an index in constant contexts
     pub const fn as_usize(self) -> usize {
         match self {
-            PieceType::Pawn => 0,
-            PieceType::Knight => 1,
-            PieceType::Bishop => 2,
-            PieceType::Rook => 3,
-            PieceType::Queen => 4,
-            PieceType::King => 5,
-            PieceType::None => 6,
+            Piece::Pawn => 0,
+            Piece::Knight => 1,
+            Piece::Bishop => 2,
+            Piece::Rook => 3,
+            Piece::Queen => 4,
+            Piece::King => 5,
+            Piece::None => 6,
         }
     }
 }
-
-/* #[derive(Clone, Copy)]
-pub enum Piece {
-    WhitePawn,
-    BlackPawn,
-    WhiteKnight,
-    BlackKnight,
-    WhiteBishop,
-    BlackBishop,
-    WhiteRook,
-    BlackRook,
-    WhiteQueen,
-    BlackQueen,
-    WhiteKing,
-    BlackKing,
-    None,
-}
-
-impl Piece {
-    pub const fn from_piece_type(piece_type: PieceType, side: Player) -> Self {
-        match piece_type {
-            PieceType::None => Piece::None,
-            PieceType::Pawn => match side {
-                Player::White => Piece::WhitePawn,
-                _ => Piece::BlackPawn,
-            },
-            PieceType::Knight => match side {
-                Player::White => Piece::WhiteKnight,
-                _ => Piece::BlackKnight,
-            },
-            PieceType::Bishop => match side {
-                Player::White => Piece::WhiteBishop,
-                _ => Piece::BlackBishop,
-            },
-            PieceType::Rook => match side {
-                Player::White => Piece::WhiteRook,
-                _ => Piece::BlackRook,
-            },
-            PieceType::Queen => match side {
-                Player::White => Piece::WhiteQueen,
-                _ => Piece::BlackQueen,
-            },
-            PieceType::King => match side {
-                Player::White => Piece::WhiteKing,
-                _ => Piece::BlackKing,
-            },
-        }
-    }
-
-    pub const fn to_string(&self) -> &str {
-        match self {
-            Piece::WhitePawn => "P",
-            Piece::BlackPawn => "p",
-            Piece::WhiteKnight => "N",
-            Piece::BlackKnight => "n",
-            Piece::WhiteBishop => "B",
-            Piece::BlackBishop => "b",
-            Piece::WhiteRook => "R",
-            Piece::BlackRook => "r",
-            Piece::WhiteQueen => "Q",
-            Piece::BlackQueen => "q",
-            Piece::WhiteKing => "K",
-            Piece::BlackKing => "k",
-            Piece::None => " ",
-        }
-    }
-}
- */
 
 /// Rook directions are 0-3
 ///
@@ -220,15 +152,15 @@ impl Value {
     pub const ROOK: i32 = 520;
     pub const QUEEN: i32 = 900;
 
-    pub const fn piece_value(piece: PieceType) -> i32 {
+    pub const fn of(piece: Piece) -> i32 {
         match piece {
-            PieceType::Pawn => Value::PAWN,
-            PieceType::Knight => Value::KNIGHT,
-            PieceType::Bishop => Value::BISHOP,
-            PieceType::Rook => Value::ROOK,
-            PieceType::Queen => Value::QUEEN,
-            PieceType::King => 0,
-            PieceType::None => 0,
+            Piece::Pawn => Value::PAWN,
+            Piece::Knight => Value::KNIGHT,
+            Piece::Bishop => Value::BISHOP,
+            Piece::Rook => Value::ROOK,
+            Piece::Queen => Value::QUEEN,
+            Piece::King => 0,
+            Piece::None => 0,
         }
     }
 }
