@@ -72,6 +72,7 @@ fn make_promotions(
     let flag = if capture { MoveFlag::CAPTURE } else { 0 };
 
     if gen_type == &GenType::Captures
+        || gen_type == &GenType::EvadingCaptures
         || gen_type == &GenType::Evasions
         || gen_type == &GenType::NonEvasions
     {
@@ -133,13 +134,13 @@ fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mu
     let pwn_not_rank_7 = pawns & !rank_7;
 
     // Quiet pushes
-    if gen_type != &GenType::Captures {
+    if gen_type != &GenType::Captures && gen_type != &GenType::EvadingCaptures {
         // One square forward
         let mut m1 = pawn_push(pwn_not_rank_7, board.turn) & !occ;
         // Double pawn push
         let mut m2 = pawn_push(m1 & rank_3, board.turn) & !occ;
 
-        if gen_type == &GenType::Evasions {
+        if gen_type == &GenType::Evasions || gen_type == &GenType::EvadingCaptures {
             m1 &= target;
             m2 &= target;
         } else if gen_type == &GenType::QuietChecks {
@@ -172,7 +173,7 @@ fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mu
         // Capture west of pawn
         let mut m2 = pawn_cap_west(pwn_not_rank_7, board.turn) & opp_bb;
 
-        if gen_type == &GenType::Evasions {
+        if gen_type == &GenType::Evasions || gen_type == &GenType::EvadingCaptures {
             m1 &= board.pos.checkers_bb;
             m2 &= board.pos.checkers_bb;
         }
@@ -211,7 +212,7 @@ fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mu
         // Promotion by capturing west of pawn
         let mut m3 = pawn_cap_west(pwn_rank_7, board.turn) & opp_bb;
 
-        if gen_type == &GenType::Evasions {
+        if gen_type == &GenType::Evasions || gen_type == &GenType::EvadingCaptures {
             m1 &= target;
             m2 &= target;
             m3 &= target;
@@ -251,7 +252,9 @@ fn gen_piece_moves(
 
         if checks {
             // Moving a blocker also causes check
-            if board.pos.king_blockers[board.turn.opp()] & BitBoard::from_sq(sq) == 0 {
+            if piece_type == PieceType::Queen
+                || board.pos.king_blockers[board.turn.opp()] & BitBoard::from_sq(sq) == 0
+            {
                 bb &= board.pos.check_squares[piece_type];
             }
         }
@@ -267,10 +270,15 @@ fn generate_all(board: &Board, gen_type: GenType, move_list: &mut MoveList) {
     let mut target_bb = BitBoard::EMPTY;
 
     // Don' t generate piece moves in double check
-    if !BitBoard::more_than_one(board.pos.checkers_bb) {
+    if (gen_type != GenType::Evasions && gen_type != GenType::EvadingCaptures)
+        || !BitBoard::more_than_one(board.pos.checkers_bb)
+    {
         target_bb = match gen_type {
-            // Panics if checkers_bb is empty
             GenType::Evasions => between(king_sq, checker_sq) | BitBoard::from_sq(checker_sq),
+            GenType::EvadingCaptures => {
+                (between(king_sq, checker_sq) | BitBoard::from_sq(checker_sq))
+                    & board.player_bb(board.turn.opp())
+            }
             GenType::NonEvasions => !board.cur_player_bb(),
             GenType::Captures => board.player_bb(board.turn.opp()),
             GenType::Quiets | GenType::QuietChecks => !board.occ_bb(),
@@ -308,7 +316,10 @@ fn generate_all(board: &Board, gen_type: GenType, move_list: &mut MoveList) {
         }
 
         // Castling
-        if !board.in_check() && board.can_castle(board.turn) {
+        if (gen_type == GenType::Quiets || gen_type == GenType::NonEvasions)
+            && !board.in_check()
+            && board.can_castle(board.turn)
+        {
             let occ = board.occ_bb();
             if board.can_castle_king(board.turn)
                 && !BitBoard::contains(occ, king_sq + 1)
@@ -339,10 +350,10 @@ fn generate_all(board: &Board, gen_type: GenType, move_list: &mut MoveList) {
 pub fn generate_legal(board: &mut Board, move_list: &mut MoveList) {
     let mut pseudo = MoveList::new();
 
-    if board.pos.checkers_bb == 0 {
-        generate_all(board, GenType::NonEvasions, &mut pseudo);
-    } else {
+    if board.in_check() {
         generate_all(board, GenType::Evasions, &mut pseudo);
+    } else {
+        generate_all(board, GenType::NonEvasions, &mut pseudo);
     }
 
     for m in pseudo {
@@ -355,8 +366,12 @@ pub fn generate_legal(board: &mut Board, move_list: &mut MoveList) {
 pub fn generate_quiet(board: &mut Board, move_list: &mut MoveList) {
     let mut pseudo = MoveList::new();
 
-    generate_all(board, GenType::Captures, &mut pseudo);
-    generate_all(board, GenType::QuietChecks, &mut pseudo);
+    if board.in_check() {
+        generate_all(board, GenType::EvadingCaptures, &mut pseudo);
+    } else {
+        generate_all(board, GenType::Captures, &mut pseudo);
+        generate_all(board, GenType::QuietChecks, &mut pseudo);
+    }
 
     for m in pseudo {
         if is_legal_move(board, m) {
