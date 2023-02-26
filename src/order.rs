@@ -13,7 +13,10 @@ pub fn order_moves(moves: &mut MoveList, board: &Board) {
             let move_piece = board.piece_type(BitMove::src(m));
             let cap_piece = board.piece_type(BitMove::dest(m));
 
-            moves.set_score(i,  100 * Value::piece_value(cap_piece) - Value::piece_value(move_piece));
+            moves.set_score(
+                i,
+                100 * Value::piece_value(cap_piece) - Value::piece_value(move_piece),
+            );
         }
     }
 
@@ -21,7 +24,13 @@ pub fn order_moves(moves: &mut MoveList, board: &Board) {
 }
 
 pub fn order_quiets(moves: &mut MoveList, board: &Board) {
+    for i in 0..moves.size() {
+        let m = moves.get(i);
+        let s = board.see_capture(m);
+        moves.set_score(i, board.see_capture(m));
+    }
 
+    sort_moves(moves)
 }
 
 /// Selection sort

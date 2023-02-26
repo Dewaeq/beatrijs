@@ -2,7 +2,7 @@ use crate::{
     board::Board,
     defs::{PieceType, Player, Value},
     movelist::MoveList,
-    order::order_moves,
+    order::{order_moves, order_quiets},
 };
 use std::cmp;
 
@@ -83,7 +83,7 @@ impl Searcher {
             return -IMMEDIATE_MATE_SCORE;
         }
 
-        order_moves(&mut moves, &self.board);
+        order_quiets(&mut moves, &self.board);
 
         for m in moves {
             let old_board = self.board.clone();

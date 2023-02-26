@@ -273,8 +273,7 @@ impl Board {
             return 0;
         }
 
-        let captured = self.piece_type(BitMove::src(m));
-
+        let captured = self.piece_type(BitMove::dest(m));
         let mut new_board = *self;
         new_board.make_move(m);
 
