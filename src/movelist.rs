@@ -42,6 +42,14 @@ impl MoveList {
     pub const fn get(&self, index: usize) -> u16 {
         self.moves[index]
     }
+
+    pub const fn get_score(&self, index: usize) -> i32 {
+        self.scores[index]
+    }
+
+    pub fn set_score(&mut self, index: usize, score: i32) {
+        self.scores[index] = score
+    }
     
     pub fn swap(&mut self, a: usize, b: usize) {
         unsafe {
