@@ -110,7 +110,7 @@ impl BitBoard {
     }
 
     #[allow(dead_code)]
-    pub fn print_bitboard(bb: u64) {
+    pub fn pretty_string(bb: u64) -> String {
         let mut output = String::new();
         for y in 0..8 {
             for x in 0..8 {
@@ -123,6 +123,6 @@ impl BitBoard {
                 }
             }
         }
-        println!("{}", output);
+        output
     }
 }

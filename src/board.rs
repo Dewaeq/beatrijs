@@ -141,9 +141,11 @@ impl Board {
         let occ = self.occ_bb();
         let us_bb = self.cur_player_bb();
         let opp_bb = self.player_bb(opp);
-
         let king_sq = self.cur_king_square();
         let opp_king_sq = self.king_square(opp);
+
+        assert!(king_sq < 64);
+        assert!(opp_king_sq < 64);
 
         // Reset checkers and pinners
         self.pos.checkers_bb = 0;
@@ -187,6 +189,7 @@ impl Board {
         let opp = self.turn.opp();
 
         assert!(piece_type != PieceType::None);
+        assert!(src != dest);
 
         // Remove all castling rights for the moving side when a king move occurs
         if piece_type == PieceType::King {
@@ -512,6 +515,7 @@ impl std::fmt::Debug for Board {
         writeln!(f, "Ply        : {}", self.pos.ply)?;
         writeln!(f, "Key        : {}", self.pos.key)?;
         writeln!(f, "Castling   : {:b}", self.pos.castling)?;
-        writeln!(f, "EP Square  : {}", self.pos.ep_square)
+        writeln!(f, "EP Square  : {}", self.pos.ep_square);
+        writeln!(f, "Checkers   :\n{}", BitBoard::pretty_string(self.pos.checkers_bb))
     }
 }
