@@ -83,7 +83,7 @@ impl Searcher {
             return -IMMEDIATE_MATE_SCORE;
         }
 
-        order_quiets(&mut moves, &self.board);
+        order_moves(&mut moves, &self.board);
 
         for m in moves {
             let old_board = self.board.clone();
