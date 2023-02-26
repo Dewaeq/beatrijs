@@ -1,4 +1,5 @@
 #![allow(unused)]
+#![feature(const_slice_index)]
 
 use std::time::Instant;
 

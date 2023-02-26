@@ -27,11 +27,11 @@ pub struct Board {
 impl Board {
     /// Get the [`PieceType`] of the piece on the provided square
     pub const fn piece_type(&self, square: Square) -> PieceType {
-        self.pieces[square as usize]
+        unsafe { *self.pieces.get_unchecked(square as usize) }
     }
 
     pub const fn occ_bb(&self) -> u64 {
-        self.side_bb[0] | self.side_bb[1]
+        unsafe { *self.side_bb.get_unchecked(0) | *self.side_bb.get_unchecked(1) }
     }
 
     pub const fn cur_player_bb(&self) -> u64 {
@@ -39,14 +39,16 @@ impl Board {
     }
 
     pub const fn player_bb(&self, side: Player) -> u64 {
-        match side {
-            Player::White => self.side_bb[WHITE_IDX],
-            _ => self.side_bb[BLACK_IDX],
+        unsafe {
+            match side {
+                Player::White => *self.side_bb.get_unchecked(WHITE_IDX),
+                _ => *self.side_bb.get_unchecked(BLACK_IDX),
+            }
         }
     }
 
     pub const fn piece_bb(&self, piece_type: PieceType) -> u64 {
-        self.piece_bb[piece_type.as_usize()]
+        unsafe { *self.piece_bb.get_unchecked(piece_type.as_usize()) }
     }
 
     /// Get a piece-like bitboard.
@@ -110,7 +112,7 @@ impl Board {
     }
 
     pub const fn blockers(&self, side: Player) -> u64 {
-        self.pos.king_blockers[side.as_usize()]
+        unsafe { *self.pos.king_blockers.get_unchecked(side.as_usize()) }
     }
 
     pub fn slider_blockers(&self, sq: Square, us_bb: u64, opp_bb: u64) -> u64 {
@@ -155,20 +157,46 @@ impl Board {
 
         self.pos.checkers_bb = attackers_to(self, king_sq, occ) & self.player_bb(opp);
 
-        self.pos.king_blockers[self.turn.as_usize()] = self.slider_blockers(king_sq, us_bb, opp_bb);
-        self.pos.king_blockers[opp.as_usize()] = self.slider_blockers(opp_king_sq, opp_bb, us_bb);
+        unsafe {
+            *self
+                .pos
+                .king_blockers
+                .get_unchecked_mut(self.turn.as_usize()) =
+                self.slider_blockers(king_sq, us_bb, opp_bb);
+            *self.pos.king_blockers.get_unchecked_mut(opp.as_usize()) =
+                self.slider_blockers(opp_king_sq, us_bb, opp_bb);
 
-        self.pos.check_squares[PieceType::Pawn.as_usize()] =
-            attacks(PieceType::Pawn, opp_king_sq, 0, self.turn);
-        self.pos.check_squares[PieceType::Knight.as_usize()] =
-            attacks(PieceType::Knight, opp_king_sq, 0, self.turn);
-        self.pos.check_squares[PieceType::Bishop.as_usize()] =
-            attacks(PieceType::Bishop, opp_king_sq, occ, self.turn);
-        self.pos.check_squares[PieceType::Rook.as_usize()] =
-            attacks(PieceType::Rook, opp_king_sq, occ, self.turn);
-        self.pos.check_squares[PieceType::Queen.as_usize()] = self.pos.check_squares
-            [PieceType::Bishop.as_usize()]
-            | self.pos.check_squares[PieceType::Rook.as_usize()];
+            self.set_check_squares(
+                PieceType::Pawn,
+                attacks(PieceType::Pawn, opp_king_sq, 0, self.turn),
+            );
+            self.set_check_squares(
+                PieceType::Knight,
+                attacks(PieceType::Knight, opp_king_sq, 0, self.turn),
+            );
+            self.set_check_squares(
+                PieceType::Bishop,
+                attacks(PieceType::Bishop, opp_king_sq, occ, self.turn),
+            );
+            self.set_check_squares(
+                PieceType::Rook,
+                attacks(PieceType::Rook, opp_king_sq, occ, self.turn),
+            );
+            self.set_check_squares(
+                PieceType::Queen,
+                self.pos
+                    .check_squares
+                    .get_unchecked(PieceType::Bishop.as_usize())
+                    | self
+                        .pos
+                        .check_squares
+                        .get_unchecked(PieceType::Rook.as_usize()),
+            );
+        }
+    }
+
+    fn set_check_squares(&mut self, piece: PieceType, bb: u64) {
+        unsafe { *self.pos.check_squares.get_unchecked_mut(piece.as_usize()) = bb }
     }
 
     /// Removes castling permissions for the given side
@@ -342,36 +370,34 @@ impl Board {
         self.pos.ep_square = 64;
     }
 
-    pub fn add_piece(&mut self, side: Player, piece_type: PieceType, sq: Square) {
-        assert!(piece_type != PieceType::None);
+    pub fn add_piece(&mut self, side: Player, piece: PieceType, sq: Square) {
+        assert!(piece != PieceType::None);
 
-        self.pos.key ^= Zobrist::piece(side, piece_type, sq);
-        self.pieces[sq as usize] = piece_type;
+        self.pos.key ^= Zobrist::piece(side, piece, sq);
+        unsafe {
+            *self.pieces.get_unchecked_mut(sq as usize) = piece;
 
-        let piece_bb = &mut self.piece_bb[piece_type.as_usize()];
-        let side_bb = match side {
-            Player::White => &mut self.side_bb[WHITE_IDX],
-            _ => &mut self.side_bb[BLACK_IDX],
-        };
+            let piece_bb = self.piece_bb.get_unchecked_mut(piece.as_usize());
+            let side_bb = self.side_bb.get_unchecked_mut(side.as_usize());
 
-        BitBoard::set_bit(piece_bb, sq);
-        BitBoard::set_bit(side_bb, sq);
+            BitBoard::set_bit(piece_bb, sq);
+            BitBoard::set_bit(side_bb, sq);
+        }
     }
 
-    pub fn remove_piece(&mut self, side: Player, piece_type: PieceType, sq: Square) {
-        assert!(piece_type != PieceType::None);
+    pub fn remove_piece(&mut self, side: Player, piece: PieceType, sq: Square) {
+        assert!(piece != PieceType::None);
 
-        self.pieces[sq as usize] = PieceType::None;
-        self.pos.key ^= Zobrist::piece(side, piece_type, sq);
+        self.pos.key ^= Zobrist::piece(side, piece, sq);
 
-        let piece_bb = &mut self.piece_bb[piece_type.as_usize()];
-        let side_bb = match side {
-            Player::White => &mut self.side_bb[WHITE_IDX],
-            _ => &mut self.side_bb[BLACK_IDX],
-        };
+        unsafe {
+            *self.pieces.get_unchecked_mut(sq as usize) = PieceType::None;
+            let piece_bb = self.piece_bb.get_unchecked_mut(piece.as_usize());
+            let side_bb = self.side_bb.get_unchecked_mut(side.as_usize());
 
-        BitBoard::pop_bit(piece_bb, sq);
-        BitBoard::pop_bit(side_bb, sq);
+            BitBoard::pop_bit(piece_bb, sq);
+            BitBoard::pop_bit(side_bb, sq);
+        }
     }
 }
 
@@ -500,7 +526,7 @@ impl Board {
             output.push_str("+---+---+---+---+---+---+---+---+\n");
             for x in 0..8 {
                 let square = 8 * (7 - y) + x;
-                let is_white = BitBoard::from_sq(square) & self.side_bb[Player::White] != 0;
+                let is_white = BitBoard::from_sq(square) & self.side_bb[Player::White.as_usize()] != 0;
                 // let piece_str = self.pieces[square as usize].to_string();
 
                 let piece_str = match self.pieces[square as usize] {

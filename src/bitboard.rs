@@ -88,7 +88,7 @@ impl BitBoard {
             return 64;
         }
 
-        INDEX_64[(((bb ^ (bb - 1)) * DEBRUIJN_64) >> 58) as usize]
+        unsafe { *INDEX_64.get_unchecked((((bb ^ (bb - 1)) * DEBRUIJN_64) >> 58) as usize) }
     }
 
     /// Get the index of the most significant bit.
@@ -106,7 +106,7 @@ impl BitBoard {
         bb |= bb >> 16;
         bb |= bb >> 32;
 
-        INDEX_64[((bb * DEBRUIJN_64) >> 58) as usize]
+        unsafe { *INDEX_64.get_unchecked(((bb * DEBRUIJN_64) >> 58) as usize) }
     }
 
     #[allow(dead_code)]

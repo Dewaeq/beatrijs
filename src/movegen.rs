@@ -291,9 +291,9 @@ fn gen_piece_moves(
         if checks {
             // Moving a blocker also causes check
             if piece_type == PieceType::Queen
-                || board.pos.king_blockers[board.turn.opp()] & BitBoard::from_sq(sq) == 0
+                || board.pos.king_blockers[board.turn.opp().as_usize()] & BitBoard::from_sq(sq) == 0
             {
-                bb &= board.pos.check_squares[piece_type];
+                bb &= board.pos.check_squares[piece_type.as_usize()];
             }
         }
 

@@ -35,27 +35,36 @@ impl MoveList {
     }
 
     pub fn push(&mut self, m: u16, score: i32) {
-        self.moves[self.count] = m;
-        self.scores[self.count] = score;
+        unsafe {
+            *self.moves.get_unchecked_mut(self.count) = m;
+            *self.scores.get_unchecked_mut(self.count) = score;
+        }
         self.count += 1;
     }
 
     pub const fn get_all(&self, index: usize) -> (u16, i32) {
-        (self.moves[index], self.scores[index])
+        unsafe {
+            (
+                *self.moves.get_unchecked(index),
+                *self.scores.get_unchecked(index),
+            )
+        }
     }
 
     pub const fn get(&self, index: usize) -> u16 {
-        self.moves[index]
+        unsafe { *self.moves.get_unchecked(index) }
     }
 
     pub const fn get_score(&self, index: usize) -> i32 {
-        self.scores[index]
+        unsafe { *self.scores.get_unchecked(index) }
     }
 
     pub fn set_score(&mut self, index: usize, score: i32) {
-        self.scores[index] = score
+        unsafe {
+            *self.scores.get_unchecked_mut(index) = score;
+        }
     }
-    
+
     pub fn swap(&mut self, a: usize, b: usize) {
         unsafe {
             let a_ptr: *mut u16 = &mut self.moves[a];

@@ -82,20 +82,6 @@ impl Player {
     }
 }
 
-impl Index<Player> for [u64; NUM_SIDES] {
-    type Output = u64;
-
-    fn index(&self, index: Player) -> &Self::Output {
-        &self[index.as_usize()]
-    }
-}
-
-impl IndexMut<Player> for [u64; NUM_SIDES] {
-    fn index_mut(&mut self, index: Player) -> &mut Self::Output {
-        &mut self[index.as_usize()]
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PieceType {
     Pawn,
@@ -119,20 +105,6 @@ impl PieceType {
             PieceType::King => 5,
             PieceType::None => 6,
         }
-    }
-}
-
-impl Index<PieceType> for [u64; NUM_PIECES] {
-    type Output = u64;
-
-    fn index(&self, index: PieceType) -> &Self::Output {
-        &self[index.as_usize()]
-    }
-}
-
-impl IndexMut<PieceType> for [u64; NUM_PIECES] {
-    fn index_mut(&mut self, index: PieceType) -> &mut Self::Output {
-        &mut self[index.as_usize()]
     }
 }
 
