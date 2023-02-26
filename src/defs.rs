@@ -232,7 +232,31 @@ pub enum GenType {
     QuietChecks,
     /// All possible check evasions
     Evasions,
+    /// Captures that evade check
+    EvadingCaptures,
     /// Captures, non-captures and promotions (everything except evasions)
     /// Only use if not in check
     NonEvasions,
+}
+
+pub struct Value;
+
+impl Value {
+    pub const PAWN: i32 = 100;
+    pub const KNIGHT: i32 = 300;
+    pub const BISHOP: i32 = 320;
+    pub const ROOK: i32 = 520;
+    pub const QUEEN: i32 = 900;
+
+    pub const fn piece_value(piece: PieceType) -> i32 {
+        match piece {
+            PieceType::Pawn => Value::PAWN,
+            PieceType::Knight => Value::KNIGHT,
+            PieceType::Bishop => Value::BISHOP,
+            PieceType::Rook => Value::ROOK,
+            PieceType::Queen => Value::QUEEN,
+            PieceType::King => 0,
+            PieceType::None => 0,
+        }
+    }
 }

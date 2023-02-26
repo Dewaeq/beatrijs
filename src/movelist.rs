@@ -1,7 +1,12 @@
-use crate::{board::Board, defs::MAX_MOVES, movegen::generate_legal};
+use crate::{
+    board::Board,
+    defs::MAX_MOVES,
+    movegen::{generate_legal, generate_quiet},
+};
 
 pub struct MoveList {
     moves: [u16; MAX_MOVES],
+    scores: [i32; MAX_MOVES],
     count: usize,
     /// Should only be used by iterator implementation
     current: usize,
@@ -11,6 +16,7 @@ impl MoveList {
     pub const fn new() -> Self {
         MoveList {
             moves: [0; MAX_MOVES],
+            scores: [0; MAX_MOVES],
             count: 0,
             current: 0,
         }
@@ -24,7 +30,7 @@ impl MoveList {
 
     pub fn quiet(board: &mut Board) -> Self {
         let mut move_list = MoveList::new();
-        generate_legal(board, &mut move_list);
+        generate_quiet(board, &mut move_list);
         move_list
     }
 
@@ -35,6 +41,18 @@ impl MoveList {
 
     pub const fn get(&self, index: usize) -> u16 {
         self.moves[index]
+    }
+    
+    pub fn swap(&mut self, a: usize, b: usize) {
+        unsafe {
+            let a_ptr: *mut u16 = &mut self.moves[a];
+            let b_ptr: *mut u16 = &mut self.moves[b];
+            std::ptr::swap(a_ptr, b_ptr);
+
+            let a_score_ptr: *mut i32 = &mut self.scores[a];
+            let b_score_ptr: *mut i32 = &mut self.scores[b];
+            std::ptr::swap(a_score_ptr, b_score_ptr)
+        }
     }
 
     pub const fn size(&self) -> usize {
