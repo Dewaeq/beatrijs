@@ -1,4 +1,4 @@
-use crate::defs::{Castling, PieceType, Square, NUM_PIECES, NUM_SIDES};
+use crate::defs::{Castling, PieceType, Square, MAX_MOVES, NUM_PIECES, NUM_SIDES};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Position {
@@ -12,7 +12,7 @@ pub struct Position {
     /// 50 move rule counter
     pub rule_fifty: u8,
     /// Ply at this position, starting from zero
-    pub ply: u16,
+    pub ply: usize,
     /// Square behind the pawn, 64 if none
     pub ep_square: Square,
 
@@ -29,6 +29,8 @@ pub struct Position {
     pub check_squares: [u64; NUM_PIECES],
     /// `PIECE_NONE` if none
     pub captured_piece: PieceType,
+    /// Quiet moves that caused a beta-cutoff, used for ordering
+    pub killers: [[u16; MAX_MOVES]; 2],
 }
 
 impl Position {
@@ -43,6 +45,7 @@ impl Position {
             king_blockers: [0; NUM_SIDES],
             check_squares: [0; NUM_PIECES],
             captured_piece: PieceType::None,
+            killers: [[0; MAX_MOVES]; 2],
         }
     }
 }

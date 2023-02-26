@@ -34,9 +34,14 @@ impl MoveList {
         move_list
     }
 
-    pub fn push(&mut self, m: u16) {
+    pub fn push(&mut self, m: u16, score: i32) {
         self.moves[self.count] = m;
+        self.scores[self.count] = score;
         self.count += 1;
+    }
+
+    pub const fn get_all(&self, index: usize) -> (u16, i32) {
+        (self.moves[index], self.scores[index])
     }
 
     pub const fn get(&self, index: usize) -> u16 {

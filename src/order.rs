@@ -6,44 +6,16 @@ use crate::{
     movelist::MoveList,
 };
 
-pub fn order_moves(moves: &mut MoveList, board: &Board) {
-    for i in 0..moves.size() {
-        let m = moves.get(i);
+pub fn pick_next_move(move_list: &mut MoveList, move_num: usize) {
+    let mut best_score = 0;
+    let mut best_index = move_num;
 
-        if BitMove::is_ep(m) {
-            moves.set_score(i, 105);
-        } else if BitMove::is_cap(m) {
-            let move_piece = board.piece_type(BitMove::src(m));
-            let cap_piece = board.piece_type(BitMove::dest(m));
-
-            moves.set_score(i, MVV_LVA[move_piece.as_usize()][cap_piece.as_usize()]);
+    for index in move_num..move_list.size() {
+        if move_list.get_score(index) > best_score {
+            best_score = move_list.get_score(index);
+            best_index = index;
         }
     }
 
-    sort_moves(moves)
-}
-
-pub fn order_quiets(moves: &mut MoveList, board: &Board) {
-    for i in 0..moves.size() {
-        let m = moves.get(i);
-        let s = board.see_capture(m);
-        moves.set_score(i, board.see_capture(m));
-    }
-
-    sort_moves(moves)
-}
-
-/// Selection sort
-fn sort_moves(moves: &mut MoveList) {
-    for i in 0..moves.size() - 1 {
-        let mut j = i + 1;
-        while j > 0 {
-            let swap_index = j - 1;
-            if moves.get_score(swap_index) < moves.get_score(j) {
-                moves.swap(j, swap_index);
-            }
-
-            j -= 1;
-        }
-    }
+    move_list.swap(move_num, best_index);
 }

@@ -1,8 +1,9 @@
 use crate::{
+    bitmove::BitMove,
     board::Board,
     defs::{PieceType, Player, Value},
     movelist::MoveList,
-    order::{order_moves, order_quiets},
+    order::pick_next_move,
 };
 use std::cmp;
 
@@ -30,7 +31,7 @@ impl Searcher {
         if depth == 0 {
             return self.quiesence(alpha, beta);
         }
-        
+
         self.num_nodes += 1;
 
         if ply_from_root > 0 {
@@ -54,15 +55,23 @@ impl Searcher {
             depth += 1;
         }
 
-        order_moves(&mut moves, &self.board);
+        for i in 0..moves.size() {
+            pick_next_move(&mut moves, i);
+            let m = moves.get(i);
 
-        for m in moves {
-            let old_board = self.board.clone();
+            let mut old_board = self.board.clone();
             self.board.make_move(m);
             let score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha);
+            old_board.pos.killers = self.board.pos.killers;
             self.board = old_board;
 
             if score >= beta {
+                if !BitMove::is_cap(m) {
+                    let ply = self.board.pos.ply;
+                    self.board.pos.killers[1][ply] = self.board.pos.killers[0][ply];
+                    self.board.pos.killers[0][ply] = m;
+                }
+
                 return beta;
             }
             if score > alpha {
@@ -90,9 +99,10 @@ impl Searcher {
             return evaluate(&self.board);
         }
 
-        order_moves(&mut moves, &self.board);
+        for i in 0..moves.size() {
+            pick_next_move(&mut moves, i);
+            let m = moves.get(i);
 
-        for m in moves {
             let old_board = self.board.clone();
             self.board.make_move(m);
             let score = -self.quiesence(-beta, -alpha);

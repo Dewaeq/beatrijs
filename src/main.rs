@@ -8,21 +8,21 @@ use crate::movelist::MoveList;
 use crate::perft::perft;
 use crate::search::Searcher;
 
-mod gen;
 mod bitboard;
 mod bitmove;
 mod board;
 mod defs;
+mod gen;
 mod history;
 mod makemove;
 mod movegen;
 mod movelist;
+mod order;
 mod perft;
 mod position;
 mod search;
 mod utils;
 mod zobrist;
-mod order;
 
 fn main() {
     let board = &mut Board::start_pos();
