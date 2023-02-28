@@ -1,5 +1,6 @@
 use crate::{defs::MAX_MOVES, position::Position, board::Board};
 
+#[derive(Copy, Clone)]
 pub struct History {
     positions: [Position; MAX_MOVES],
     count: usize,

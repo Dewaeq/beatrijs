@@ -79,12 +79,9 @@ fn inner_perft_all(board: &mut Board, depth: u8, perft: &mut PerftResult) {
                 }
             }
 
-            // let mut new_board = board.clone();
-            let new_board: Board = todo!();
-
-            new_board.make_move(m);
-
-            inner_perft_all(&mut new_board, depth - 1, perft);
+            board.make_move(m);
+            inner_perft_all(board, depth - 1, perft);
+            board.unmake_move(m);
         }
     }
 }

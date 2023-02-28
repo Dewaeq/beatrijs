@@ -78,9 +78,9 @@ fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board) {
 
     let mut score = 0;
     let ply = board.pos.ply;
-    if board.pos.killers[0][ply] == m {
+    if board.killers[0][ply] == m {
         score = KILLER_1_BONUS;
-    } else if board.pos.killers[1][ply] == m {
+    } else if board.killers[1][ply] == m {
         score = KILLER_2_BONUS;
     }
 

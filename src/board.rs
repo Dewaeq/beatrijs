@@ -4,17 +4,18 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
-        Castling, Piece, Player, Square, Value, BLACK_IDX, FEN_START_STRING, NUM_PIECES, NUM_SIDES,
-        NUM_SQUARES, WHITE_IDX,
+        Castling, Piece, Player, Square, Value, BLACK_IDX, FEN_START_STRING, MAX_MOVES, NUM_PIECES,
+        NUM_SIDES, NUM_SQUARES, WHITE_IDX,
     },
     gen::{attack::attacks, between::between},
-    history::{History},
+    history::History,
     movegen::{attackers_to, smallest_attacker},
     position::Position,
     utils::square_from_string,
     zobrist::Zobrist,
 };
 
+#[derive(Clone, Copy)]
 pub struct Board {
     pub turn: Player,
     pub piece_bb: [u64; NUM_PIECES],
@@ -22,6 +23,8 @@ pub struct Board {
     pub pieces: [Piece; NUM_SQUARES],
     pub pos: Position,
     history: History,
+    /// Quiet moves that caused a beta-cutoff, used for ordering
+    pub killers: [[u16; MAX_MOVES]; 2],
 }
 
 /// Getter methods
@@ -285,8 +288,6 @@ impl Board {
         self.pos.key ^= Zobrist::side();
         // target.pos.key ^= Zobrist::piece(self.turn, piece_type, src);
 
-        self.pos.last_move = m;
-
         self.remove_piece(self.turn, piece, src);
         self.set_castling_from_move(m);
         self.turn = self.turn.opp();
@@ -334,7 +335,7 @@ impl Board {
             self.remove_piece(opp, Piece::Rook, rook_sq);
             self.add_piece(opp, Piece::Rook, rook_home_sq);
         }
-        
+
         self.pos = self.history.pop();
         self.turn = opp;
     }
@@ -345,7 +346,7 @@ impl Board {
         }
 
         let captured = self.piece(BitMove::dest(m));
-        let mut new_board: Board = todo!();
+        let mut new_board: Board = *self;
         new_board.make_move(m);
 
         Value::of(captured) - new_board.see(BitMove::dest(m))
@@ -447,6 +448,7 @@ impl Board {
             pieces: [Piece::None; 64],
             pos: Position::new(),
             history: History::new(),
+            killers: [[0; MAX_MOVES]; 2],
         }
     }
 

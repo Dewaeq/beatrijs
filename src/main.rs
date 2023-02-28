@@ -31,9 +31,9 @@ fn main() {
 
     println!("{board:?}");
 
-    perft(&mut board, 6);
+    // perft(&mut board, 6);
 
-    /* let start = Instant::now();
+    let start = Instant::now();
 
     let mut searcher = Searcher::new(board);
     let score = searcher.search(9);
@@ -46,5 +46,5 @@ fn main() {
     );
 
     println!("{:?}", score);
-    println!("{:?}", searcher.num_nodes); */
+    println!("{:?}", searcher.num_nodes);
 }

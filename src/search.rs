@@ -67,8 +67,8 @@ impl Searcher {
             if score >= beta {
                 if !BitMove::is_cap(m) {
                     let ply = self.board.pos.ply;
-                    self.board.pos.killers[1][ply] = self.board.pos.killers[0][ply];
-                    self.board.pos.killers[0][ply] = m;
+                    self.board.killers[1][ply] = self.board.killers[0][ply];
+                    self.board.killers[0][ply] = m;
                 }
 
                 return beta;
