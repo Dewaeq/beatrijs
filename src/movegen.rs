@@ -91,6 +91,9 @@ fn add_capture_move(m: u16, move_list: &mut MoveList, board: &Board) {
     let move_piece = board.piece(BitMove::src(m));
     let cap_piece = board.piece(BitMove::dest(m));
 
+    assert!(move_piece != Piece::None);
+    assert!(cap_piece != Piece::None);
+
     let score = MVV_LVA[move_piece.as_usize()][cap_piece.as_usize()] + CAPTURE_BONUS;
     move_list.push(m, score);
 }

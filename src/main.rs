@@ -15,7 +15,6 @@ mod board;
 mod defs;
 mod gen;
 mod history;
-mod makemove;
 mod movegen;
 mod movelist;
 mod order;
@@ -26,16 +25,18 @@ mod utils;
 mod zobrist;
 
 fn main() {
-    let board = &mut Board::start_pos();
+    let mut board = Board::start_pos();
     // let board = &mut Board::from_fen("5Q2/1k5p/6p1/5p2/2P2B2/1P5P/P4PP1/6K1 b - - 2 41");
     // let board = &mut Board::from_fen("3qr1k1/p5b1/2p1pp1p/3p3N/6Q1/r6P/5PP1/1R4K1 w - - 0 27");
 
-    // perft(board, 6);
+    println!("{board:?}");
 
-    let start = Instant::now();
+    perft(&mut board, 6);
 
-    let mut searcher = Searcher::new(board.clone());
-    let score = searcher.search(8);
+    /* let start = Instant::now();
+
+    let mut searcher = Searcher::new(board);
+    let score = searcher.search(9);
     let end = start.elapsed();
 
     println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
@@ -45,5 +46,5 @@ fn main() {
     );
 
     println!("{:?}", score);
-    println!("{:?}", searcher.num_nodes);
+    println!("{:?}", searcher.num_nodes); */
 }

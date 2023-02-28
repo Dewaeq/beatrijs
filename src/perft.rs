@@ -79,7 +79,9 @@ fn inner_perft_all(board: &mut Board, depth: u8, perft: &mut PerftResult) {
                 }
             }
 
-            let mut new_board = board.clone();
+            // let mut new_board = board.clone();
+            let new_board: Board = todo!();
+
             new_board.make_move(m);
 
             inner_perft_all(&mut new_board, depth - 1, perft);
@@ -97,14 +99,15 @@ fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
     }
 
     for m in moves {
-        let new_board = &mut board.clone();
-        new_board.make_move(m);
+        board.make_move(m);
 
         let add = if depth == 2 {
-            MoveList::legal(new_board).size() as u64
+            MoveList::legal(board).size() as u64
         } else {
-            inner_perft(false, new_board, depth - 1)
+            inner_perft(false, board, depth - 1)
         };
+        
+        board.unmake_move(m);
 
         count += add;
 

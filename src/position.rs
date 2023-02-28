@@ -1,6 +1,6 @@
-use crate::defs::{Castling, Piece, Square, MAX_MOVES, NUM_PIECES, NUM_SIDES};
+use crate::{defs::{Castling, Piece, Square, MAX_MOVES, NUM_PIECES, NUM_SIDES}, bitmove::BitMove};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub struct Position {
     /// Castling state.
     ///
@@ -29,6 +29,7 @@ pub struct Position {
     pub check_squares: [u64; NUM_PIECES],
     /// `PIECE_NONE` if none
     pub captured_piece: Piece,
+    pub last_move: u16,
     /// Quiet moves that caused a beta-cutoff, used for ordering
     pub killers: [[u16; MAX_MOVES]; 2],
 }
@@ -45,6 +46,7 @@ impl Position {
             king_blockers: [0; NUM_SIDES],
             check_squares: [0; NUM_PIECES],
             captured_piece: Piece::None,
+            last_move: 0,
             killers: [[0; MAX_MOVES]; 2],
         }
     }

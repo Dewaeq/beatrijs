@@ -1,34 +1,31 @@
-/* use crate::position::Position;
+use crate::{defs::MAX_MOVES, position::Position, board::Board};
 
-/// Array-based wrapper of game history,
-/// so that we can quickly undo moves
 pub struct History {
-    list: Vec<Position>,
+    positions: [Position; MAX_MOVES],
     count: usize,
 }
 
 impl History {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         History {
-            list: vec![],
+            positions: [Position::new(); MAX_MOVES],
             count: 0,
         }
     }
 
-    /// Add a position at `count`
     pub fn push(&mut self, pos: Position) {
-        self.list.push(pos);
+        unsafe {
+            *self.positions.get_unchecked_mut(self.count) = pos;
+        }
         self.count += 1;
     }
 
-    /// Decrease `count` by one
-    pub fn pop(&mut self) {
-        self.list.pop();
+    pub fn pop(&mut self) -> Position {
+        assert!(self.count >= 1);
+        
         self.count -= 1;
-    }
-
-    pub fn current(&self) -> Position {
-        self.list[self.count - 1].clone()
+        unsafe {
+            *self.positions.get_unchecked(self.count)
+        }
     }
 }
- */

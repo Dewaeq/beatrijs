@@ -4,23 +4,24 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
-        Castling, Piece, Player, Square, Value, BLACK_IDX, FEN_START_STRING, NUM_PIECES,
-        NUM_SIDES, NUM_SQUARES, WHITE_IDX,
+        Castling, Piece, Player, Square, Value, BLACK_IDX, FEN_START_STRING, NUM_PIECES, NUM_SIDES,
+        NUM_SQUARES, WHITE_IDX,
     },
     gen::{attack::attacks, between::between},
+    history::{History},
     movegen::{attackers_to, smallest_attacker},
     position::Position,
     utils::square_from_string,
     zobrist::Zobrist,
 };
 
-#[derive(Clone, Copy)]
 pub struct Board {
     pub turn: Player,
     pub piece_bb: [u64; NUM_PIECES],
     pub side_bb: [u64; NUM_SIDES],
     pub pieces: [Piece; NUM_SQUARES],
     pub pos: Position,
+    history: History,
 }
 
 /// Getter methods
@@ -120,8 +121,7 @@ impl Board {
         // Every piece of the opponent which is a possible pinner
         let mut pinners = attacks(Piece::Bishop, sq, opp_bb, opp)
             & self.player_piece_like_bb(opp, Piece::Bishop)
-            | attacks(Piece::Rook, sq, opp_bb, opp)
-                & self.player_piece_like_bb(opp, Piece::Rook);
+            | attacks(Piece::Rook, sq, opp_bb, opp) & self.player_piece_like_bb(opp, Piece::Rook);
         let mut pinned_bb = BitBoard::EMPTY;
 
         while pinners != 0 {
@@ -166,10 +166,7 @@ impl Board {
             *self.pos.king_blockers.get_unchecked_mut(opp.as_usize()) =
                 self.slider_blockers(opp_king_sq, us_bb, opp_bb);
 
-            self.set_check_squares(
-                Piece::Pawn,
-                attacks(Piece::Pawn, opp_king_sq, 0, self.turn),
-            );
+            self.set_check_squares(Piece::Pawn, attacks(Piece::Pawn, opp_king_sq, 0, self.turn));
             self.set_check_squares(
                 Piece::Knight,
                 attacks(Piece::Knight, opp_king_sq, 0, self.turn),
@@ -187,10 +184,7 @@ impl Board {
                 self.pos
                     .check_squares
                     .get_unchecked(Piece::Bishop.as_usize())
-                    | self
-                        .pos
-                        .check_squares
-                        .get_unchecked(Piece::Rook.as_usize()),
+                    | self.pos.check_squares.get_unchecked(Piece::Rook.as_usize()),
             );
         }
     }
@@ -220,6 +214,8 @@ impl Board {
 
         assert!(piece != Piece::None);
         assert!(src != dest);
+
+        self.history.push(self.pos);
 
         // Remove all castling rights for the moving side when a king move occurs
         if piece == Piece::King {
@@ -289,11 +285,58 @@ impl Board {
         self.pos.key ^= Zobrist::side();
         // target.pos.key ^= Zobrist::piece(self.turn, piece_type, src);
 
+        self.pos.last_move = m;
+
         self.remove_piece(self.turn, piece, src);
         self.set_castling_from_move(m);
         self.turn = self.turn.opp();
         self.pos.ply += 1;
         self.set_check_info();
+    }
+
+    pub fn unmake_move(&mut self, m: u16) {
+        let src = BitMove::src(m);
+        let dest = BitMove::dest(m);
+        let flag = BitMove::flag(m);
+        let is_cap = BitMove::is_cap(m);
+        let is_prom = BitMove::is_prom(m);
+        let is_castle = BitMove::is_castle(m);
+        let is_ep = BitMove::is_ep(m);
+        let piece = self.piece(dest);
+        let opp = self.turn.opp();
+
+        self.remove_piece(opp, piece, dest);
+
+        if is_prom {
+            self.add_piece(opp, Piece::Pawn, src);
+        } else {
+            self.add_piece(opp, piece, src);
+        }
+
+        if is_ep {
+            self.add_piece(self.turn, Piece::Pawn, dest + self.turn.pawn_dir());
+        } else if is_cap {
+            self.add_piece(self.turn, self.pos.captured_piece, dest);
+        }
+
+        if is_castle {
+            let rook_sq;
+            let rook_home_sq;
+
+            if flag == MoveFlag::CASTLE_KING {
+                rook_sq = dest - 1;
+                rook_home_sq = dest + 1;
+            } else {
+                rook_sq = dest + 1;
+                rook_home_sq = dest - 2;
+            }
+
+            self.remove_piece(opp, Piece::Rook, rook_sq);
+            self.add_piece(opp, Piece::Rook, rook_home_sq);
+        }
+        
+        self.pos = self.history.pop();
+        self.turn = opp;
     }
 
     pub fn see_capture(&self, m: u16) -> i32 {
@@ -302,7 +345,7 @@ impl Board {
         }
 
         let captured = self.piece(BitMove::dest(m));
-        let mut new_board = *self;
+        let mut new_board: Board = todo!();
         new_board.make_move(m);
 
         Value::of(captured) - new_board.see(BitMove::dest(m))
@@ -320,13 +363,7 @@ impl Board {
         }
     }
 
-    fn move_piece_cheap(
-        &mut self,
-        src: Square,
-        dest: Square,
-        piece: Piece,
-        captured: Piece,
-    ) {
+    fn move_piece_cheap(&mut self, src: Square, dest: Square, piece: Piece, captured: Piece) {
         self.remove_piece(self.turn, piece, src);
         self.remove_piece(self.turn.opp(), captured, dest);
         self.add_piece(self.turn, piece, dest);
@@ -409,6 +446,7 @@ impl Board {
             side_bb: [BitBoard::EMPTY; NUM_SIDES],
             pieces: [Piece::None; 64],
             pos: Position::new(),
+            history: History::new(),
         }
     }
 
@@ -526,7 +564,8 @@ impl Board {
             output.push_str("+---+---+---+---+---+---+---+---+\n");
             for x in 0..8 {
                 let square = 8 * (7 - y) + x;
-                let is_white = BitBoard::from_sq(square) & self.side_bb[Player::White.as_usize()] != 0;
+                let is_white =
+                    BitBoard::from_sq(square) & self.side_bb[Player::White.as_usize()] != 0;
                 // let piece_str = self.pieces[square as usize].to_string();
 
                 let piece_str = match self.pieces[square as usize] {

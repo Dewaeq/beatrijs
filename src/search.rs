@@ -59,11 +59,10 @@ impl Searcher {
             pick_next_move(&mut moves, i);
             let m = moves.get(i);
 
-            let mut old_board = self.board.clone();
+            
             self.board.make_move(m);
             let score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha);
-            old_board.pos.killers = self.board.pos.killers;
-            self.board = old_board;
+            self.board.unmake_move(m);
 
             if score >= beta {
                 if !BitMove::is_cap(m) {
@@ -99,10 +98,9 @@ impl Searcher {
             pick_next_move(&mut moves, i);
             let m = moves.get(i);
 
-            let old_board = self.board.clone();
             self.board.make_move(m);
             let score = -self.quiesence(-beta, -alpha);
-            self.board = old_board;
+            self.board.unmake_move(m);
 
             if score >= beta {
                 return beta;
