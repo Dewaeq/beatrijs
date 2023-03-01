@@ -34,19 +34,22 @@ pub fn perft_all(board: &mut Board, depth: u8) -> PerftResult {
     perft
 }
 
-pub fn perft(board: &mut Board, depth: u8) -> u64 {
+pub fn perft(board: &mut Board, depth: u8, print_info: bool) -> u64 {
     let start = Instant::now();
-    let nodes = inner_perft(true, board, depth);
+    let nodes = inner_perft(print_info, board, depth);
     let end = start.elapsed();
 
-    println!("\n=================================\n");
-    println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
-    println!("Num moves      :   {}", MoveList::legal(board).size());
-    println!("Num nodes      :   {nodes}");
-    println!(
-        "Nodes/s        :   {}",
-        (nodes as f64 / end.as_secs_f64()) as u64
-    );
+    if print_info {
+        println!("\n=================================\n");
+        println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
+        println!("Num moves      :   {}", MoveList::legal(board).size());
+        println!("Num nodes      :   {nodes}");
+        println!(
+            "Nodes/s        :   {}",
+            (nodes as f64 / end.as_secs_f64()) as u64
+        );
+    }
+
 
     nodes
 }
