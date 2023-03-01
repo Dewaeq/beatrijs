@@ -619,7 +619,7 @@ impl std::fmt::Debug for Board {
             }
         )?;
         writeln!(f, "Ply        : {}", self.pos.ply)?;
-        writeln!(f, "Key        : {}", self.pos.key)?;
+        writeln!(f, "Key        : {:x}", self.pos.key)?;
         writeln!(f, "Castling   : {:b}", self.pos.castling)?;
         writeln!(f, "EP Square  : {}", square_to_string(self.pos.ep_square))?;
         write!(f, "Checkers   : ")?;

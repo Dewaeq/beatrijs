@@ -23,7 +23,7 @@ impl Game {
             let mut buffer = String::new();
             let input = stdin.read_line(&mut buffer);
 
-            if !input.is_ok() || buffer.is_empty() {
+            if !input.is_ok() || buffer.is_empty() || buffer.trim().is_empty() {
                 continue;
             }
 
