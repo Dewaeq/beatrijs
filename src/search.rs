@@ -1,11 +1,13 @@
 use crate::{
+    bitboard::BitBoard,
     bitmove::BitMove,
     board::Board,
     defs::{Piece, Player, Value},
     movelist::MoveList,
-    order::pick_next_move, bitboard::BitBoard,
+    order::pick_next_move,
 };
 use std::cmp;
+use std::time::Instant;
 
 const IMMEDIATE_MATE_SCORE: i32 = 100000;
 
@@ -22,9 +24,13 @@ impl Searcher {
         }
     }
 
-    pub fn search(&mut self, depth: u8) -> i32 {
+    pub fn search(&mut self, depth: u8) -> (f64, i32) {
         self.num_nodes = 0;
-        self.negamax(depth, 0, i32::MIN + 1, i32::MAX - 1)
+        let start = Instant::now();
+        let score = self.negamax(depth, 0, i32::MIN + 1, i32::MAX - 1);
+        let end = start.elapsed();
+
+        (end.as_secs_f64() * 1000f64, score)
     }
 
     fn negamax(&mut self, mut depth: u8, ply_from_root: u8, mut alpha: i32, mut beta: i32) -> i32 {
@@ -59,7 +65,6 @@ impl Searcher {
             pick_next_move(&mut moves, i);
             let m = moves.get(i);
 
-            
             self.board.make_move(m);
             let score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha);
             self.board.unmake_move(m);
