@@ -11,7 +11,7 @@ use crate::{
     history::History,
     movegen::{attackers_to, smallest_attacker},
     position::Position,
-    utils::square_from_string,
+    utils::{square_from_string, square_to_string},
     zobrist::Zobrist,
 };
 
@@ -569,7 +569,6 @@ impl Board {
                 let square = 8 * (7 - y) + x;
                 let is_white =
                     BitBoard::from_sq(square) & self.side_bb[Player::White.as_usize()] != 0;
-                // let piece_str = self.pieces[square as usize].to_string();
 
                 let piece_str = match self.pieces[square as usize] {
                     Piece::Pawn => " p ",
@@ -622,11 +621,14 @@ impl std::fmt::Debug for Board {
         writeln!(f, "Ply        : {}", self.pos.ply)?;
         writeln!(f, "Key        : {}", self.pos.key)?;
         writeln!(f, "Castling   : {:b}", self.pos.castling)?;
-        writeln!(f, "EP Square  : {}", self.pos.ep_square);
-        writeln!(
-            f,
-            "Checkers   :\n{}",
-            BitBoard::pretty_string(self.pos.checkers_bb)
-        )
+        writeln!(f, "EP Square  : {}", square_to_string(self.pos.ep_square))?;
+        write!(f, "Checkers   : ")?;
+        let mut checkers = self.pos.checkers_bb;
+        while checkers != 0 {
+            let checker_sq = BitBoard::pop_lsb(&mut checkers);
+            write!(f, "{} ", square_to_string(checker_sq))?;
+        }
+
+        writeln!(f)
     }
 }

@@ -3,10 +3,22 @@ use crate::{bitboard::BitBoard, defs::Square};
 pub fn square_from_string(str: &str) -> Square {
     assert!(str.len() == 2);
 
-    let file = (str.as_bytes()[0] as char).to_digit(10).unwrap() - 1;
-    let rank = (str.as_bytes()[1] as char).to_digit(10).unwrap() - 1;
+    let file = (str.as_bytes()[0] - 97);
+    let rank = (str.as_bytes()[1] - 49);
 
-    (file as Square) * 8 + (rank as Square)
+    (rank as Square) * 8 + (file as Square)
+}
+
+pub fn square_to_string(sq: Square) -> String {
+    if !is_in_board(sq) {
+        return "".to_owned();
+    }
+
+    let (file, rank) = coord_from_square(sq);
+    let file_str = char::from_u32(file as u32 + 97).unwrap();
+    let rank_str = char::from_u32(rank as u32 + 49).unwrap();
+
+    format!("{file_str}{rank_str}")
 }
 
 pub const fn adjacent_files(file: Square) -> u64 {
