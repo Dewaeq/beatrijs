@@ -45,6 +45,6 @@ fn main() {
         (searcher.num_nodes as f64 / end.as_secs_f64()) as u64
     );
 
-    println!("{:?}", score);
+    println!("{score}");
     println!("{:?}", searcher.num_nodes);
 }

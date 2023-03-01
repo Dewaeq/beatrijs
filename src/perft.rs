@@ -42,7 +42,7 @@ pub fn perft(board: &mut Board, depth: u8) -> u64 {
     println!("\n=================================\n");
     println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
     println!("Num moves      :   {}", MoveList::legal(board).size());
-    println!("Num nodes      :   {}", nodes);
+    println!("Num nodes      :   {nodes}");
     println!(
         "Nodes/s        :   {}",
         (nodes as f64 / end.as_secs_f64()) as u64
@@ -110,7 +110,7 @@ fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
 
         if root {
             let pretty = BitMove::pretty_move(m);
-            println!("{}: {}", pretty, add);
+            println!("{pretty}: {add}");
         }
     }
 

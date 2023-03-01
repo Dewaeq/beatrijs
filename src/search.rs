@@ -136,5 +136,5 @@ fn count_material(board: &Board, side: Player) -> i32 {
     score += BitBoard::count(board.player_piece_bb(side, Piece::Rook)) as i32 * Value::ROOK;
     score += BitBoard::count(board.player_piece_bb(side, Piece::Queen)) as i32 * Value::QUEEN;
 
-    score as i32
+    score
 }

@@ -115,12 +115,10 @@ const fn gen_lines() -> [[u64; 64]; 64] {
                     } else {
                         DIRS[Dir::NORTH_WEST]
                     }
+                } else if source_rank > dest_rank {
+                    DIRS[Dir::SOUTH_EAST]
                 } else {
-                    if source_rank > dest_rank {
-                        DIRS[Dir::SOUTH_EAST]
-                    } else {
-                        DIRS[Dir::NORTH_EAST]
-                    }
+                    DIRS[Dir::NORTH_EAST]
                 };
 
                 let bb = get_line_bb(src, offset);

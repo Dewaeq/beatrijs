@@ -214,6 +214,7 @@ impl Board {
         let is_ep = BitMove::is_ep(m);
         let piece = self.pieces[src as usize];
         let opp = self.turn.opp();
+        let old_castle = self.pos.castling;
 
         assert!(piece != Piece::None);
         assert!(src != dest);
@@ -281,7 +282,7 @@ impl Board {
             // target.pos.key ^= Zobrist::piece(self.turn, piece_type, dest);
         }
 
-        if self.pos.castling != self.pos.castling {
+        if self.pos.castling != old_castle {
             self.pos.key ^= Zobrist::castle(self.pos.castling);
         }
 
@@ -354,7 +355,7 @@ impl Board {
 
     fn see(&mut self, dest: Square) -> i32 {
         let captured = self.piece(dest);
-        let (attacker, src) = smallest_attacker(&self, dest, self.turn);
+        let (attacker, src) = smallest_attacker(self, dest, self.turn);
 
         if attacker != Piece::None {
             self.move_piece_cheap(src, dest, attacker, captured);
@@ -486,7 +487,7 @@ impl Board {
         };
 
         // Castling permissions
-        if !castle_str.contains("-") {
+        if !castle_str.contains('-') {
             for symbol in castle_str.split("") {
                 if symbol.is_empty() {
                     continue;
@@ -502,7 +503,7 @@ impl Board {
         }
 
         // EP-square
-        if !ep_str.contains("-") {
+        if !ep_str.contains('-') {
             board.set_ep(square_from_string(ep_str));
         }
 
@@ -589,8 +590,8 @@ impl Board {
 
                 if x == 7 {
                     output.push('|');
-                    output.push_str(&format!(" {}", &(8 - y).to_string()));
-                    output.push_str("\n");
+                    output.push_str(&format!(" {}", (8 - y)));
+                    output.push('\n');
                 }
             }
         }

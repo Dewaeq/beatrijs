@@ -64,7 +64,7 @@ impl BitMove {
         let dest = BitMove::dest(bitmove);
         let flag = BitMove::flag(bitmove);
 
-        println!("from: {} to: {} flag: {}", src, dest, flag);
+        println!("from: {src} to: {dest} flag: {flag}");
     }
 
     pub fn pretty_move(bitmove: u16) -> String {

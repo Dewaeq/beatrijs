@@ -479,10 +479,7 @@ const fn is_legal_move(board: &Board, m: u16) -> bool {
             bishop_attacks(king_sq, occ) & bishop_like_bb == 0
                 && rook_attacks(king_sq, occ) & rook_like_bb == 0
         }
-        _ => {
-            return !BitBoard::contains(blockers, src)
-                || BitBoard::triple_aligned(src, dest, king_sq);
-        }
+        _ => !BitBoard::contains(blockers, src) || BitBoard::triple_aligned(src, dest, king_sq),
     }
 }
 

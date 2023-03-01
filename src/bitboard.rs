@@ -126,10 +126,10 @@ impl BitBoard {
             for x in 0..8 {
                 let square = 8 * (7 - y) + x;
                 let value = (bb >> square) & 1;
-                output.push_str(&format!(" {} ", value));
+                output.push_str(&format!(" {value} "));
 
                 if x == 7 {
-                    output.push_str("\n");
+                    output.push('\n');
                 }
             }
         }

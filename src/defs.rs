@@ -36,29 +36,29 @@ pub enum Player {
 impl Player {
     pub const fn opp(&self) -> Self {
         match self {
-            &Player::White => Player::Black,
-            &Player::Black => Player::White,
+            Player::White => Player::Black,
+            Player::Black => Player::White,
         }
     }
 
     pub const fn pawn_dir(&self) -> Square {
         match self {
-            &Player::White => 8,
-            &Player::Black => -8,
+            Player::White => 8,
+            Player::Black => -8,
         }
     }
 
     pub const fn rank_3(&self) -> u64 {
         match self {
-            &Player::White => BitBoard::RANK_3,
-            &Player::Black => BitBoard::RANK_6,
+            Player::White => BitBoard::RANK_3,
+            Player::Black => BitBoard::RANK_6,
         }
     }
 
     pub const fn rank_7(&self) -> u64 {
         match self {
-            &Player::White => BitBoard::RANK_7,
-            &Player::Black => BitBoard::RANK_2,
+            Player::White => BitBoard::RANK_7,
+            Player::Black => BitBoard::RANK_2,
         }
     }
 

@@ -45,12 +45,10 @@ const fn gen_between() -> [[u64; 64]; 64] {
                     } else {
                         DIRS[Dir::NORTH_WEST]
                     }
+                } else if source_rank > dest_rank {
+                    DIRS[Dir::SOUTH_EAST]
                 } else {
-                    if source_rank > dest_rank {
-                        DIRS[Dir::SOUTH_EAST]
-                    } else {
-                        DIRS[Dir::NORTH_EAST]
-                    }
+                    DIRS[Dir::NORTH_EAST]
                 };
 
                 let bb = get_between_bb(src, dest, offset);
