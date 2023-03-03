@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::{board::Board, search::Searcher, perft::perft, tests::{self, perft::test_perft}};
+use crate::{board::Board, search::{Searcher, evaluate}, perft::perft, tests::{self, perft::test_perft}};
 
 pub struct Game {
     board: Board,
@@ -40,6 +40,8 @@ impl Game {
                 game.parse_perft(commands);
             } else if base_command == "test" {
                 game.parse_test(commands);
+            } else if base_command == "static" {
+                game.parse_static(commands);
             }
         }
     }
@@ -79,11 +81,16 @@ impl Game {
         perft(&mut self.board, depth, true);
     }
 
-    fn parse_test(&mut self, commands: Vec<&str>) {
+    fn parse_test(&self, commands: Vec<&str>) {
         assert!(commands.len() == 2);
 
         if commands[1] == "perft" {
             test_perft();
         }
+    }
+
+    fn parse_static(&self, commands: Vec<&str>) {
+        let eval = evaluate(&self.board);
+        println!("{eval} cp");
     }
 }
