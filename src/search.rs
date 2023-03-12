@@ -13,6 +13,7 @@ const IMMEDIATE_MATE_SCORE: i32 = 100000;
 
 pub struct Searcher {
     pub num_nodes: u32,
+    pub best_move: u16,
     board: Board,
 }
 
@@ -20,6 +21,7 @@ impl Searcher {
     pub fn new(board: Board) -> Self {
         Searcher {
             num_nodes: 0,
+            best_move: 0,
             board,
         }
     }
@@ -91,6 +93,9 @@ impl Searcher {
             }
             if score > alpha {
                 alpha = score;
+                if ply_from_root == 0 {
+                    self.best_move = m;
+                }
             }
         }
 

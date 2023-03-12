@@ -79,7 +79,8 @@ impl Game {
         let time = time as u64;
 
         println!(
-            "info depth {depth} cp {score} nodes {} time {time} nps {}",
+            "info depth {depth} move {} cp {score} nodes {} time {time} nps {}",
+            BitMove::pretty_move(self.searcher.best_move),
             self.searcher.num_nodes,
             (self.searcher.num_nodes as f64 / time as f64 * 1000f64) as u64
         );
