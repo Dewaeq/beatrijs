@@ -1,12 +1,22 @@
-use std::thread;
+use std::{
+    rc::Rc,
+    sync::{
+        atomic::{AtomicI32, Ordering},
+        Arc, Mutex,
+    },
+    thread,
+};
 
 use crate::{board::Board, perft::perft};
 
 pub fn test_perft() {
     let mut handles = vec![];
+    let mut result = Arc::new(Mutex::new((0, 0)));
 
     for entry in POSITIONS {
-        let handle = thread::spawn(|| {
+        let counter = Arc::clone(&result);
+
+        let handle = thread::spawn(move || {
             let mut a = entry.split('|');
             let fen = a.next().unwrap();
             let depth = a.next().unwrap().parse::<u8>().unwrap();
@@ -14,11 +24,14 @@ pub fn test_perft() {
 
             let mut board = Board::from_fen(fen);
             let nodes_counted = perft(&mut board, depth, false);
+            let mut counter = counter.lock().unwrap();
 
             if nodes_counted == nodes {
                 println!("SUCCES: {nodes} nodes at depth {depth} for {fen}");
+                counter.0 += 1;
             } else {
                 println!("ERROR: {nodes} nodes at depth {depth} for {fen}");
+                counter.1 += 1;
             }
         });
 
@@ -28,6 +41,9 @@ pub fn test_perft() {
     for handle in handles {
         handle.join();
     }
+
+    let result = *result.lock().unwrap();
+    println!("{} of {} tests passed", result.0, POSITIONS.len());
 }
 
 const POSITIONS: &'static [&'static str] = &[
