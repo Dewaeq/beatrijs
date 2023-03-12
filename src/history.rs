@@ -29,4 +29,8 @@ impl History {
             *self.positions.get_unchecked(self.count)
         }
     }
+
+    pub const fn empty(&self) -> bool {
+        self.count == 0
+    }
 }

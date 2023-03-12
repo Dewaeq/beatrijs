@@ -27,13 +27,13 @@ impl Searcher {
     pub fn search(&mut self, depth: u8) -> (f64, i32) {
         self.num_nodes = 0;
         let start = Instant::now();
-        let score = self.negamax(depth, 0, i32::MIN + 1, i32::MAX - 1);
+        let score = self.negamax(depth, 0, i32::MIN + 1, i32::MAX - 1, false);
         let end = start.elapsed();
 
         (end.as_secs_f64() * 1000f64, score)
     }
 
-    fn negamax(&mut self, mut depth: u8, ply_from_root: u8, mut alpha: i32, mut beta: i32) -> i32 {
+    fn negamax(&mut self, mut depth: u8, ply_from_root: u8, mut alpha: i32, mut beta: i32, do_null: bool) -> i32 {
         if depth == 0 {
             return self.quiesence(alpha, beta);
         }
@@ -57,6 +57,17 @@ impl Searcher {
             return 0;
         }
 
+        // TODO: add zugzwang protection
+        if do_null && !self.board.in_check() && depth >= 4 {
+            self.board.make_null_move();
+            let score = -self.negamax(depth - 4, ply_from_root + 1, -beta, -beta + 1, false);
+            self.board.unmake_null_move();
+
+            if score >= beta {
+                return beta;
+            }
+        }
+
         if self.board.in_check() {
             depth += 1;
         }
@@ -66,7 +77,7 @@ impl Searcher {
             let m = moves.get(i);
 
             self.board.make_move(m);
-            let score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha);
+            let score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha, true);
             self.board.unmake_move(m);
 
             if score >= beta {

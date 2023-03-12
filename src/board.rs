@@ -151,6 +151,10 @@ impl Board {
         let king_sq = self.cur_king_square();
         let opp_king_sq = self.king_square(opp);
 
+        if king_sq >= 64 {
+            self.debug();
+        }
+
         assert!(king_sq < 64);
         assert!(opp_king_sq < 64);
 
@@ -220,6 +224,7 @@ impl Board {
         assert!(src != dest);
 
         self.history.push(self.pos);
+        self.pos.last_move = m;
 
         // Remove all castling rights for the moving side when a king move occurs
         if piece == Piece::King {
@@ -341,6 +346,24 @@ impl Board {
         self.turn = opp;
     }
 
+    pub fn make_null_move(&mut self) {
+        self.history.push(self.pos);
+
+        self.pos.last_move = 0;
+        self.pos.ply += 1;
+        self.pos.key ^= Zobrist::side();
+        self.turn = self.turn.opp();
+        if self.can_ep() {
+            self.clear_ep();
+        }
+        self.set_check_info();
+    }
+
+    pub fn unmake_null_move(&mut self) {
+        self.pos = self.history.pop();
+        self.turn = self.turn.opp();
+    }
+
     pub fn see_capture(&self, m: u16) -> i32 {
         if !BitMove::is_cap(m) {
             return 0;
@@ -436,6 +459,23 @@ impl Board {
 
             BitBoard::pop_bit(piece_bb, sq);
             BitBoard::pop_bit(side_bb, sq);
+        }
+    }
+
+    pub fn debug(&mut self) {
+        println!("{self:?}");
+
+        let mut b = self.clone();
+        while !b.history.empty() {
+            let m = b.pos.last_move;
+            println!("{}", BitMove::pretty_move(m));
+            if m == 0 {
+                b.unmake_null_move();
+            } else {
+                b.unmake_move(m);
+            }
+            println!("{:?}", self.piece(32));
+            println!("{b:?}");
         }
     }
 }

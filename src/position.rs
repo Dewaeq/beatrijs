@@ -29,6 +29,7 @@ pub struct Position {
     pub check_squares: [u64; NUM_PIECES],
     /// `PIECE_NONE` if none
     pub captured_piece: Piece,
+    pub last_move: u16,
 }
 
 impl Position {
@@ -43,6 +44,7 @@ impl Position {
             king_blockers: [0; NUM_SIDES],
             check_squares: [0; NUM_PIECES],
             captured_piece: Piece::None,
+            last_move: 0,
         }
     }
 }
