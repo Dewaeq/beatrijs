@@ -1,6 +1,14 @@
 use std::io;
 
-use crate::{board::Board, search::{Searcher, evaluate}, perft::perft, tests::{self, perft::test_perft}};
+use crate::{
+    bitmove::BitMove,
+    board::Board,
+    movelist::MoveList,
+    perft::perft,
+    search::{evaluate, Searcher},
+    tests::{self, perft::test_perft},
+    utils::square_from_string,
+};
 
 pub struct Game {
     board: Board,
@@ -42,6 +50,10 @@ impl Game {
                 game.parse_test(commands);
             } else if base_command == "static" {
                 game.parse_static(commands);
+            } else if base_command == "move" {
+                game.parse_move(commands);
+            } else if base_command == "moves" {
+                game.parse_moves();
             }
         }
     }
@@ -92,5 +104,31 @@ impl Game {
     fn parse_static(&self, commands: Vec<&str>) {
         let eval = evaluate(&self.board);
         println!("{eval} cp");
+    }
+
+    fn parse_move(&mut self, commands: Vec<&str>) {
+        assert!(commands.len() == 2);
+
+        let src = square_from_string(&commands[1][0..2]);
+        let dest = square_from_string(&commands[1][2..4]);
+
+        let mut moves = MoveList::legal(&mut self.board);
+        let mut m = moves.find(|&x| BitMove::src(x) == src && BitMove::dest(x) == dest);
+        if let Some(m) = m {
+            self.board.make_move(m);
+        } else {
+            eprintln!("failed to parse move {}", commands[1]);
+        }
+    }
+
+    fn parse_moves(&mut self) {
+        let mut moves = MoveList::legal(&mut self.board);
+        print!("{}: ", moves.size());
+        
+        for m in moves {
+            print!("{}, ", BitMove::pretty_move(m));
+        }
+
+        println!();
     }
 }
