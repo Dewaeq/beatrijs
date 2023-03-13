@@ -1,4 +1,5 @@
-use std::io;
+use std::{io, thread};
+use std::sync::{Arc, Mutex};
 
 use crate::{
     bitmove::BitMove,
@@ -9,18 +10,24 @@ use crate::{
     tests::{self, perft::test_perft},
     utils::square_from_string,
 };
+use std::sync::atomic::{AtomicBool, Ordering};
 
 pub struct Game {
     board: Board,
-    searcher: Searcher,
+    abort_search: Arc<AtomicBool>,
 }
 
 impl Game {
     fn new() -> Self {
         Game {
             board: Board::start_pos(),
-            searcher: Searcher::new(Board::start_pos()),
+            abort_search: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    fn create_searcher(&self) -> Searcher {
+        let abort = self.abort_search.clone();
+        Searcher::new(self.board, abort)
     }
 
     pub fn main_loop() {
@@ -35,6 +42,8 @@ impl Game {
                 continue;
             }
 
+            game.stop_search();
+
             let commands: Vec<&str> = buffer.split_whitespace().collect();
             let base_command = commands[0];
 
@@ -44,6 +53,10 @@ impl Game {
                 game.parse_position(commands);
             } else if base_command == "search" {
                 game.parse_search(commands);
+            } else if base_command == "go" {
+                game.parse_go();
+            } else if base_command == "stop" {
+                game.stop_search();
             } else if base_command == "perft" {
                 game.parse_perft(commands);
             } else if base_command == "test" {
@@ -74,16 +87,23 @@ impl Game {
         assert!(commands[1] == "depth");
 
         let depth = commands[2].parse::<u8>().unwrap();
-        self.searcher = Searcher::new(self.board);
-        let (time, score) = self.searcher.search(depth);
-        let time = time as u64;
+        let mut searcher = self.create_searcher();
 
-        println!(
-            "info depth {depth} move {} cp {score} nodes {} time {time} nps {}",
-            BitMove::pretty_move(self.searcher.best_move),
-            self.searcher.num_nodes,
-            (self.searcher.num_nodes as f64 / time as f64 * 1000f64) as u64
-        );
+        let handle = thread::spawn(move || {
+            searcher.search(depth);
+        });
+    }
+
+    fn parse_go(&mut self) {
+        let mut searcher = self.create_searcher();
+
+        let handle = std::thread::spawn(move || {
+            searcher.iterate(255);
+        });
+    }
+
+    fn stop_search(&mut self) {
+        self.abort_search.store(true, Ordering::Relaxed);
     }
 
     fn parse_perft(&mut self, commands: Vec<&str>) {
@@ -104,7 +124,7 @@ impl Game {
 
     fn parse_static(&self, commands: Vec<&str>) {
         let eval = evaluate(&self.board);
-        println!("{eval} cp");
+        println!("{} cp", eval);
     }
 
     fn parse_move(&mut self, commands: Vec<&str>) {
@@ -125,7 +145,7 @@ impl Game {
     fn parse_moves(&mut self) {
         let mut moves = MoveList::legal(&mut self.board);
         print!("{}: ", moves.size());
-        
+
         for m in moves {
             print!("{}, ", BitMove::pretty_move(m));
         }

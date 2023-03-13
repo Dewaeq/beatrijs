@@ -1,4 +1,5 @@
 use crate::{bitboard::BitBoard, defs::Square};
+use crate::bitmove::BitMove;
 
 pub fn square_from_string(str: &str) -> Square {
     assert!(str.len() == 2);
@@ -57,6 +58,18 @@ pub const fn b_max(a: Square, b: Square) -> Square {
     } else {
         b
     }
+}
+
+pub fn print_search_info(depth: u8, score: i32, time: u64, best_move: u16, num_nodes: u64) {
+    println!(
+        "info depth {} move {} cp {} nodes {} time {} nps {}",
+        depth,
+        BitMove::pretty_move(best_move),
+        score,
+        num_nodes,
+        time,
+        (num_nodes as f64 / time as f64 * 1000f64) as u64
+    );
 }
 
 /* Square locations

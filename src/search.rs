@@ -8,34 +8,80 @@ use crate::{
 };
 use std::cmp;
 use std::time::Instant;
+use crate::utils::print_search_info;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 const IMMEDIATE_MATE_SCORE: i32 = 100000;
 
 pub struct Searcher {
-    pub num_nodes: u32,
+    pub num_nodes: u64,
     pub best_move: u16,
     board: Board,
+    abort: Arc<AtomicBool>,
+}
+
+impl Default for Searcher {
+    fn default() -> Self {
+        Searcher::new(Board::start_pos(), Arc::new(AtomicBool::new(false)))
+    }
 }
 
 impl Searcher {
-    pub fn new(board: Board) -> Self {
+    pub fn new(board: Board, abort: Arc<AtomicBool>) -> Self {
         Searcher {
             num_nodes: 0,
             best_move: 0,
             board,
+            abort,
         }
     }
 
-    pub fn search(&mut self, depth: u8) -> (f64, i32) {
+    pub fn start(&mut self) {
+        self.abort.store(false, Ordering::Relaxed);
+    }
+
+    pub fn stop(&mut self) {
+        self.abort.store(true, Ordering::Relaxed);
+    }
+
+    fn should_stop(&self) -> bool {
+        self.abort.load(Ordering::Relaxed)
+    }
+
+    pub fn iterate(&mut self, max_depth: u8) {
+        self.start();
+
+        for depth in 1..max_depth {
+            let prev_best_move = self.best_move;
+            self.search(depth);
+            if self.should_stop() {
+                self.best_move = prev_best_move;
+                break;
+            }
+
+            self.num_nodes = 0;
+            self.best_move = 0;
+        }
+    }
+
+    pub fn search(&mut self, depth: u8) -> (u64, i32) {
         self.num_nodes = 0;
         let start = Instant::now();
         let score = self.negamax(depth, 0, i32::MIN + 1, i32::MAX - 1, false);
         let end = start.elapsed();
+        let time = (end.as_secs_f64() * 1000f64) as u64;
 
-        (end.as_secs_f64() * 1000f64, score)
+        print_search_info(depth, score, time, self.best_move, self.num_nodes);
+
+        (time, score)
     }
 
     fn negamax(&mut self, mut depth: u8, ply_from_root: u8, mut alpha: i32, mut beta: i32, do_null: bool) -> i32 {
+        if self.should_stop() {
+            return 0;
+        }
+
         if depth == 0 {
             return self.quiesence(alpha, beta);
         }
@@ -64,6 +110,10 @@ impl Searcher {
             self.board.make_null_move();
             let score = -self.negamax(depth - 4, ply_from_root + 1, -beta, -beta + 1, false);
             self.board.unmake_null_move();
+
+            if self.should_stop() {
+                return 0;
+            }
 
             if score >= beta {
                 return beta;
@@ -103,6 +153,10 @@ impl Searcher {
     }
 
     fn quiesence(&mut self, mut alpha: i32, beta: i32) -> i32 {
+        if self.should_stop() {
+            return 0;
+        }
+
         self.num_nodes += 1;
 
         let stand_pat = evaluate(&self.board);
