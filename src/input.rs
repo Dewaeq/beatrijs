@@ -90,7 +90,8 @@ impl Game {
         let mut searcher = self.create_searcher();
 
         let handle = thread::spawn(move || {
-            searcher.search(depth);
+            searcher.start();
+            searcher.search(depth, i32::MIN + 1, i32::MAX - 1);
         });
     }
 
@@ -98,7 +99,7 @@ impl Game {
         let mut searcher = self.create_searcher();
 
         let handle = std::thread::spawn(move || {
-            searcher.iterate(255);
+            searcher.iterate();
         });
     }
 

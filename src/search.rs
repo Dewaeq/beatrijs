@@ -11,6 +11,7 @@ use std::time::Instant;
 use crate::utils::print_search_info;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use crate::defs::MAX_MOVES;
 
 const IMMEDIATE_MATE_SCORE: i32 = 100000;
 
@@ -49,32 +50,51 @@ impl Searcher {
         self.abort.load(Ordering::Relaxed)
     }
 
-    pub fn iterate(&mut self, max_depth: u8) {
+    pub fn iterate(&mut self) {
         self.start();
 
-        for depth in 1..max_depth {
+        // save alpha and beta for aspiration search
+        let mut alpha = i32::MIN + 1;
+        let mut beta = i32::MAX - 1;
+
+        for depth in 1..MAX_MOVES {
             let prev_best_move = self.best_move;
-            self.search(depth);
+            let mut score = self.search(depth as u8, alpha, beta);
+
             if self.should_stop() {
                 self.best_move = prev_best_move;
                 break;
             }
+
+            // score is outside of the window, so do a full-width search
+            if score <= alpha || score >= beta {
+                alpha = i32::MIN + 1;
+                beta = i32::MAX - 1;
+                score = self.search(depth as u8, alpha, beta);
+            }
+
+            // aspiration search:
+            // slightly shrink the search window
+            alpha = score - 50;
+            beta = score + 50;
 
             self.num_nodes = 0;
             self.best_move = 0;
         }
     }
 
-    pub fn search(&mut self, depth: u8) -> (u64, i32) {
+    pub fn search(&mut self, depth: u8, alpha: i32, beta: i32) -> i32 {
         self.num_nodes = 0;
         let start = Instant::now();
-        let score = self.negamax(depth, 0, i32::MIN + 1, i32::MAX - 1, false);
+        let score = self.negamax(depth, 0, alpha, beta, false);
         let end = start.elapsed();
         let time = (end.as_secs_f64() * 1000f64) as u64;
 
-        print_search_info(depth, score, time, self.best_move, self.num_nodes);
+        if !self.should_stop() {
+            print_search_info(depth, score, time, self.best_move, self.num_nodes);
+        }
 
-        (time, score)
+        score
     }
 
     fn negamax(&mut self, mut depth: u8, ply_from_root: u8, mut alpha: i32, mut beta: i32, do_null: bool) -> i32 {
