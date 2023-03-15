@@ -1,3 +1,4 @@
+use std::thread::JoinHandle;
 use std::{io, thread};
 use std::sync::{Arc, Mutex};
 
@@ -15,6 +16,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub struct Game {
     board: Board,
     abort_search: Arc<AtomicBool>,
+    search_thread: Option<JoinHandle<()>>,
 }
 
 impl Game {
@@ -22,6 +24,7 @@ impl Game {
         Game {
             board: Board::start_pos(),
             abort_search: Arc::new(AtomicBool::new(false)),
+            search_thread: None,
         }
     }
 
@@ -93,6 +96,8 @@ impl Game {
             searcher.start();
             searcher.search(depth, i32::MIN + 1, i32::MAX - 1);
         });
+
+        self.search_thread = Some(handle);
     }
 
     fn parse_go(&mut self) {
@@ -105,6 +110,7 @@ impl Game {
 
     fn stop_search(&mut self) {
         self.abort_search.store(true, Ordering::Relaxed);
+        self.search_thread.take().map(JoinHandle::join);
     }
 
     fn parse_perft(&mut self, commands: Vec<&str>) {

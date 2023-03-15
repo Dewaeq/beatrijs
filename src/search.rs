@@ -1,3 +1,5 @@
+use crate::defs::MAX_MOVES;
+use crate::utils::print_search_info;
 use crate::{
     bitboard::BitBoard,
     bitmove::BitMove,
@@ -7,11 +9,9 @@ use crate::{
     order::pick_next_move,
 };
 use std::cmp;
-use std::time::Instant;
-use crate::utils::print_search_info;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use crate::defs::MAX_MOVES;
+use std::time::Instant;
 
 const IMMEDIATE_MATE_SCORE: i32 = 100000;
 
@@ -47,7 +47,7 @@ impl Searcher {
     }
 
     fn should_stop(&self) -> bool {
-        self.abort.load(Ordering::Relaxed)
+        self.num_nodes & 2047 != 0 && self.abort.load(Ordering::Relaxed)
     }
 
     pub fn iterate(&mut self) {
@@ -97,7 +97,14 @@ impl Searcher {
         score
     }
 
-    fn negamax(&mut self, mut depth: u8, ply_from_root: u8, mut alpha: i32, mut beta: i32, do_null: bool) -> i32 {
+    fn negamax(
+        &mut self,
+        mut depth: u8,
+        ply_from_root: u8,
+        mut alpha: i32,
+        mut beta: i32,
+        do_null: bool,
+    ) -> i32 {
         if self.should_stop() {
             return 0;
         }
