@@ -1,7 +1,9 @@
+use std::cell::UnsafeCell;
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::{io, thread};
-use std::sync::{Arc, Mutex};
 
+use crate::table::{HashEntry, HashTable, TWrapper, Table, TT};
 use crate::{
     bitmove::BitMove,
     board::Board,
@@ -17,6 +19,7 @@ pub struct Game {
     board: Board,
     abort_search: Arc<AtomicBool>,
     search_thread: Option<JoinHandle<()>>,
+    table: Arc<TWrapper>,
 }
 
 impl Game {
@@ -25,12 +28,14 @@ impl Game {
             board: Board::start_pos(),
             abort_search: Arc::new(AtomicBool::new(false)),
             search_thread: None,
+            table: Arc::new(TWrapper::new()),
         }
     }
 
-    fn create_searcher(&self) -> Searcher {
+    fn create_searcher(&mut self) -> Searcher {
         let abort = self.abort_search.clone();
-        Searcher::new(self.board, abort)
+        let table = self.table.clone();
+        Searcher::new(self.board, abort, table)
     }
 
     pub fn main_loop() {
@@ -44,8 +49,6 @@ impl Game {
             if !input.is_ok() || buffer.is_empty() || buffer.trim().is_empty() {
                 continue;
             }
-
-            game.stop_search();
 
             let commands: Vec<&str> = buffer.split_whitespace().collect();
             let base_command = commands[0];
@@ -111,6 +114,14 @@ impl Game {
     fn stop_search(&mut self) {
         self.abort_search.store(true, Ordering::Relaxed);
         self.search_thread.take().map(JoinHandle::join);
+
+        let best_move = unsafe { (*self.table.inner.get()).best_move(self.board.pos.key) };
+
+        if let Some(m) = best_move {
+            println!("best move: {}", BitMove::pretty_move(m));
+        } else {
+            println!("failed to probe best move");
+        }
     }
 
     fn parse_perft(&mut self, commands: Vec<&str>) {

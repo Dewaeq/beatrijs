@@ -1,16 +1,6 @@
 #![allow(unused)]
 #![feature(const_slice_index)]
 
-use std::time::Instant;
-
-use crate::bitmove::{BitMove, MoveFlag};
-use crate::board::Board;
-use crate::input::Game;
-use crate::movelist::MoveList;
-use crate::perft::perft;
-use crate::search::Searcher;
-use crate::tests::perft::test_perft;
-
 mod bitboard;
 mod bitmove;
 mod board;
@@ -24,9 +14,14 @@ mod order;
 mod perft;
 mod position;
 mod search;
+mod table;
 mod tests;
 mod utils;
 mod zobrist;
+
+use table::{TWrapper, TT, Table};
+
+use crate::{input::Game, table::{HashEntry, HashTable}};
 
 fn main() {
     Game::main_loop();
