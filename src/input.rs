@@ -19,8 +19,7 @@ pub struct Game {
     board: Board,
     abort_search: Arc<AtomicBool>,
     search_thread: Option<JoinHandle<()>>,
-    // table: Arc<TWrapper>,
-    searcher: Searcher,
+    table: Arc<TWrapper>,
 }
 
 impl Game {
@@ -29,16 +28,15 @@ impl Game {
             board: Board::start_pos(),
             abort_search: Arc::new(AtomicBool::new(false)),
             search_thread: None,
-            searcher: Searcher::default(),
-            // table: Arc::new(TWrapper::new()),
+            table: Arc::new(TWrapper::new()),
         }
     }
 
-    /* fn create_searcher(&mut self) -> Searcher {
+    fn create_searcher(&mut self) -> Searcher {
         let abort = self.abort_search.clone();
         let table = self.table.clone();
         Searcher::new(self.board, abort, table)
-    } */
+    }
 
     pub fn main_loop() {
         let mut game = Game::new();
@@ -51,6 +49,8 @@ impl Game {
             if !input.is_ok() || buffer.is_empty() || buffer.trim().is_empty() {
                 continue;
             }
+
+            game.stop_search();
 
             let commands: Vec<&str> = buffer.split_whitespace().collect();
             let base_command = commands[0];
@@ -75,14 +75,15 @@ impl Game {
                 game.parse_move(commands);
             } else if base_command == "moves" {
                 game.parse_moves();
-            } else if base_command == "best" {
-                let best_move = game.best_move();
+            } else if base_command == "pv" {
+                let pv = unsafe { (*game.table.inner.get()).extract_pv(&mut game.board) };
 
-                if let Some(m) = best_move {
-                    println!("best move: {}", BitMove::pretty_move(m));
-                } else {
-                    println!("failed to probe best move");
+                print!("pv ");
+                for m in pv {
+                    print!("{} ", BitMove::pretty_move(m));
                 }
+
+                println!();
             }
         }
     }
@@ -103,32 +104,30 @@ impl Game {
         assert!(commands[1] == "depth");
 
         let depth = commands[2].parse::<u8>().unwrap();
-        self.searcher.start();
-        self.searcher.search(depth, i32::MIN + 1, i32::MAX - 1);
+        let mut searcher = self.create_searcher();
 
-        // let handle = thread::spawn(move || {
-        // searcher.start();
-        // searcher.search(depth, i32::MIN + 1, i32::MAX - 1);
-        // });
+        let handle = thread::spawn(move || {
+            searcher.start();
+            searcher.search(depth, i32::MIN + 1, i32::MAX - 1);
+        });
 
-        // self.search_thread = Some(handle);
+        self.search_thread = Some(handle);
     }
 
     fn parse_go(&mut self) {
-        self.searcher.iterate(19);
+        let mut searcher = self.create_searcher();
+
+        let handle = thread::spawn(move || {
+            searcher.start();
+            searcher.iterate(255);
+        });
+
+        self.search_thread = Some(handle);
     }
 
     fn stop_search(&mut self) {
-        // self.abort_search.store(true, Ordering::Relaxed);
-        // self.search_thread.take().map(JoinHandle::join);
-
-        let best_move = self.best_move();
-
-        if let Some(m) = best_move {
-            println!("best move: {}", BitMove::pretty_move(m));
-        } else {
-            println!("failed to probe best move");
-        }
+        self.abort_search.store(true, Ordering::Release);
+        self.search_thread.take().map(JoinHandle::join);
     }
 
     fn parse_perft(&mut self, commands: Vec<&str>) {
@@ -179,6 +178,6 @@ impl Game {
     }
 
     fn best_move(&self) -> Option<u16> {
-        unsafe { (*self.searcher.table.inner.get()).best_move(self.board.pos.key) }
+        unsafe { (*self.table.inner.get()).best_move(self.board.pos.key) }
     }
 }

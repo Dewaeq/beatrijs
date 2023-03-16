@@ -15,14 +15,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-const IMMEDIATE_MATE_SCORE: i32 = 100000;
+pub const IMMEDIATE_MATE_SCORE: i32 = 100000;
+pub const IS_MATE: i32 = IMMEDIATE_MATE_SCORE - 64;
 
 pub struct Searcher {
     pub num_nodes: u64,
     pub board: Board,
     pub table: Arc<TWrapper>,
-    // table: Arc<TWrapper>,
-    // abort: Arc<AtomicBool>,
+    abort: Arc<AtomicBool>,
 }
 
 impl Default for Searcher {
@@ -38,23 +38,23 @@ impl Default for Searcher {
 impl Searcher {
     pub fn new(board: Board, abort: Arc<AtomicBool>, tt: Arc<TWrapper>) -> Self {
         Searcher {
-            num_nodes: 0,
             board,
+            abort,
+            num_nodes: 0,
             table: tt,
         }
     }
 
     pub fn start(&mut self) {
-        // self.abort.store(false, Ordering::Relaxed);
+        self.abort.store(false, Ordering::Relaxed);
     }
 
     pub fn stop(&mut self) {
-        // self.abort.store(true, Ordering::Relaxed);
+        self.abort.store(true, Ordering::Relaxed);
     }
 
     fn should_stop(&self) -> bool {
-        // self.num_nodes & 2047 != 0 && self.abort.load(Ordering::Relaxed)
-        false
+        self.abort.load(Ordering::SeqCst)
     }
 
     pub fn iterate(&mut self, max_depth: u8) {
@@ -96,7 +96,6 @@ impl Searcher {
 
         if !self.should_stop() {
             let best_move = unsafe { (*self.table.inner.get()).best_move(self.board.pos.key) };
-            // let best_move = self.table.best_move(self.board.pos.key);
             print_search_info(depth, score, time, best_move.unwrap(), self.num_nodes);
         }
 
@@ -115,30 +114,6 @@ impl Searcher {
             return 0;
         }
 
-        let entry = unsafe { (*self.table.inner.get()).probe(self.board.pos.key, depth) };
-        // let entry = self.table.probe(self.board.pos.key, depth);
-
-        let mut best_move = 0;
-        if let Some(entry) = entry {
-            if entry.depth >= depth {
-                match entry.node_type {
-                    NodeType::Exact => return entry.score,
-                    NodeType::Alpha => {
-                        if alpha >= entry.score {
-                            return entry.score;
-                        }
-                    }
-                    NodeType::Beta => {
-                        if beta <= entry.score {
-                            return entry.score;
-                        }
-                    }
-                }
-            }
-
-            best_move = entry.m;
-        }
-
         if depth == 0 {
             let score = self.quiesence(alpha, beta);
 
@@ -151,17 +126,44 @@ impl Searcher {
             };
 
             let entry = HashEntry::new(self.board.pos.key, depth, 0, score, node_type);
-            // self.table.store(entry);
-
             unsafe {
-                (*self.table.inner.get()).store(entry);
+                (*self.table.inner.get()).store(entry, ply_from_root);
             }
 
             return score;
         }
 
+        let entry = unsafe { (*self.table.inner.get()).probe(self.board.pos.key, depth) };
+        let mut pv_move = 0;
+
+        if let Some(entry) = entry {
+            pv_move = entry.m;
+
+            if entry.depth >= depth {
+                let mut score = entry.score;
+                if score > IS_MATE {
+                    score -= ply_from_root as i32;
+                } else if score < -IS_MATE {
+                    score += ply_from_root as i32;
+                }
+
+                match entry.node_type {
+                    NodeType::Exact => return entry.score,
+                    NodeType::Alpha => {
+                        if alpha >= score {
+                            return alpha;
+                        }
+                    }
+                    NodeType::Beta => {
+                        if beta <= score {
+                            return beta;
+                        }
+                    }
+                }
+            }
+        }
+
         self.num_nodes += 1;
-        let old_alpha = alpha;
 
         if ply_from_root > 0 {
             alpha = i32::max(-IMMEDIATE_MATE_SCORE + ply_from_root as i32, alpha);
@@ -199,10 +201,15 @@ impl Searcher {
             depth += 1;
         }
 
-        if best_move != 0 {
+        let mut best_move = 0;
+        let mut score = i32::MIN + 1;
+        let mut best_score = i32::MIN + 1;
+        let old_alpha = alpha;
+
+        if pv_move != 0 {
             let mut i = 0;
             while i < moves.size() {
-                if moves.get(i) == best_move {
+                if moves.get(i) == pv_move {
                     moves.set_score(i, 2_000_000);
                     break;
                 }
@@ -215,56 +222,64 @@ impl Searcher {
             let m = moves.get(i);
 
             self.board.make_move(m);
-            let score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha, true);
+            score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha, true);
             self.board.unmake_move(m);
 
             if self.should_stop() {
                 return 0;
             }
 
-            if score >= beta {
-                if !BitMove::is_cap(m) {
-                    let ply = self.board.pos.ply;
-                    self.board.killers[1][ply] = self.board.killers[0][ply];
-                    self.board.killers[0][ply] = m;
-                }
-
-                let entry =
-                    HashEntry::new(self.board.pos.key, depth, best_move, score, NodeType::Beta);
-                // self.table.store(entry);
-
-                unsafe {
-                    (*self.table.inner.get()).store(entry);
-                }
-
-                return beta;
-            }
-            if score > alpha {
-                alpha = score;
+            if score > best_score {
+                best_score = score;
                 best_move = m;
+
+                if score > alpha {
+                    if score >= beta {
+                        if !BitMove::is_cap(m) {
+                            let ply = self.board.pos.ply;
+                            self.board.killers[1][ply] = self.board.killers[0][ply];
+                            self.board.killers[0][ply] = m;
+                        }
+
+                        let entry = HashEntry::new(
+                            self.board.pos.key,
+                            depth,
+                            best_move,
+                            beta,
+                            NodeType::Beta,
+                        );
+                        unsafe {
+                            (*self.table.inner.get()).store(entry, ply_from_root);
+                        }
+
+                        return beta;
+                    }
+
+                    alpha = score;
+                }
             }
         }
 
-        let node_type = if alpha > old_alpha {
-            NodeType::Exact
+        let entry = if alpha != old_alpha {
+            HashEntry::new(
+                self.board.pos.key,
+                depth,
+                best_move,
+                best_score,
+                NodeType::Exact,
+            )
         } else {
-            NodeType::Alpha
+            HashEntry::new(self.board.pos.key, depth, best_move, alpha, NodeType::Alpha)
         };
 
-        let entry = HashEntry::new(self.board.pos.key, depth, best_move, alpha, node_type);
-        // self.table.store(entry);
         unsafe {
-            (*self.table.inner.get()).store(entry);
+            (*self.table.inner.get()).store(entry, ply_from_root);
         }
 
         alpha
     }
 
     fn quiesence(&mut self, mut alpha: i32, beta: i32) -> i32 {
-        if self.should_stop() {
-            return 0;
-        }
-
         self.num_nodes += 1;
 
         let stand_pat = evaluate(&self.board);

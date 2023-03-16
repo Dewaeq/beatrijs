@@ -1,5 +1,6 @@
 #![allow(unused)]
 #![feature(const_slice_index)]
+#![feature(sync_unsafe_cell)]
 
 mod bitboard;
 mod bitmove;

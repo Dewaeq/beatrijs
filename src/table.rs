@@ -1,6 +1,12 @@
-use std::{cell::UnsafeCell, collections::HashSet, mem::MaybeUninit};
+use std::{
+    cell::{SyncUnsafeCell, UnsafeCell},
+    collections::HashSet,
+    mem::MaybeUninit,
+};
 
-pub const TABLE_SIZE: usize = 100_000;
+use crate::{board::Board, search::IS_MATE};
+
+pub const TABLE_SIZE: usize = 1_000_000;
 pub type TT = HashTable<HashEntry, TABLE_SIZE>;
 
 pub struct HashTable<T, const L: usize>
@@ -11,9 +17,7 @@ where
     pub size: u64,
 }
 
-impl<const L: usize> HashTable<HashEntry, L>
-where
-{
+impl<const L: usize> HashTable<HashEntry, L> {
     pub fn new() -> Self {
         let mut entries = vec![HashEntry::default(); L];
 
@@ -32,7 +36,7 @@ where
         }
     }
 
-    fn get(&self, key: u64) -> HashEntry {
+    pub fn get(&self, key: u64) -> HashEntry {
         unsafe { *self.entries.get_unchecked((key % self.size) as usize) }
     }
 
@@ -50,40 +54,70 @@ where
         }
     }
 
-    pub fn store(&mut self, entry: HashEntry) {
-        unsafe {
-            let prev = self.get_mut(entry.key());
-            if !prev.valid() || !(prev.key() == entry.key() && prev.depth() >= entry.depth()) {
-                *prev = entry;
-            }
+    pub fn store(&mut self, mut entry: HashEntry, ply_from_root: u8) {
+        if entry.score > IS_MATE {
+            entry.score += ply_from_root as i32;
+        } else if entry.score < -IS_MATE {
+            entry.score -= ply_from_root as i32;
         }
+
+        let prev = self.get_mut(entry.key());
+        if !prev.valid() || (prev.key() != entry.key()) || (prev.depth() <= entry.depth())
+        // prioritize entries that add a move to a
+        // position that previously didnt have a pv move stored
+        // || (prev.m == 0 && entry.m != 0)
+        {
+            *prev = entry;
+        }
+    }
+
+    pub fn extract_pv(&self, board: &mut Board) -> Vec<u16> {
+        let mut pv = vec![];
+        let mut m = self.best_move(board.pos.key);
+
+        while let Some(pv_move) = m {
+            if pv_move == 0 {
+                break;
+            }
+
+            pv.push(pv_move);
+            board.make_move(pv_move);
+            m = self.best_move(board.pos.key);
+        }
+
+        for _ in 0..pv.len() {
+            board.unmake_move(board.pos.last_move);
+        }
+
+        pv
     }
 }
 
 impl<T, const L: usize> HashTable<T, L> where T: Default + Copy {}
 
 unsafe impl Sync for TWrapper {}
+unsafe impl Send for TWrapper {}
 
 pub struct TWrapper {
-    pub inner: UnsafeCell<TT>,
+    pub inner: SyncUnsafeCell<TT>,
 }
 
 impl TWrapper {
     pub fn new() -> Self {
         TWrapper {
-            inner: UnsafeCell::new(TT::new()),
+            inner: SyncUnsafeCell::new(TT::new()),
         }
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum NodeType {
     Exact,
     Alpha,
     Beta,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct HashEntry {
     pub key: u64,
     pub depth: u8,
