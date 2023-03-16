@@ -19,7 +19,6 @@ mod tests;
 mod utils;
 mod zobrist;
 
-use table::{TWrapper, TT, Table};
 
 use crate::{input::Game, table::{HashEntry, HashTable}};
 

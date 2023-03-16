@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::{io, thread};
 
-use crate::table::{HashEntry, HashTable, TWrapper, Table, TT};
+use crate::table::{HashEntry, HashTable, TWrapper, TT};
 use crate::{
     bitmove::BitMove,
     board::Board,
@@ -19,7 +19,8 @@ pub struct Game {
     board: Board,
     abort_search: Arc<AtomicBool>,
     search_thread: Option<JoinHandle<()>>,
-    table: Arc<TWrapper>,
+    // table: Arc<TWrapper>,
+    searcher: Searcher,
 }
 
 impl Game {
@@ -28,15 +29,16 @@ impl Game {
             board: Board::start_pos(),
             abort_search: Arc::new(AtomicBool::new(false)),
             search_thread: None,
-            table: Arc::new(TWrapper::new()),
+            searcher: Searcher::default(),
+            // table: Arc::new(TWrapper::new()),
         }
     }
 
-    fn create_searcher(&mut self) -> Searcher {
+    /* fn create_searcher(&mut self) -> Searcher {
         let abort = self.abort_search.clone();
         let table = self.table.clone();
         Searcher::new(self.board, abort, table)
-    }
+    } */
 
     pub fn main_loop() {
         let mut game = Game::new();
@@ -73,6 +75,14 @@ impl Game {
                 game.parse_move(commands);
             } else if base_command == "moves" {
                 game.parse_moves();
+            } else if base_command == "best" {
+                let best_move = game.best_move();
+
+                if let Some(m) = best_move {
+                    println!("best move: {}", BitMove::pretty_move(m));
+                } else {
+                    println!("failed to probe best move");
+                }
             }
         }
     }
@@ -93,29 +103,26 @@ impl Game {
         assert!(commands[1] == "depth");
 
         let depth = commands[2].parse::<u8>().unwrap();
-        let mut searcher = self.create_searcher();
+        self.searcher.start();
+        self.searcher.search(depth, i32::MIN + 1, i32::MAX - 1);
 
-        let handle = thread::spawn(move || {
-            searcher.start();
-            searcher.search(depth, i32::MIN + 1, i32::MAX - 1);
-        });
+        // let handle = thread::spawn(move || {
+        // searcher.start();
+        // searcher.search(depth, i32::MIN + 1, i32::MAX - 1);
+        // });
 
-        self.search_thread = Some(handle);
+        // self.search_thread = Some(handle);
     }
 
     fn parse_go(&mut self) {
-        let mut searcher = self.create_searcher();
-
-        let handle = std::thread::spawn(move || {
-            searcher.iterate();
-        });
+        self.searcher.iterate(19);
     }
 
     fn stop_search(&mut self) {
-        self.abort_search.store(true, Ordering::Relaxed);
-        self.search_thread.take().map(JoinHandle::join);
+        // self.abort_search.store(true, Ordering::Relaxed);
+        // self.search_thread.take().map(JoinHandle::join);
 
-        let best_move = unsafe { (*self.table.inner.get()).best_move(self.board.pos.key) };
+        let best_move = self.best_move();
 
         if let Some(m) = best_move {
             println!("best move: {}", BitMove::pretty_move(m));
@@ -169,5 +176,9 @@ impl Game {
         }
 
         println!();
+    }
+
+    fn best_move(&self) -> Option<u16> {
+        unsafe { (*self.searcher.table.inner.get()).best_move(self.board.pos.key) }
     }
 }

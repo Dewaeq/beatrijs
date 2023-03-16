@@ -1,74 +1,46 @@
 use std::{cell::UnsafeCell, collections::HashSet, mem::MaybeUninit};
 
-const TABLE_SIZE: usize = 100_000;
+pub const TABLE_SIZE: usize = 100_000;
 pub type TT = HashTable<HashEntry, TABLE_SIZE>;
-
-pub trait Table<T, const L: usize>
-where
-    T: Default + Copy + Entry,
-{
-    fn new() -> Self;
-
-    fn probe(&self, key: u64, depth: u8) -> Option<T>;
-
-    fn store(&mut self, entry: T);
-
-    fn get(&self, key: u64) -> T;
-
-    fn get_mut(&mut self, key: u64) -> &mut T;
-}
-
-pub trait Entry
-where
-    Self: Default + Copy,
-{
-    fn key(&self) -> u64;
-
-    fn depth(&self) -> u8;
-
-    fn m(&self) -> u16;
-
-    fn valid(&self) -> bool {
-        self.key() != 0
-    }
-}
 
 pub struct HashTable<T, const L: usize>
 where
-    T: Default + Copy + Entry,
+    T: Default + Copy,
 {
     pub entries: Vec<T>,
     pub size: u64,
 }
 
-impl<T, const L: usize> Table<T, L> for HashTable<T, L>
+impl<const L: usize> HashTable<HashEntry, L>
 where
-    T: Default + Copy + Entry,
 {
-    fn new() -> Self {
-        unsafe {
-            let mut entries: Vec<T> = Vec::with_capacity(L);
+    pub fn new() -> Self {
+        let mut entries = vec![HashEntry::default(); L];
 
-            for i in 0..L {
-                entries.push(T::default());
-            }
-
-            HashTable {
-                entries,
-                size: L as u64,
-            }
+        HashTable {
+            entries,
+            size: L as u64,
         }
     }
 
-    fn get(&self, key: u64) -> T {
+    pub fn best_move(&self, key: u64) -> Option<u16> {
+        let entry = self.get(key);
+        if entry.valid() && entry.key() == key && entry.m() != 0 {
+            Some(entry.m())
+        } else {
+            None
+        }
+    }
+
+    fn get(&self, key: u64) -> HashEntry {
         unsafe { *self.entries.get_unchecked((key % self.size) as usize) }
     }
 
-    fn get_mut(&mut self, key: u64) -> &mut T {
+    fn get_mut(&mut self, key: u64) -> &mut HashEntry {
         unsafe { self.entries.get_unchecked_mut((key % self.size) as usize) }
     }
 
-    fn probe(&self, key: u64, depth: u8) -> Option<T> {
+    pub fn probe(&self, key: u64, depth: u8) -> Option<HashEntry> {
         let entry = self.get(key);
 
         if entry.valid() && entry.key() == key {
@@ -78,7 +50,7 @@ where
         }
     }
 
-    fn store(&mut self, entry: T) {
+    pub fn store(&mut self, entry: HashEntry) {
         unsafe {
             let prev = self.get_mut(entry.key());
             if !prev.valid() || !(prev.key() == entry.key() && prev.depth() >= entry.depth()) {
@@ -88,19 +60,7 @@ where
     }
 }
 
-impl<T, const L: usize> HashTable<T, L>
-where
-    T: Default + Copy + Entry,
-{
-    pub fn best_move(&self, key: u64) -> Option<u16> {
-        let entry = self.get(key);
-        if entry.valid() && entry.key() == key && entry.m() != 0 {
-            Some(entry.m())
-        } else {
-            None
-        }
-    }
-}
+impl<T, const L: usize> HashTable<T, L> where T: Default + Copy {}
 
 unsafe impl Sync for TWrapper {}
 
@@ -144,7 +104,21 @@ impl Default for HashEntry {
     }
 }
 
-impl Entry for HashEntry {
+impl HashEntry {
+    pub fn new(key: u64, depth: u8, m: u16, score: i32, node_type: NodeType) -> Self {
+        HashEntry {
+            key,
+            depth,
+            m,
+            score,
+            node_type,
+        }
+    }
+
+    pub const fn valid(&self) -> bool {
+        self.key != 0
+    }
+
     fn key(&self) -> u64 {
         self.key
     }
@@ -155,17 +129,5 @@ impl Entry for HashEntry {
 
     fn m(&self) -> u16 {
         self.m
-    }
-}
-
-impl HashEntry {
-    pub fn new(key: u64, depth: u8, m: u16, score: i32, node_type: NodeType) -> Self {
-        HashEntry {
-            key,
-            depth,
-            m,
-            score,
-            node_type,
-        }
     }
 }

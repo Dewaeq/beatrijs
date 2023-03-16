@@ -1,5 +1,5 @@
 use crate::defs::MAX_MOVES;
-use crate::table::{HashEntry, HashTable, NodeType, TWrapper, Table, TT};
+use crate::table::{HashEntry, HashTable, NodeType, TWrapper, TABLE_SIZE, TT};
 use crate::utils::print_search_info;
 use crate::{
     bitboard::BitBoard,
@@ -19,9 +19,10 @@ const IMMEDIATE_MATE_SCORE: i32 = 100000;
 
 pub struct Searcher {
     pub num_nodes: u64,
-    board: Board,
-    table: Arc<TWrapper>,
-    abort: Arc<AtomicBool>,
+    pub board: Board,
+    pub table: Arc<TWrapper>,
+    // table: Arc<TWrapper>,
+    // abort: Arc<AtomicBool>,
 }
 
 impl Default for Searcher {
@@ -39,31 +40,31 @@ impl Searcher {
         Searcher {
             num_nodes: 0,
             board,
-            abort,
             table: tt,
         }
     }
 
     pub fn start(&mut self) {
-        self.abort.store(false, Ordering::Relaxed);
+        // self.abort.store(false, Ordering::Relaxed);
     }
 
     pub fn stop(&mut self) {
-        self.abort.store(true, Ordering::Relaxed);
+        // self.abort.store(true, Ordering::Relaxed);
     }
 
     fn should_stop(&self) -> bool {
-        self.num_nodes & 2047 != 0 && self.abort.load(Ordering::Relaxed)
+        // self.num_nodes & 2047 != 0 && self.abort.load(Ordering::Relaxed)
+        false
     }
 
-    pub fn iterate(&mut self) {
+    pub fn iterate(&mut self, max_depth: u8) {
         self.start();
 
         // save alpha and beta for aspiration search
         let mut alpha = i32::MIN + 1;
         let mut beta = i32::MAX - 1;
 
-        for depth in 1..MAX_MOVES {
+        for depth in 1..max_depth {
             let mut score = self.search(depth as u8, alpha, beta);
 
             if self.should_stop() {
@@ -95,6 +96,7 @@ impl Searcher {
 
         if !self.should_stop() {
             let best_move = unsafe { (*self.table.inner.get()).best_move(self.board.pos.key) };
+            // let best_move = self.table.best_move(self.board.pos.key);
             print_search_info(depth, score, time, best_move.unwrap(), self.num_nodes);
         }
 
@@ -114,6 +116,8 @@ impl Searcher {
         }
 
         let entry = unsafe { (*self.table.inner.get()).probe(self.board.pos.key, depth) };
+        // let entry = self.table.probe(self.board.pos.key, depth);
+
         let mut best_move = 0;
         if let Some(entry) = entry {
             if entry.depth >= depth {
@@ -147,6 +151,7 @@ impl Searcher {
             };
 
             let entry = HashEntry::new(self.board.pos.key, depth, 0, score, node_type);
+            // self.table.store(entry);
 
             unsafe {
                 (*self.table.inner.get()).store(entry);
@@ -224,7 +229,10 @@ impl Searcher {
                     self.board.killers[0][ply] = m;
                 }
 
-                let entry = HashEntry::new(self.board.pos.key, depth, best_move, score, NodeType::Beta);
+                let entry =
+                    HashEntry::new(self.board.pos.key, depth, best_move, score, NodeType::Beta);
+                // self.table.store(entry);
+
                 unsafe {
                     (*self.table.inner.get()).store(entry);
                 }
@@ -244,6 +252,7 @@ impl Searcher {
         };
 
         let entry = HashEntry::new(self.board.pos.key, depth, best_move, alpha, node_type);
+        // self.table.store(entry);
         unsafe {
             (*self.table.inner.get()).store(entry);
         }
