@@ -224,7 +224,7 @@ impl Board {
         assert!(src != dest);
 
         self.history.push(self.pos);
-        self.pos.last_move = m;
+        self.pos.last_move = Some(m);
 
         // Remove all castling rights for the moving side when a king move occurs
         if piece == Piece::King {
@@ -346,10 +346,16 @@ impl Board {
         self.turn = opp;
     }
 
+    pub fn unmake_last_move(&mut self) {
+        if let Some(m) = self.pos.last_move {
+            self.unmake_move(m);
+        }
+    }
+
     pub fn make_null_move(&mut self) {
         self.history.push(self.pos);
 
-        self.pos.last_move = 0;
+        self.pos.last_move = None;
         self.pos.ply += 1;
         self.pos.key ^= Zobrist::side();
         self.turn = self.turn.opp();
@@ -467,7 +473,7 @@ impl Board {
 
         let mut b = self.clone();
         while !b.history.empty() {
-            let m = b.pos.last_move;
+            let m = b.pos.last_move.unwrap();
             println!("{}", BitMove::pretty_move(m));
             if m == 0 {
                 b.unmake_null_move();

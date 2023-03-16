@@ -71,6 +71,8 @@ impl Game {
                 game.parse_test(commands);
             } else if base_command == "static" {
                 game.parse_static(commands);
+            } else if base_command == "take" {
+                game.board.unmake_last_move();
             } else if base_command == "move" {
                 game.parse_move(commands);
             } else if base_command == "moves" {

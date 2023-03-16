@@ -93,7 +93,7 @@ impl<const L: usize> HashTable<HashEntry, L> {
         }
 
         for _ in 0..pv.len() {
-            board.unmake_move(board.pos.last_move);
+            board.unmake_move(board.pos.last_move.unwrap());
         }
 
         pv
