@@ -64,7 +64,7 @@ impl Searcher {
         let mut alpha = i32::MIN + 1;
         let mut beta = i32::MAX - 1;
 
-        for depth in 1..max_depth {
+        for depth in 1..=max_depth {
             let mut score = self.search(depth as u8, alpha, beta);
 
             if self.should_stop() {

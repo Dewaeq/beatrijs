@@ -62,7 +62,7 @@ impl Game {
             } else if base_command == "search" {
                 game.parse_search(commands);
             } else if base_command == "go" {
-                game.parse_go();
+                game.parse_go(255);
             } else if base_command == "stop" {
                 game.stop_search();
             } else if base_command == "perft" {
@@ -104,22 +104,14 @@ impl Game {
         assert!(commands[1] == "depth");
 
         let depth = commands[2].parse::<u8>().unwrap();
-        let mut searcher = self.create_searcher();
-
-        let handle = thread::spawn(move || {
-            searcher.start();
-            searcher.search(depth, i32::MIN + 1, i32::MAX - 1);
-        });
-
-        self.search_thread = Some(handle);
+        self.parse_go(depth);
     }
 
-    fn parse_go(&mut self) {
+    fn parse_go(&mut self, max_depth: u8) {
         let mut searcher = self.create_searcher();
-
         let handle = thread::spawn(move || {
             searcher.start();
-            searcher.iterate(255);
+            searcher.iterate(max_depth);
         });
 
         self.search_thread = Some(handle);
