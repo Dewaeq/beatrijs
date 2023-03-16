@@ -62,13 +62,20 @@ impl<const L: usize> HashTable<HashEntry, L> {
         }
 
         let prev = self.get_mut(entry.key());
-        if !prev.valid() || (prev.key() != entry.key()) || (prev.depth() <= entry.depth())
+
+        if !prev.valid() 
         // prioritize entries that add a move to a
         // position that previously didnt have a pv move stored
+        || (prev.m == 0 && entry.m != 0) 
+        || prev.depth < entry.depth {
+            *prev = entry;
+        }
+
+        /* if !prev.valid() || (prev.key() != entry.key()) || (prev.depth() <= entry.depth())
         // || (prev.m == 0 && entry.m != 0)
         {
             *prev = entry;
-        }
+        } */
     }
 
     pub fn extract_pv(&self, board: &mut Board) -> Vec<u16> {

@@ -96,7 +96,7 @@ impl Searcher {
 
         if !self.should_stop() {
             let best_move = unsafe { (*self.table.inner.get()).best_move(self.board.pos.key) };
-            print_search_info(depth, score, time, best_move.unwrap(), self.num_nodes);
+            print_search_info(depth, score, time, best_move.unwrap_or(0), self.num_nodes);
         }
 
         score
