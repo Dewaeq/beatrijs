@@ -21,6 +21,7 @@ pub struct Searcher {
     pub board: Board,
     pub table: Arc<TWrapper>,
     abort: Arc<AtomicBool>,
+    pv: [u16; 64],
 }
 
 impl Default for Searcher {
@@ -40,6 +41,7 @@ impl Searcher {
             abort,
             num_nodes: 0,
             table: tt,
+            pv: [0; 64],
         }
     }
 
@@ -94,7 +96,7 @@ impl Searcher {
 
         if !self.should_stop() {
             let best_move = self.table.best_move(self.board.key());
-            print_search_info(depth, score, time, best_move.unwrap_or(0), self.num_nodes);
+            print_search_info(depth, score, time, best_move.unwrap_or(0), self.num_nodes, &self.pv);
         }
 
         score
@@ -227,7 +229,7 @@ impl Searcher {
             if score > best_score {
                 best_score = score;
                 best_move = m;
-
+                
                 if score > alpha {
                     if score >= beta {
                         if !BitMove::is_cap(m) {
@@ -235,7 +237,7 @@ impl Searcher {
                             self.board.killers[1][ply] = self.board.killers[0][ply];
                             self.board.killers[0][ply] = m;
                         }
-
+                        
                         let entry = HashEntry::new(
                             self.board.pos.key,
                             depth,
@@ -243,11 +245,12 @@ impl Searcher {
                             beta,
                             NodeType::Beta,
                         );
-
+                        
                         self.table.store(entry, ply_from_root);
                         return beta;
                     }
-
+                    
+                    self.pv[ply_from_root as usize] = m;
                     alpha = score;
                 }
             }
