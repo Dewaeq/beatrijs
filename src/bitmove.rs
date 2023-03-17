@@ -1,4 +1,4 @@
-use crate::{defs::{Piece, Square}, utils::coord_from_square};
+use crate::{defs::{PieceType, Square}, utils::coord_from_square};
 
 /// Move encoded into a `u16`
 ///
@@ -47,14 +47,14 @@ impl BitMove {
             || BitMove::flag(bitmove) == MoveFlag::CASTLE_QUEEN
     }
 
-    pub fn from_piece(flag: u8) -> Piece {
+    pub fn from_piece(flag: u8) -> PieceType {
         // Remove capture bit
         match flag & 0b1011 {
-            MoveFlag::PROMOTE_KNIGHT => Piece::Knight,
-            MoveFlag::PROMOTE_BISHOP => Piece::Bishop,
-            MoveFlag::PROMOTE_ROOK => Piece::Rook,
-            MoveFlag::PROMOTE_QUEEN => Piece::Queen,
-            _ => Piece::None,
+            MoveFlag::PROMOTE_KNIGHT => PieceType::Knight,
+            MoveFlag::PROMOTE_BISHOP => PieceType::Bishop,
+            MoveFlag::PROMOTE_ROOK => PieceType::Rook,
+            MoveFlag::PROMOTE_QUEEN => PieceType::Queen,
+            _ => PieceType::None,
         }
     }
 

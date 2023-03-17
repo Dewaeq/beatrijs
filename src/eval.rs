@@ -1,26 +1,37 @@
-use crate::{board::Board, defs::{Score, Player, Piece, Value}, bitboard::BitBoard};
+use crate::{
+    bitboard::BitBoard,
+    board::Board,
+    defs::{PieceType, Player, Score, Value},
+    gen::pesto::MG_TABLE,
+};
 
 pub fn evaluate(board: &Board) -> Score {
-    let white_material = count_material(board, Player::White);
-    let black_material = count_material(board, Player::Black);
+    let mut white = 0;
+    let mut black = 0;
 
-    let eval = if board.turn == Player::White {
-        white_material - black_material
+    count_psqt(board, &mut white, &mut black);
+
+    if board.turn == Player::White {
+        white - black
     } else {
-        black_material - white_material
-    };
-
-    eval
+        black - white
+    }
 }
 
-fn count_material(board: &Board, side: Player) -> Score {
-    let mut score = 0;
+fn count_psqt(board: &Board, white: &mut Score, black: &mut Score) {
+    let mut sq = 0;
+    for piece in board.pieces {
+        if piece.is_none() {
+            sq += 1;
+            continue;
+        }
 
-    score += BitBoard::count(board.player_piece_bb(side, Piece::Pawn)) as Score * Value::PAWN;
-    score += BitBoard::count(board.player_piece_bb(side, Piece::Knight)) as Score * Value::KNIGHT;
-    score += BitBoard::count(board.player_piece_bb(side, Piece::Bishop)) as Score * Value::BISHOP;
-    score += BitBoard::count(board.player_piece_bb(side, Piece::Rook)) as Score * Value::ROOK;
-    score += BitBoard::count(board.player_piece_bb(side, Piece::Queen)) as Score * Value::QUEEN;
+        let score = MG_TABLE[piece.as_usize()][sq];
+        match piece.c {
+            Player::White => *white += score,
+            Player::Black => *black += score,
+        }
 
-    score
+        sq += 1;
+    }
 }

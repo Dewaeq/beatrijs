@@ -4,8 +4,8 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
-        Castling, Piece, Player, Square, Value, BLACK_IDX, FEN_START_STRING, MAX_MOVES, NUM_PIECES,
-        NUM_SIDES, NUM_SQUARES, WHITE_IDX, Score,
+        Castling, Piece, PieceType, Player, Score, Square, Value, BLACK_IDX, FEN_START_STRING,
+        MAX_MOVES, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX,
     },
     gen::{attack::attacks, between::between},
     history::History,
@@ -34,8 +34,8 @@ impl Board {
     }
 
     /// Get the [`PieceType`] of the piece on the provided square
-    pub const fn piece(&self, square: Square) -> Piece {
-        unsafe { *self.pieces.get_unchecked(square as usize) }
+    pub const fn piece(&self, square: Square) -> PieceType {
+        unsafe { self.pieces.get_unchecked(square as usize).t }
     }
 
     pub const fn occ_bb(&self) -> u64 {
@@ -55,34 +55,34 @@ impl Board {
         }
     }
 
-    pub const fn piece_bb(&self, piece: Piece) -> u64 {
+    pub const fn piece_bb(&self, piece: PieceType) -> u64 {
         unsafe { *self.piece_bb.get_unchecked(piece.as_usize()) }
     }
 
     /// Get a piece-like bitboard.
     ///
     /// Eg `get_piece_like_bb(PieceType::Bishop)` returns queen and bishop bitboards combined
-    pub const fn piece_like_bb(&self, piece_like: Piece) -> u64 {
-        self.piece_bb(piece_like) | self.piece_bb(Piece::Queen)
+    pub const fn piece_like_bb(&self, piece_like: PieceType) -> u64 {
+        self.piece_bb(piece_like) | self.piece_bb(PieceType::Queen)
     }
 
-    pub const fn player_piece_like_bb(&self, side: Player, piece_like: Piece) -> u64 {
-        (self.piece_bb(piece_like) | self.piece_bb(Piece::Queen)) & self.player_bb(side)
+    pub const fn player_piece_like_bb(&self, side: Player, piece_like: PieceType) -> u64 {
+        (self.piece_bb(piece_like) | self.piece_bb(PieceType::Queen)) & self.player_bb(side)
     }
 
-    pub const fn player_piece_bb(&self, side: Player, piece: Piece) -> u64 {
+    pub const fn player_piece_bb(&self, side: Player, piece: PieceType) -> u64 {
         let piece_bb = self.piece_bb(piece);
         let side_bb = self.player_bb(side);
         piece_bb & side_bb
     }
 
     pub const fn cur_king_square(&self) -> Square {
-        let bb = self.player_piece_bb(self.turn, Piece::King);
+        let bb = self.player_piece_bb(self.turn, PieceType::King);
         BitBoard::bit_scan_forward(bb)
     }
 
     pub const fn king_square(&self, side: Player) -> Square {
-        let bb = self.player_piece_bb(side, Piece::King);
+        let bb = self.player_piece_bb(side, PieceType::King);
         BitBoard::bit_scan_forward(bb)
     }
 
@@ -126,9 +126,10 @@ impl Board {
     pub fn slider_blockers(&self, sq: Square, us_bb: u64, opp_bb: u64) -> u64 {
         let opp = self.turn.opp();
         // Every piece of the opponent which is a possible pinner
-        let mut pinners = attacks(Piece::Bishop, sq, opp_bb, opp)
-            & self.player_piece_like_bb(opp, Piece::Bishop)
-            | attacks(Piece::Rook, sq, opp_bb, opp) & self.player_piece_like_bb(opp, Piece::Rook);
+        let mut pinners = attacks(PieceType::Bishop, sq, opp_bb, opp)
+            & self.player_piece_like_bb(opp, PieceType::Bishop)
+            | attacks(PieceType::Rook, sq, opp_bb, opp)
+                & self.player_piece_like_bb(opp, PieceType::Rook);
         let mut pinned_bb = BitBoard::EMPTY;
 
         while pinners != 0 {
@@ -177,30 +178,36 @@ impl Board {
             *self.pos.king_blockers.get_unchecked_mut(opp.as_usize()) =
                 self.slider_blockers(opp_king_sq, us_bb, opp_bb);
 
-            self.set_check_squares(Piece::Pawn, attacks(Piece::Pawn, opp_king_sq, 0, self.turn));
             self.set_check_squares(
-                Piece::Knight,
-                attacks(Piece::Knight, opp_king_sq, 0, self.turn),
+                PieceType::Pawn,
+                attacks(PieceType::Pawn, opp_king_sq, 0, self.turn),
             );
             self.set_check_squares(
-                Piece::Bishop,
-                attacks(Piece::Bishop, opp_king_sq, occ, self.turn),
+                PieceType::Knight,
+                attacks(PieceType::Knight, opp_king_sq, 0, self.turn),
             );
             self.set_check_squares(
-                Piece::Rook,
-                attacks(Piece::Rook, opp_king_sq, occ, self.turn),
+                PieceType::Bishop,
+                attacks(PieceType::Bishop, opp_king_sq, occ, self.turn),
             );
             self.set_check_squares(
-                Piece::Queen,
+                PieceType::Rook,
+                attacks(PieceType::Rook, opp_king_sq, occ, self.turn),
+            );
+            self.set_check_squares(
+                PieceType::Queen,
                 self.pos
                     .check_squares
-                    .get_unchecked(Piece::Bishop.as_usize())
-                    | self.pos.check_squares.get_unchecked(Piece::Rook.as_usize()),
+                    .get_unchecked(PieceType::Bishop.as_usize())
+                    | self
+                        .pos
+                        .check_squares
+                        .get_unchecked(PieceType::Rook.as_usize()),
             );
         }
     }
 
-    fn set_check_squares(&mut self, piece: Piece, bb: u64) {
+    fn set_check_squares(&mut self, piece: PieceType, bb: u64) {
         unsafe { *self.pos.check_squares.get_unchecked_mut(piece.as_usize()) = bb }
     }
 
@@ -220,18 +227,18 @@ impl Board {
         let is_prom = BitMove::is_prom(m);
         let is_castle = BitMove::is_castle(m);
         let is_ep = BitMove::is_ep(m);
-        let piece = self.pieces[src as usize];
+        let piece = self.piece(src);
         let opp = self.turn.opp();
         let old_castle = self.pos.castling;
 
-        assert!(piece != Piece::None);
+        assert!(piece != PieceType::None);
         assert!(src != dest);
 
         self.history.push(self.pos);
         self.pos.last_move = Some(m);
 
         // Remove all castling rights for the moving side when a king move occurs
-        if piece == Piece::King {
+        if piece == PieceType::King {
             self.disable_castling(self.turn);
         }
 
@@ -248,7 +255,7 @@ impl Board {
         if self.can_ep() {
             if is_ep {
                 let ep_pawn_sq = self.pos.ep_square - self.turn.pawn_dir();
-                self.remove_piece(opp, Piece::Pawn, ep_pawn_sq);
+                self.remove_piece(opp, PieceType::Pawn, ep_pawn_sq);
                 // target.pos.key ^= Zobrist::piece(opp, PieceType::Pawn, dest);
             }
 
@@ -274,8 +281,8 @@ impl Board {
                 rook_target_sq = self.turn.castle_queen_sq() + 1;
             }
 
-            self.remove_piece(self.turn, Piece::Rook, rook_sq);
-            self.add_piece(self.turn, Piece::Rook, rook_target_sq);
+            self.remove_piece(self.turn, PieceType::Rook, rook_sq);
+            self.add_piece(self.turn, PieceType::Rook, rook_target_sq);
 
             // target.pos.key ^= Zobrist::piece(self.turn, PieceType::Rook, rook_sq);
             // target.pos.key ^= Zobrist::piece(self.turn, PieceType::Rook, rook_target_sq);
@@ -319,13 +326,13 @@ impl Board {
         self.remove_piece(opp, piece, dest);
 
         if is_prom {
-            self.add_piece(opp, Piece::Pawn, src);
+            self.add_piece(opp, PieceType::Pawn, src);
         } else {
             self.add_piece(opp, piece, src);
         }
 
         if is_ep {
-            self.add_piece(self.turn, Piece::Pawn, dest + self.turn.pawn_dir());
+            self.add_piece(self.turn, PieceType::Pawn, dest + self.turn.pawn_dir());
         } else if is_cap {
             self.add_piece(self.turn, self.pos.captured_piece, dest);
         }
@@ -342,8 +349,8 @@ impl Board {
                 rook_home_sq = dest - 2;
             }
 
-            self.remove_piece(opp, Piece::Rook, rook_sq);
-            self.add_piece(opp, Piece::Rook, rook_home_sq);
+            self.remove_piece(opp, PieceType::Rook, rook_sq);
+            self.add_piece(opp, PieceType::Rook, rook_home_sq);
         }
 
         self.pos = self.history.pop();
@@ -390,7 +397,7 @@ impl Board {
         let captured = self.piece(dest);
         let (attacker, src) = smallest_attacker(self, dest, self.turn);
 
-        if attacker != Piece::None {
+        if attacker != PieceType::None {
             self.move_piece_cheap(src, dest, attacker, captured);
             cmp::max(0, Value::of(captured) - self.see(dest))
         } else {
@@ -398,7 +405,13 @@ impl Board {
         }
     }
 
-    fn move_piece_cheap(&mut self, src: Square, dest: Square, piece: Piece, captured: Piece) {
+    fn move_piece_cheap(
+        &mut self,
+        src: Square,
+        dest: Square,
+        piece: PieceType,
+        captured: PieceType,
+    ) {
         self.remove_piece(self.turn, piece, src);
         self.remove_piece(self.turn.opp(), captured, dest);
         self.add_piece(self.turn, piece, dest);
@@ -442,12 +455,12 @@ impl Board {
         self.pos.ep_square = 64;
     }
 
-    pub fn add_piece(&mut self, side: Player, piece: Piece, sq: Square) {
-        assert!(piece != Piece::None);
+    pub fn add_piece(&mut self, side: Player, piece: PieceType, sq: Square) {
+        assert!(piece != PieceType::None);
 
         self.pos.key ^= Zobrist::piece(side, piece, sq);
         unsafe {
-            *self.pieces.get_unchecked_mut(sq as usize) = piece;
+            *self.pieces.get_unchecked_mut(sq as usize) = Piece::new(piece, side);
 
             let piece_bb = self.piece_bb.get_unchecked_mut(piece.as_usize());
             let side_bb = self.side_bb.get_unchecked_mut(side.as_usize());
@@ -457,13 +470,13 @@ impl Board {
         }
     }
 
-    pub fn remove_piece(&mut self, side: Player, piece: Piece, sq: Square) {
-        assert!(piece != Piece::None);
+    pub fn remove_piece(&mut self, side: Player, piece: PieceType, sq: Square) {
+        assert!(piece != PieceType::None);
 
         self.pos.key ^= Zobrist::piece(side, piece, sq);
 
         unsafe {
-            *self.pieces.get_unchecked_mut(sq as usize) = Piece::None;
+            *self.pieces.get_unchecked_mut(sq as usize) = Piece::NONE;
             let piece_bb = self.piece_bb.get_unchecked_mut(piece.as_usize());
             let side_bb = self.side_bb.get_unchecked_mut(side.as_usize());
 
@@ -496,7 +509,7 @@ impl Board {
             turn: Player::White,
             piece_bb: [BitBoard::EMPTY; NUM_PIECES],
             side_bb: [BitBoard::EMPTY; NUM_SIDES],
-            pieces: [Piece::None; 64],
+            pieces: [Piece::NONE; 64],
             pos: Position::new(),
             history: History::new(),
             killers: [[0; MAX_MOVES]; 2],
@@ -587,12 +600,12 @@ impl Board {
 
             let square = rank * 8 + file;
             let piece = match c {
-                "p" => Piece::Pawn,
-                "n" => Piece::Knight,
-                "b" => Piece::Bishop,
-                "r" => Piece::Rook,
-                "q" => Piece::Queen,
-                "k" => Piece::King,
+                "p" => PieceType::Pawn,
+                "n" => PieceType::Knight,
+                "b" => PieceType::Bishop,
+                "r" => PieceType::Rook,
+                "q" => PieceType::Queen,
+                "k" => PieceType::King,
                 _ => panic!(),
             };
 
@@ -620,14 +633,14 @@ impl Board {
                 let is_white =
                     BitBoard::from_sq(square) & self.side_bb[Player::White.as_usize()] != 0;
 
-                let piece_str = match self.pieces[square as usize] {
-                    Piece::Pawn => " p ",
-                    Piece::Knight => " n ",
-                    Piece::Bishop => " b ",
-                    Piece::Rook => " r ",
-                    Piece::Queen => " q ",
-                    Piece::King => " k ",
-                    Piece::None => "   ",
+                let piece_str = match self.piece(square) {
+                    PieceType::Pawn => " p ",
+                    PieceType::Knight => " n ",
+                    PieceType::Bishop => " b ",
+                    PieceType::Rook => " r ",
+                    PieceType::Queen => " q ",
+                    PieceType::King => " k ",
+                    PieceType::None => "   ",
                 };
 
                 output.push('|');

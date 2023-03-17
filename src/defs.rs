@@ -31,8 +31,8 @@ impl Castling {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Player {
-    White,
-    Black,
+    White = 0,
+    Black = 1,
 }
 
 impl Player {
@@ -84,8 +84,50 @@ impl Player {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub struct Piece {
+    pub t: PieceType,
+    pub c: Player,
+}
+
+impl Piece {
+    pub const NONE: Piece = Piece::new(PieceType::None, Player::White);
+
+    pub const fn new(piece_type: PieceType, side: Player) -> Self {
+        Piece {
+            t: piece_type,
+            c: side,
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        self.t == PieceType::None
+    }
+
+    pub fn as_usize(&self) -> usize {
+        assert!(self.t != PieceType::None);
+
+        self.t.as_usize() + self.c.as_usize() * 6
+    }
+}
+
+pub const PIECES: [Piece; 12] = [
+    Piece::new(PieceType::Pawn, Player::White),
+    Piece::new(PieceType::Knight, Player::White),
+    Piece::new(PieceType::Bishop, Player::White),
+    Piece::new(PieceType::Rook, Player::White),
+    Piece::new(PieceType::Queen, Player::White),
+    Piece::new(PieceType::King, Player::White),
+    Piece::new(PieceType::Pawn, Player::Black),
+    Piece::new(PieceType::Knight, Player::Black),
+    Piece::new(PieceType::Bishop, Player::Black),
+    Piece::new(PieceType::Rook, Player::Black),
+    Piece::new(PieceType::Queen, Player::Black),
+    Piece::new(PieceType::King, Player::Black),
+];
+
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Piece {
+pub enum PieceType {
     Pawn,
     Knight,
     Bishop,
@@ -95,17 +137,17 @@ pub enum Piece {
     None,
 }
 
-impl Piece {
+impl PieceType {
     /// Constant function to use PieceType as an index in constant contexts
     pub const fn as_usize(self) -> usize {
         match self {
-            Piece::Pawn => 0,
-            Piece::Knight => 1,
-            Piece::Bishop => 2,
-            Piece::Rook => 3,
-            Piece::Queen => 4,
-            Piece::King => 5,
-            Piece::None => 6,
+            PieceType::Pawn => 0,
+            PieceType::Knight => 1,
+            PieceType::Bishop => 2,
+            PieceType::Rook => 3,
+            PieceType::Queen => 4,
+            PieceType::King => 5,
+            PieceType::None => 6,
         }
     }
 }
@@ -154,15 +196,18 @@ impl Value {
     pub const ROOK: Score = 520;
     pub const QUEEN: Score = 900;
 
-    pub const fn of(piece: Piece) -> Score {
+    pub const fn of(piece: PieceType) -> Score {
         match piece {
-            Piece::Pawn => Value::PAWN,
-            Piece::Knight => Value::KNIGHT,
-            Piece::Bishop => Value::BISHOP,
-            Piece::Rook => Value::ROOK,
-            Piece::Queen => Value::QUEEN,
-            Piece::King => 0,
-            Piece::None => 0,
+            PieceType::Pawn => Value::PAWN,
+            PieceType::Knight => Value::KNIGHT,
+            PieceType::Bishop => Value::BISHOP,
+            PieceType::Rook => Value::ROOK,
+            PieceType::Queen => Value::QUEEN,
+            PieceType::King => 0,
+            PieceType::None => 0,
         }
     }
 }
+
+pub const MG_VALUE: [Score; NUM_PIECES] = [82, 337, 364, 477, 1025, 0];
+pub const EG_VALUE: [Score; NUM_PIECES] = [94, 281, 297, 512, 936, 0];

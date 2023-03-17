@@ -68,6 +68,7 @@ impl Game {
                 game.parse_static(commands);
             } else if base_command == "take" {
                 game.board.unmake_last_move();
+                println!("{:?}", game.board);
             } else if base_command == "move" {
                 game.parse_move(commands);
             } else if base_command == "moves" {
@@ -150,6 +151,7 @@ impl Game {
         let m = moves.find(|&x| BitMove::src(x) == src && BitMove::dest(x) == dest);
         if let Some(m) = m {
             self.board.make_move(m);
+            println!("{:?}", self.board);
         } else {
             eprintln!("failed to parse move {}", commands[1]);
         }

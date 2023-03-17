@@ -22,7 +22,9 @@ mod zobrist;
 mod eval;
 mod psqt;
 
-use crate::input::Game;
+use defs::PIECES;
+
+use crate::{input::Game, gen::pesto::MG_TABLE, utils::{square_from_string, mirror, square_to_string}};
 
 fn main() {
     Game::main_loop();

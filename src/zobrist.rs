@@ -1,11 +1,11 @@
-use crate::defs::{Piece, Player, Square};
+use crate::defs::{PieceType, Player, Square};
 
 include!(concat!(env!("OUT_DIR"), "/zobrist.rs"));
 
 pub struct Zobrist;
 
 impl Zobrist {
-    pub const fn piece(side: Player, piece: Piece, sq: Square) -> u64 {
+    pub const fn piece(side: Player, piece: PieceType, sq: Square) -> u64 {
         PIECES[piece.as_usize() + side.as_usize() * 6][sq as usize]
     }
 

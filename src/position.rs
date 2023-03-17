@@ -1,4 +1,4 @@
-use crate::{defs::{Castling, Piece, Square, MAX_MOVES, NUM_PIECES, NUM_SIDES}, bitmove::BitMove};
+use crate::{defs::{Castling, PieceType, Square, MAX_MOVES, NUM_PIECES, NUM_SIDES}, bitmove::BitMove};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Position {
@@ -28,7 +28,7 @@ pub struct Position {
     /// type gives check to the opponent
     pub check_squares: [u64; NUM_PIECES],
     /// `PIECE_NONE` if none
-    pub captured_piece: Piece,
+    pub captured_piece: PieceType,
     pub last_move: Option<u16>,
 }
 
@@ -43,7 +43,7 @@ impl Position {
             checkers_bb: 0,
             king_blockers: [0; NUM_SIDES],
             check_squares: [0; NUM_PIECES],
-            captured_piece: Piece::None,
+            captured_piece: PieceType::None,
             last_move: None,
         }
     }

@@ -6,7 +6,7 @@ use crate::{
     bitboard::BitBoard,
     bitmove::BitMove,
     board::Board,
-    defs::{Piece, Player, Value},
+    defs::{PieceType, Player, Value},
     movelist::MoveList,
     order::pick_next_move,
 };
@@ -75,6 +75,10 @@ impl Searcher {
                 alpha = -INFINITY;
                 beta = INFINITY;
                 score = self.search(depth as u8, alpha, beta);
+            }
+
+            if score >= IS_MATE || score <= -IS_MATE {
+                break;
             }
 
             // aspiration search:
