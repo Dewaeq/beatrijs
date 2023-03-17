@@ -1,16 +1,15 @@
-use std::cell::UnsafeCell;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::{io, thread};
 
-use crate::table::{HashEntry, HashTable, TWrapper, TT};
+use crate::table::TWrapper;
 use crate::{
     bitmove::BitMove,
     board::Board,
     movelist::MoveList,
     perft::perft,
     search::{evaluate, Searcher},
-    tests::{self, perft::test_perft},
+    tests::perft::test_perft,
     utils::square_from_string,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -152,7 +151,7 @@ impl Game {
         let dest = square_from_string(&commands[1][2..4]);
 
         let mut moves = MoveList::legal(&mut self.board);
-        let mut m = moves.find(|&x| BitMove::src(x) == src && BitMove::dest(x) == dest);
+        let m = moves.find(|&x| BitMove::src(x) == src && BitMove::dest(x) == dest);
         if let Some(m) = m {
             self.board.make_move(m);
         } else {
@@ -161,7 +160,7 @@ impl Game {
     }
 
     fn parse_moves(&mut self) {
-        let mut moves = MoveList::legal(&mut self.board);
+        let moves = MoveList::legal(&mut self.board);
         print!("{}: ", moves.size());
 
         for m in moves {
@@ -169,9 +168,5 @@ impl Game {
         }
 
         println!();
-    }
-
-    fn best_move(&self) -> Option<u16> {
-        unsafe { (*self.table.inner.get()).best_move(self.board.pos.key) }
     }
 }

@@ -1,3 +1,4 @@
+use crate::defs::Score;
 use crate::{bitboard::BitBoard, defs::Square};
 use crate::bitmove::BitMove;
 
@@ -60,7 +61,7 @@ pub const fn b_max(a: Square, b: Square) -> Square {
     }
 }
 
-pub fn print_search_info(depth: u8, score: i32, time: u64, best_move: u16, num_nodes: u64) {
+pub fn print_search_info(depth: u8, score: Score, time: u64, best_move: u16, num_nodes: u64) {
     println!(
         "info depth {} move {} cp {} nodes {} time {} nps {}",
         depth,

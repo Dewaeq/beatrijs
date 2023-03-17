@@ -1,5 +1,5 @@
-use crate::defs::MAX_MOVES;
-use crate::table::{HashEntry, HashTable, NodeType, TWrapper, TABLE_SIZE, TT};
+use crate::defs::{Score, INFINITY};
+use crate::table::{HashEntry, NodeType, TWrapper};
 use crate::utils::print_search_info;
 use crate::{
     bitboard::BitBoard,
@@ -9,14 +9,12 @@ use crate::{
     movelist::MoveList,
     order::pick_next_move,
 };
-use std::cell::UnsafeCell;
-use std::cmp;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-pub const IMMEDIATE_MATE_SCORE: i32 = 100000;
-pub const IS_MATE: i32 = IMMEDIATE_MATE_SCORE - 64;
+pub const IMMEDIATE_MATE_SCORE: Score = 30_000;
+pub const IS_MATE: Score = IMMEDIATE_MATE_SCORE - 64;
 
 pub struct Searcher {
     pub num_nodes: u64,
@@ -61,8 +59,8 @@ impl Searcher {
         self.start();
 
         // save alpha and beta for aspiration search
-        let mut alpha = i32::MIN + 1;
-        let mut beta = i32::MAX - 1;
+        let mut alpha = -INFINITY;
+        let mut beta = INFINITY;
 
         for depth in 1..=max_depth {
             let mut score = self.search(depth as u8, alpha, beta);
@@ -73,8 +71,8 @@ impl Searcher {
 
             // score is outside of the window, so do a full-width search
             if score <= alpha || score >= beta {
-                alpha = i32::MIN + 1;
-                beta = i32::MAX - 1;
+                alpha = -INFINITY;
+                beta = INFINITY;
                 score = self.search(depth as u8, alpha, beta);
             }
 
@@ -87,7 +85,7 @@ impl Searcher {
         }
     }
 
-    pub fn search(&mut self, depth: u8, alpha: i32, beta: i32) -> i32 {
+    pub fn search(&mut self, depth: u8, alpha: Score, beta: Score) -> Score {
         self.num_nodes = 0;
         let start = Instant::now();
         let score = self.negamax(depth, 0, alpha, beta, false);
@@ -95,7 +93,7 @@ impl Searcher {
         let time = (end.as_secs_f64() * 1000f64) as u64;
 
         if !self.should_stop() {
-            let best_move = self.table.best_move(self.board.pos.key);
+            let best_move = self.table.best_move(self.board.key());
             print_search_info(depth, score, time, best_move.unwrap_or(0), self.num_nodes);
         }
 
@@ -106,10 +104,10 @@ impl Searcher {
         &mut self,
         mut depth: u8,
         ply_from_root: u8,
-        mut alpha: i32,
-        mut beta: i32,
+        mut alpha: Score,
+        mut beta: Score,
         do_null: bool,
-    ) -> i32 {
+    ) -> Score {
         if self.should_stop() {
             return 0;
         }
@@ -125,13 +123,13 @@ impl Searcher {
                 NodeType::Exact
             };
 
-            let entry = HashEntry::new(self.board.pos.key, depth, 0, score, node_type);
+            let entry = HashEntry::new(self.board.key(), depth, 0, score, node_type);
             self.table.store(entry, ply_from_root);
 
             return score;
         }
 
-        let entry = self.table.probe(self.board.pos.key);
+        let entry = self.table.probe(self.board.key());
         let mut pv_move = 0;
 
         if let Some(entry) = entry {
@@ -140,9 +138,9 @@ impl Searcher {
             if entry.depth >= depth {
                 let mut score = entry.score;
                 if score > IS_MATE {
-                    score -= ply_from_root as i32;
+                    score -= ply_from_root as Score;
                 } else if score < -IS_MATE {
-                    score += ply_from_root as i32;
+                    score += ply_from_root as Score;
                 }
 
                 match entry.node_type {
@@ -164,8 +162,8 @@ impl Searcher {
         self.num_nodes += 1;
 
         if ply_from_root > 0 {
-            alpha = i32::max(-IMMEDIATE_MATE_SCORE + ply_from_root as i32, alpha);
-            beta = i32::min(IMMEDIATE_MATE_SCORE - ply_from_root as i32, beta);
+            alpha = Score::max(-IMMEDIATE_MATE_SCORE + ply_from_root as Score, alpha);
+            beta = Score::min(IMMEDIATE_MATE_SCORE - ply_from_root as Score, beta);
 
             if alpha >= beta {
                 return alpha;
@@ -175,7 +173,7 @@ impl Searcher {
         let mut moves = MoveList::legal(&mut self.board);
         if moves.is_empty() {
             if self.board.in_check() {
-                return -IMMEDIATE_MATE_SCORE + ply_from_root as i32;
+                return -IMMEDIATE_MATE_SCORE + ply_from_root as Score;
             }
             return 0;
         }
@@ -200,8 +198,7 @@ impl Searcher {
         }
 
         let mut best_move = 0;
-        let mut score = i32::MIN + 1;
-        let mut best_score = i32::MIN + 1;
+        let mut best_score = -INFINITY;
         let old_alpha = alpha;
 
         if pv_move != 0 {
@@ -220,7 +217,7 @@ impl Searcher {
             let m = moves.get(i);
 
             self.board.make_move(m);
-            score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha, true);
+            let score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha, true);
             self.board.unmake_move(m);
 
             if self.should_stop() {
@@ -258,14 +255,14 @@ impl Searcher {
 
         let entry = if alpha != old_alpha {
             HashEntry::new(
-                self.board.pos.key,
+                self.board.key(),
                 depth,
                 best_move,
                 best_score,
                 NodeType::Exact,
             )
         } else {
-            HashEntry::new(self.board.pos.key, depth, best_move, alpha, NodeType::Alpha)
+            HashEntry::new(self.board.key(), depth, best_move, alpha, NodeType::Alpha)
         };
 
         self.table.store(entry, ply_from_root);
@@ -273,7 +270,7 @@ impl Searcher {
         alpha
     }
 
-    fn quiesence(&mut self, mut alpha: i32, beta: i32) -> i32 {
+    fn quiesence(&mut self, mut alpha: Score, beta: Score) -> Score {
         self.num_nodes += 1;
 
         let stand_pat = evaluate(&self.board);
@@ -306,7 +303,7 @@ impl Searcher {
     }
 }
 
-pub fn evaluate(board: &Board) -> i32 {
+pub fn evaluate(board: &Board) -> Score {
     let white_material = count_material(board, Player::White);
     let black_material = count_material(board, Player::Black);
 
@@ -319,14 +316,14 @@ pub fn evaluate(board: &Board) -> i32 {
     eval
 }
 
-fn count_material(board: &Board, side: Player) -> i32 {
+fn count_material(board: &Board, side: Player) -> Score {
     let mut score = 0;
 
-    score += BitBoard::count(board.player_piece_bb(side, Piece::Pawn)) as i32 * Value::PAWN;
-    score += BitBoard::count(board.player_piece_bb(side, Piece::Knight)) as i32 * Value::KNIGHT;
-    score += BitBoard::count(board.player_piece_bb(side, Piece::Bishop)) as i32 * Value::BISHOP;
-    score += BitBoard::count(board.player_piece_bb(side, Piece::Rook)) as i32 * Value::ROOK;
-    score += BitBoard::count(board.player_piece_bb(side, Piece::Queen)) as i32 * Value::QUEEN;
+    score += BitBoard::count(board.player_piece_bb(side, Piece::Pawn)) as Score * Value::PAWN;
+    score += BitBoard::count(board.player_piece_bb(side, Piece::Knight)) as Score * Value::KNIGHT;
+    score += BitBoard::count(board.player_piece_bb(side, Piece::Bishop)) as Score * Value::BISHOP;
+    score += BitBoard::count(board.player_piece_bb(side, Piece::Rook)) as Score * Value::ROOK;
+    score += BitBoard::count(board.player_piece_bb(side, Piece::Queen)) as Score * Value::QUEEN;
 
     score
 }

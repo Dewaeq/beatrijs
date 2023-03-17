@@ -1,10 +1,8 @@
 use std::{
-    cell::{SyncUnsafeCell, UnsafeCell},
-    collections::HashSet,
-    mem::MaybeUninit,
+    cell::SyncUnsafeCell,
 };
 
-use crate::{board::Board, search::IS_MATE};
+use crate::{board::Board, search::IS_MATE, defs::Score};
 
 pub const TABLE_SIZE: usize = 1_000_000;
 pub type TT = HashTable<HashEntry, TABLE_SIZE>;
@@ -85,7 +83,7 @@ impl<const L: usize> HashTable<HashEntry, L> {
 
     pub fn extract_pv(&self, board: &mut Board) -> Vec<u16> {
         let mut pv = vec![];
-        let mut m = self.best_move(board.pos.key);
+        let mut m = self.best_move(board.key());
 
         while let Some(pv_move) = m {
             if pv_move == 0 {
@@ -94,7 +92,7 @@ impl<const L: usize> HashTable<HashEntry, L> {
 
             pv.push(pv_move);
             board.make_move(pv_move);
-            m = self.best_move(board.pos.key);
+            m = self.best_move(board.key());
         }
 
         for _ in 0..pv.len() {
@@ -129,9 +127,9 @@ impl TWrapper {
 
     pub fn store(&self, mut entry: HashEntry, ply_from_root: u8) {
         if entry.score > IS_MATE {
-            entry.score += ply_from_root as i32;
+            entry.score += ply_from_root as Score;
         } else if entry.score < -IS_MATE {
-            entry.score -= ply_from_root as i32;
+            entry.score -= ply_from_root as Score;
         }
 
         unsafe {
@@ -158,7 +156,7 @@ pub struct HashEntry {
     pub key: u64,
     pub depth: u8,
     pub m: u16,
-    pub score: i32,
+    pub score: Score,
     pub node_type: NodeType,
 }
 
@@ -175,7 +173,7 @@ impl Default for HashEntry {
 }
 
 impl HashEntry {
-    pub fn new(key: u64, depth: u8, m: u16, score: i32, node_type: NodeType) -> Self {
+    pub fn new(key: u64, depth: u8, m: u16, score: Score, node_type: NodeType) -> Self {
         HashEntry {
             key,
             depth,

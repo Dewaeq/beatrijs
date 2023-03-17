@@ -5,7 +5,7 @@ use crate::{
     bitmove::{BitMove, MoveFlag},
     defs::{
         Castling, Piece, Player, Square, Value, BLACK_IDX, FEN_START_STRING, MAX_MOVES, NUM_PIECES,
-        NUM_SIDES, NUM_SQUARES, WHITE_IDX,
+        NUM_SIDES, NUM_SQUARES, WHITE_IDX, Score,
     },
     gen::{attack::attacks, between::between},
     history::History,
@@ -29,6 +29,10 @@ pub struct Board {
 
 /// Getter methods
 impl Board {
+    pub const fn key(&self) -> u64 {
+        self.pos.key
+    }
+
     /// Get the [`PieceType`] of the piece on the provided square
     pub const fn piece(&self, square: Square) -> Piece {
         unsafe { *self.pieces.get_unchecked(square as usize) }
@@ -370,7 +374,7 @@ impl Board {
         self.turn = self.turn.opp();
     }
 
-    pub fn see_capture(&self, m: u16) -> i32 {
+    pub fn see_capture(&self, m: u16) -> Score {
         if !BitMove::is_cap(m) {
             return 0;
         }
@@ -382,7 +386,7 @@ impl Board {
         Value::of(captured) - new_board.see(BitMove::dest(m))
     }
 
-    fn see(&mut self, dest: Square) -> i32 {
+    fn see(&mut self, dest: Square) -> Score {
         let captured = self.piece(dest);
         let (attacker, src) = smallest_attacker(self, dest, self.turn);
 

@@ -20,8 +20,7 @@ mod tests;
 mod utils;
 mod zobrist;
 
-
-use crate::{input::Game, table::{HashEntry, HashTable}};
+use crate::input::Game;
 
 fn main() {
     Game::main_loop();

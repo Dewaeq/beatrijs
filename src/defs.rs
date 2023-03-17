@@ -1,5 +1,4 @@
 use crate::bitboard::BitBoard;
-use std::ops::{Index, IndexMut};
 
 pub const WHITE_IDX: usize = 0;
 pub const BLACK_IDX: usize = 1;
@@ -10,6 +9,9 @@ pub const NUM_SIDES: usize = 2;
 pub const NUM_SQUARES: usize = 64;
 
 pub type Square = i8;
+pub type Score = i16;
+
+pub const INFINITY: Score = Score::MAX - 1;
 
 pub const DIRS: [i8; 8] = [8, 1, -8, -1, 9, -7, -9, 7];
 
@@ -146,13 +148,13 @@ pub enum GenType {
 pub struct Value;
 
 impl Value {
-    pub const PAWN: i32 = 100;
-    pub const KNIGHT: i32 = 300;
-    pub const BISHOP: i32 = 320;
-    pub const ROOK: i32 = 520;
-    pub const QUEEN: i32 = 900;
+    pub const PAWN: Score = 100;
+    pub const KNIGHT: Score = 300;
+    pub const BISHOP: Score = 320;
+    pub const ROOK: Score = 520;
+    pub const QUEEN: Score = 900;
 
-    pub const fn of(piece: Piece) -> i32 {
+    pub const fn of(piece: Piece) -> Score {
         match piece {
             Piece::Pawn => Value::PAWN,
             Piece::Knight => Value::KNIGHT,
