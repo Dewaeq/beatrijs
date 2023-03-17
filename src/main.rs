@@ -19,6 +19,8 @@ mod table;
 mod tests;
 mod utils;
 mod zobrist;
+mod eval;
+mod psqt;
 
 use crate::input::Game;
 

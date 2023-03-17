@@ -2,15 +2,11 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::{io, thread};
 
+use crate::eval::evaluate;
 use crate::table::TWrapper;
 use crate::{
-    bitmove::BitMove,
-    board::Board,
-    movelist::MoveList,
-    perft::perft,
-    search::{evaluate, Searcher},
-    tests::perft::test_perft,
-    utils::square_from_string,
+    bitmove::BitMove, board::Board, movelist::MoveList, perft::perft, search::Searcher,
+    tests::perft::test_perft, utils::square_from_string,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 
