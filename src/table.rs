@@ -9,6 +9,20 @@ use crate::{board::Board, search::IS_MATE};
 pub const TABLE_SIZE: usize = 1_000_000;
 pub type TT = HashTable<HashEntry, TABLE_SIZE>;
 
+pub trait Table<T, const L: usize> 
+where T: Default + Copy,
+{
+    fn new() -> Self;
+
+    fn probe(&self, key: u64) -> Option<T>;
+
+    fn store(&mut self, entry: T);
+
+    fn get(&self, key: u64) -> T;
+
+    fn get_mut(&mut self, key: u64) -> &mut T;
+}
+
 pub struct HashTable<T, const L: usize>
 where
     T: Default + Copy,
@@ -17,9 +31,9 @@ where
     pub size: u64,
 }
 
-impl<const L: usize> HashTable<HashEntry, L> {
-    pub fn new() -> Self {
-        let mut entries = vec![HashEntry::default(); L];
+impl<const L: usize> Table<HashEntry, L> for HashTable<HashEntry, L> {
+    fn new() -> Self {
+        let entries = vec![HashEntry::default(); L];
 
         HashTable {
             entries,
@@ -27,16 +41,29 @@ impl<const L: usize> HashTable<HashEntry, L> {
         }
     }
 
-    pub fn best_move(&self, key: u64) -> Option<u16> {
+    fn probe(&self, key: u64) -> Option<HashEntry> {
         let entry = self.get(key);
-        if entry.valid() && entry.key() == key && entry.m() != 0 {
-            Some(entry.m())
+
+        if entry.valid() && entry.key == key {
+            Some(entry)
         } else {
             None
         }
     }
 
-    pub fn get(&self, key: u64) -> HashEntry {
+    fn store(&mut self, entry: HashEntry) {
+        let prev = self.get_mut(entry.key);
+
+        if !prev.valid() 
+        // prioritize entries that add a move to a
+        // position that previously didnt have a pv move stored
+        || (!prev.has_move() && entry.has_move()) 
+        || prev.depth < entry.depth {
+            *prev = entry;
+        }
+    }
+
+    fn get(&self, key: u64) -> HashEntry {
         unsafe { *self.entries.get_unchecked((key % self.size) as usize) }
     }
 
@@ -44,38 +71,16 @@ impl<const L: usize> HashTable<HashEntry, L> {
         unsafe { self.entries.get_unchecked_mut((key % self.size) as usize) }
     }
 
-    pub fn probe(&self, key: u64, depth: u8) -> Option<HashEntry> {
-        let entry = self.get(key);
+}
 
-        if entry.valid() && entry.key() == key {
-            Some(entry)
+impl<const L: usize> HashTable<HashEntry, L> {
+    pub fn best_move(&self, key: u64) -> Option<u16> {
+        let entry = self.get(key);
+        if entry.valid() && entry.key == key && entry.has_move() {
+            Some(entry.m)
         } else {
             None
         }
-    }
-
-    pub fn store(&mut self, mut entry: HashEntry, ply_from_root: u8) {
-        if entry.score > IS_MATE {
-            entry.score += ply_from_root as i32;
-        } else if entry.score < -IS_MATE {
-            entry.score -= ply_from_root as i32;
-        }
-
-        let prev = self.get_mut(entry.key());
-
-        if !prev.valid() 
-        // prioritize entries that add a move to a
-        // position that previously didnt have a pv move stored
-        || (prev.m == 0 && entry.m != 0) 
-        || prev.depth < entry.depth {
-            *prev = entry;
-        }
-
-        /* if !prev.valid() || (prev.key() != entry.key()) || (prev.depth() <= entry.depth())
-        // || (prev.m == 0 && entry.m != 0)
-        {
-            *prev = entry;
-        } */
     }
 
     pub fn extract_pv(&self, board: &mut Board) -> Vec<u16> {
@@ -113,6 +118,30 @@ impl TWrapper {
     pub fn new() -> Self {
         TWrapper {
             inner: SyncUnsafeCell::new(TT::new()),
+        }
+    }
+
+    pub fn probe(&self, key: u64) -> Option<HashEntry> {
+        unsafe {
+            (*self.inner.get()).probe(key)
+        }
+    }
+
+    pub fn store(&self, mut entry: HashEntry, ply_from_root: u8) {
+        if entry.score > IS_MATE {
+            entry.score += ply_from_root as i32;
+        } else if entry.score < -IS_MATE {
+            entry.score -= ply_from_root as i32;
+        }
+
+        unsafe {
+            (*self.inner.get()).store(entry);
+        }
+    }
+
+    pub fn best_move(&self, key: u64) -> Option<u16> {
+        unsafe {
+            (*self.inner.get()).best_move(key)
         }
     }
 }
@@ -160,15 +189,7 @@ impl HashEntry {
         self.key != 0
     }
 
-    fn key(&self) -> u64 {
-        self.key
-    }
-
-    fn depth(&self) -> u8 {
-        self.depth
-    }
-
-    fn m(&self) -> u16 {
-        self.m
+    pub const fn has_move(&self) -> bool {
+        self.m != 0
     }
 }

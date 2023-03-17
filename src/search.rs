@@ -95,7 +95,7 @@ impl Searcher {
         let time = (end.as_secs_f64() * 1000f64) as u64;
 
         if !self.should_stop() {
-            let best_move = unsafe { (*self.table.inner.get()).best_move(self.board.pos.key) };
+            let best_move = self.table.best_move(self.board.pos.key);
             print_search_info(depth, score, time, best_move.unwrap_or(0), self.num_nodes);
         }
 
@@ -126,14 +126,12 @@ impl Searcher {
             };
 
             let entry = HashEntry::new(self.board.pos.key, depth, 0, score, node_type);
-            unsafe {
-                (*self.table.inner.get()).store(entry, ply_from_root);
-            }
+            self.table.store(entry, ply_from_root);
 
             return score;
         }
 
-        let entry = unsafe { (*self.table.inner.get()).probe(self.board.pos.key, depth) };
+        let entry = self.table.probe(self.board.pos.key);
         let mut pv_move = 0;
 
         if let Some(entry) = entry {
@@ -248,10 +246,8 @@ impl Searcher {
                             beta,
                             NodeType::Beta,
                         );
-                        unsafe {
-                            (*self.table.inner.get()).store(entry, ply_from_root);
-                        }
 
+                        self.table.store(entry, ply_from_root);
                         return beta;
                     }
 
@@ -272,9 +268,7 @@ impl Searcher {
             HashEntry::new(self.board.pos.key, depth, best_move, alpha, NodeType::Alpha)
         };
 
-        unsafe {
-            (*self.table.inner.get()).store(entry, ply_from_root);
-        }
+        self.table.store(entry, ply_from_root);
 
         alpha
     }
