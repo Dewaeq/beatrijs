@@ -21,7 +21,6 @@ pub struct Searcher {
     pub board: Board,
     pub table: Arc<TWrapper>,
     abort: Arc<AtomicBool>,
-    pv: [u16; 64],
 }
 
 impl Default for Searcher {
@@ -41,7 +40,6 @@ impl Searcher {
             abort,
             num_nodes: 0,
             table: tt,
-            pv: [0; 64],
         }
     }
 
@@ -95,8 +93,9 @@ impl Searcher {
         let time = (end.as_secs_f64() * 1000f64) as u64;
 
         if !self.should_stop() {
+            let pv = self.table.extract_pv(&mut self.board);
             let best_move = self.table.best_move(self.board.key());
-            print_search_info(depth, score, time, best_move.unwrap_or(0), self.num_nodes, &self.pv);
+            print_search_info(depth, score, time, best_move.unwrap_or(0), self.num_nodes, &pv);
         }
 
         score
@@ -250,7 +249,6 @@ impl Searcher {
                         return beta;
                     }
                     
-                    self.pv[ply_from_root as usize] = m;
                     alpha = score;
                 }
             }

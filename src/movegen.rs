@@ -431,7 +431,7 @@ pub fn generate_quiet(board: &mut Board, move_list: &mut MoveList) {
     }
 }
 
-const fn is_legal_move(board: &Board, m: u16) -> bool {
+pub const fn is_legal_move(board: &Board, m: u16) -> bool {
     let blockers = board.blockers(board.turn);
     let flag = BitMove::flag(m);
     let src = BitMove::src(m);

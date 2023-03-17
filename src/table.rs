@@ -2,7 +2,7 @@ use std::{
     cell::SyncUnsafeCell,
 };
 
-use crate::{board::Board, search::IS_MATE, defs::Score};
+use crate::{board::Board, search::IS_MATE, defs::Score, movegen::is_legal_move};
 
 pub const TABLE_SIZE: usize = 1_000_000;
 pub type TT = HashTable<HashEntry, TABLE_SIZE>;
@@ -90,6 +90,10 @@ impl<const L: usize> HashTable<HashEntry, L> {
                 break;
             }
 
+            if !is_legal_move(board, pv_move) {
+                break;
+            }
+
             pv.push(pv_move);
             board.make_move(pv_move);
             m = self.best_move(board.key());
@@ -142,6 +146,12 @@ impl TWrapper {
             (*self.inner.get()).best_move(key)
         }
     }
+
+    pub fn extract_pv(&self, board: &mut Board) -> Vec<u16> {
+        unsafe {
+            (*self.inner.get()).extract_pv(board)
+        }
+    } 
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]

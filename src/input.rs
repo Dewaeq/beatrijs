@@ -77,7 +77,7 @@ impl Game {
             } else if base_command == "moves" {
                 game.parse_moves();
             } else if base_command == "pv" {
-                let pv = unsafe { (*game.table.inner.get()).extract_pv(&mut game.board) };
+                let pv = game.table.extract_pv(&mut game.board);
 
                 print!("pv ");
                 for m in pv {
