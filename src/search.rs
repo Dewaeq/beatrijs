@@ -24,16 +24,6 @@ pub struct Searcher {
     start_time: Instant,
 }
 
-impl Default for Searcher {
-    fn default() -> Self {
-        Searcher::new(
-            Board::start_pos(),
-            Arc::new(AtomicBool::new(false)),
-            Arc::new(TWrapper::new()),
-        )
-    }
-}
-
 impl Searcher {
     pub fn new(board: Board, abort: Arc<AtomicBool>, tt: Arc<TWrapper>) -> Self {
         Searcher {
