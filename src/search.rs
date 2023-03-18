@@ -228,7 +228,7 @@ impl Searcher {
                 score = alpha + 1;
                 // LMR
                 // Dot not reduce moves that give check, capture or promote
-                if depth >= 3 && !BitMove::is_tactical(m) && !self.board.in_check() {
+                if depth >= 3 && !BitMove::is_tactical(m) && !self.board.in_check() && i > 3 {
                     let d = depth - depth / 5 - 2;
                     score = -self.negamax(d, ply + 1, -alpha - 1, -alpha, true);
                 }
