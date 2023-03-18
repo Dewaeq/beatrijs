@@ -22,16 +22,7 @@ pub struct Searcher {
     pub board: Board,
     pub table: Arc<TWrapper>,
     abort: Arc<AtomicBool>,
-}
-
-impl Default for Searcher {
-    fn default() -> Self {
-        Searcher::new(
-            Board::start_pos(),
-            Arc::new(AtomicBool::new(false)),
-            Arc::new(TWrapper::new()),
-        )
-    }
+    start_time: Instant,
 }
 
 impl Searcher {
@@ -41,10 +32,12 @@ impl Searcher {
             abort,
             num_nodes: 0,
             table: tt,
+            start_time: Instant::now(),
         }
     }
 
     pub fn start(&mut self) {
+        self.start_time = Instant::now();
         self.abort.store(false, Ordering::Relaxed);
     }
 
@@ -54,6 +47,11 @@ impl Searcher {
 
     fn should_stop(&self) -> bool {
         self.abort.load(Ordering::SeqCst)
+    }
+
+    fn clear_for_search(&mut self) {
+        self.num_nodes = 0;
+        self.board.clear_killers();
     }
 
     pub fn iterate(&mut self, max_depth: u8) {
@@ -90,16 +88,27 @@ impl Searcher {
         }
     }
 
-    pub fn search(&mut self, depth: u8, alpha: Score, beta: Score) -> Score {
-        self.num_nodes = 0;
+    fn search(&mut self, depth: u8, alpha: Score, beta: Score) -> Score {
+        self.clear_for_search();
+
         let start = Instant::now();
         let score = self.negamax(depth, 0, alpha, beta, false);
-        let end = start.elapsed();
-        let time = (end.as_secs_f64() * 1000f64) as u64;
+        let elapsed = self.start_time.elapsed();
+        let total_time = (elapsed.as_secs_f64() * 1000f64) as u64;
+        let search_time = start.elapsed().as_secs_f64();
 
         if !self.should_stop() {
+            let pv = self.table.extract_pv(&mut self.board);
             let best_move = self.table.best_move(self.board.key());
-            print_search_info(depth, score, time, best_move.unwrap_or(0), self.num_nodes);
+            print_search_info(
+                depth,
+                score,
+                total_time,
+                search_time,
+                best_move.unwrap_or(0),
+                self.num_nodes,
+                &pv,
+            );
         }
 
         score
@@ -108,7 +117,7 @@ impl Searcher {
     fn negamax(
         &mut self,
         mut depth: u8,
-        ply_from_root: u8,
+        ply: u8,
         mut alpha: Score,
         mut beta: Score,
         do_null: bool,
@@ -129,34 +138,28 @@ impl Searcher {
             };
 
             let entry = HashEntry::new(self.board.key(), depth, 0, score, node_type);
-            self.table.store(entry, ply_from_root);
+            self.table.store(entry, ply);
 
             return score;
         }
 
-        let entry = self.table.probe(self.board.key());
+        let entry = self.table.probe(self.board.key(), ply);
+        let in_check = self.board.in_check();
         let mut pv_move = 0;
 
         if let Some(entry) = entry {
             pv_move = entry.m;
 
             if entry.depth >= depth {
-                let mut score = entry.score;
-                if score > IS_MATE {
-                    score -= ply_from_root as Score;
-                } else if score < -IS_MATE {
-                    score += ply_from_root as Score;
-                }
-
                 match entry.node_type {
                     NodeType::Exact => return entry.score,
                     NodeType::Alpha => {
-                        if alpha >= score {
+                        if alpha >= entry.score {
                             return alpha;
                         }
                     }
                     NodeType::Beta => {
-                        if beta <= score {
+                        if beta <= entry.score {
                             return beta;
                         }
                     }
@@ -166,9 +169,9 @@ impl Searcher {
 
         self.num_nodes += 1;
 
-        if ply_from_root > 0 {
-            alpha = Score::max(-IMMEDIATE_MATE_SCORE + ply_from_root as Score, alpha);
-            beta = Score::min(IMMEDIATE_MATE_SCORE - ply_from_root as Score, beta);
+        if ply > 0 {
+            alpha = Score::max(-IMMEDIATE_MATE_SCORE + ply as Score, alpha);
+            beta = Score::min(IMMEDIATE_MATE_SCORE - ply as Score, beta);
 
             if alpha >= beta {
                 return alpha;
@@ -177,16 +180,15 @@ impl Searcher {
 
         let mut moves = MoveList::legal(&mut self.board);
         if moves.is_empty() {
-            if self.board.in_check() {
-                return -IMMEDIATE_MATE_SCORE + ply_from_root as Score;
+            if in_check {
+                return -IMMEDIATE_MATE_SCORE + ply as Score;
             }
             return 0;
         }
 
-        // TODO: add zugzwang protection
-        if do_null && !self.board.in_check() && depth >= 4 {
+        if do_null && !in_check && depth >= 4 && self.board.has_big_piece(self.board.turn) {
             self.board.make_null_move();
-            let score = -self.negamax(depth - 4, ply_from_root + 1, -beta, -beta + 1, false);
+            let score = -self.negamax(depth - 4, ply + 1, -beta, -beta + 1, false);
             self.board.unmake_null_move();
 
             if self.should_stop() {
@@ -198,7 +200,7 @@ impl Searcher {
             }
         }
 
-        if self.board.in_check() {
+        if in_check {
             depth += 1;
         }
 
@@ -222,7 +224,28 @@ impl Searcher {
             let m = moves.get(i);
 
             self.board.make_move(m);
-            let score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha, true);
+            let mut score = 0;
+
+            // search pv move in a full window, at full depth
+            if i == 0 {
+                score = -self.negamax(depth - 1, ply + 1, -beta, -alpha, true);
+            } else {
+                score = alpha + 1;
+                // LMR
+                // Dot not reduce moves that give check, capture or promote
+                if depth >= 3 && !BitMove::is_tactical(m) && !self.board.in_check() && i > 3 {
+                    let d = depth - depth / 5 - 2;
+                    score = -self.negamax(d, ply + 1, -alpha - 1, -alpha, true);
+                }
+
+                if score > alpha {
+                    score = -self.negamax(depth - 1, ply + 1, -alpha - 1, -alpha, true);
+                    if score > alpha && score < beta {
+                        score = -self.negamax(depth - 1, ply + 1, -beta, -alpha, true);
+                    }
+                }
+            }
+
             self.board.unmake_move(m);
 
             if self.should_stop() {
@@ -249,7 +272,7 @@ impl Searcher {
                             NodeType::Beta,
                         );
 
-                        self.table.store(entry, ply_from_root);
+                        self.table.store(entry, ply);
                         return beta;
                     }
 
@@ -270,7 +293,7 @@ impl Searcher {
             HashEntry::new(self.board.key(), depth, best_move, alpha, NodeType::Alpha)
         };
 
-        self.table.store(entry, ply_from_root);
+        self.table.store(entry, ply);
 
         alpha
     }

@@ -61,16 +61,34 @@ pub const fn b_max(a: Square, b: Square) -> Square {
     }
 }
 
-pub fn print_search_info(depth: u8, score: Score, time: u64, best_move: u16, num_nodes: u64) {
-    println!(
+pub fn print_search_info(
+    depth: u8,
+    score: Score,
+    total_time: u64,
+    search_time: f64,
+    best_move: u16,
+    num_nodes: u64,
+    pv: &[u16],
+) {
+    print!(
         "info depth {} move {} cp {} nodes {} time {} nps {}",
         depth,
         BitMove::pretty_move(best_move),
         score,
         num_nodes,
-        time,
-        (num_nodes as f64 / time as f64 * 1000f64) as u64
+        total_time,
+        (num_nodes as f64 / search_time) as u64
     );
+
+    print!(" pv ");
+    for &m in pv {
+        if m == 0 {
+            break;
+        }
+        print!("{} ", BitMove::pretty_move(m));
+    }
+
+    println!();
 }
 
 pub const fn mirror(sq: Square) -> Square {

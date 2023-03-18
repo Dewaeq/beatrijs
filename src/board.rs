@@ -4,8 +4,8 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
-        Castling, Piece, PieceType, Player, Score, Square, Value, BLACK_IDX, FEN_START_STRING,
-        MAX_MOVES, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX,
+        Castling, Piece, Player, Score, Square, Value, BLACK_IDX, FEN_START_STRING, MAX_MOVES,
+        NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX, PieceType,
     },
     gen::{attack::attacks, between::between},
     history::History,
@@ -117,6 +117,12 @@ impl Board {
             Player::White => self.pos.castling & Castling::WHITE_ALL != 0,
             Player::Black => self.pos.castling & Castling::BLACK_ALL != 0,
         }
+    }
+
+    pub const fn has_big_piece(&self, side: Player) -> bool {
+        self.player_piece_bb(side, PieceType::Bishop) != 0
+            || self.player_piece_bb(side, PieceType::Rook) != 0
+            || self.player_piece_bb(side, PieceType::Queen) != 0
     }
 
     pub const fn blockers(&self, side: Player) -> u64 {
@@ -379,6 +385,10 @@ impl Board {
     pub fn unmake_null_move(&mut self) {
         self.pos = self.history.pop();
         self.turn = self.turn.opp();
+    }
+
+    pub fn clear_killers(&mut self) {
+        self.killers = [[0; MAX_MOVES]; 2];
     }
 
     pub fn see_capture(&self, m: u16) -> Score {

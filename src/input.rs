@@ -74,7 +74,7 @@ impl Game {
             } else if base_command == "moves" {
                 game.parse_moves();
             } else if base_command == "pv" {
-                let pv = unsafe { (*game.table.inner.get()).extract_pv(&mut game.board) };
+                let pv = game.table.extract_pv(&mut game.board);
 
                 print!("pv ");
                 for m in pv {
@@ -95,6 +95,8 @@ impl Game {
         } else {
             eprintln!("Invalid position command!");
         }
+
+        self.table.clear();
     }
 
     fn parse_search(&mut self, commands: Vec<&str>) {
@@ -142,18 +144,21 @@ impl Game {
     }
 
     fn parse_move(&mut self, commands: Vec<&str>) {
-        assert!(commands.len() == 2);
+        assert!(commands.len() >= 2);
 
-        let src = square_from_string(&commands[1][0..2]);
-        let dest = square_from_string(&commands[1][2..4]);
+        let num_moves = commands.len();
+        for i in 1..num_moves {
+            let src = square_from_string(&commands[i][0..2]);
+            let dest = square_from_string(&commands[i][2..4]);
 
-        let mut moves = MoveList::legal(&mut self.board);
-        let m = moves.find(|&x| BitMove::src(x) == src && BitMove::dest(x) == dest);
-        if let Some(m) = m {
-            self.board.make_move(m);
-            println!("{:?}", self.board);
-        } else {
-            eprintln!("failed to parse move {}", commands[1]);
+            let mut moves = MoveList::legal(&mut self.board);
+            let m = moves.find(|&x| BitMove::src(x) == src && BitMove::dest(x) == dest);
+            if let Some(m) = m {
+                self.board.make_move(m);
+            } else {
+                eprintln!("failed to parse move {}", commands[i]);
+                break;
+            }
         }
     }
 
