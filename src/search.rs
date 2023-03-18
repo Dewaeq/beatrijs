@@ -21,6 +21,7 @@ pub struct Searcher {
     pub board: Board,
     pub table: Arc<TWrapper>,
     abort: Arc<AtomicBool>,
+    start_time: Instant,
 }
 
 impl Default for Searcher {
@@ -40,10 +41,12 @@ impl Searcher {
             abort,
             num_nodes: 0,
             table: tt,
+            start_time: Instant::now(),
         }
     }
 
     pub fn start(&mut self) {
+        self.start_time = Instant::now();
         self.abort.store(false, Ordering::Relaxed);
     }
 
@@ -85,17 +88,23 @@ impl Searcher {
         }
     }
 
-    pub fn search(&mut self, depth: u8, alpha: Score, beta: Score) -> Score {
+    fn search(&mut self, depth: u8, alpha: Score, beta: Score) -> Score {
         self.num_nodes = 0;
-        let start = Instant::now();
         let score = self.negamax(depth, 0, alpha, beta, false);
-        let end = start.elapsed();
-        let time = (end.as_secs_f64() * 1000f64) as u64;
+        let elapsed = self.start_time.elapsed();
+        let time = (elapsed.as_secs_f64() * 1000f64) as u64;
 
         if !self.should_stop() {
             let pv = self.table.extract_pv(&mut self.board);
             let best_move = self.table.best_move(self.board.key());
-            print_search_info(depth, score, time, best_move.unwrap_or(0), self.num_nodes, &pv);
+            print_search_info(
+                depth,
+                score,
+                time,
+                best_move.unwrap_or(0),
+                self.num_nodes,
+                &pv,
+            );
         }
 
         score
@@ -246,7 +255,7 @@ impl Searcher {
             if score > best_score {
                 best_score = score;
                 best_move = m;
-                
+
                 if score > alpha {
                     if score >= beta {
                         if !BitMove::is_cap(m) {
@@ -254,7 +263,7 @@ impl Searcher {
                             self.board.killers[1][ply] = self.board.killers[0][ply];
                             self.board.killers[0][ply] = m;
                         }
-                        
+
                         let entry = HashEntry::new(
                             self.board.pos.key,
                             depth,
@@ -262,11 +271,11 @@ impl Searcher {
                             beta,
                             NodeType::Beta,
                         );
-                        
+
                         self.table.store(entry, ply_from_root);
                         return beta;
                     }
-                    
+
                     alpha = score;
                 }
             }
