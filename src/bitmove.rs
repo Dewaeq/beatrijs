@@ -47,6 +47,10 @@ impl BitMove {
             || BitMove::flag(bitmove) == MoveFlag::CASTLE_QUEEN
     }
 
+    pub const fn is_tactical(bitmove: u16) -> bool {
+        BitMove::is_cap(bitmove) || BitMove::is_prom(bitmove)
+    }
+
     pub fn from_piece(flag: u8) -> Piece {
         // Remove capture bit
         match flag & 0b1011 {

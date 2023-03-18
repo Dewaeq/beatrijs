@@ -131,6 +131,7 @@ impl Searcher {
         }
 
         let entry = self.table.probe(self.board.key());
+        let in_check = self.board.in_check();
         let mut pv_move = 0;
 
         if let Some(entry) = entry {
@@ -173,14 +174,14 @@ impl Searcher {
 
         let mut moves = MoveList::legal(&mut self.board);
         if moves.is_empty() {
-            if self.board.in_check() {
+            if in_check {
                 return -IMMEDIATE_MATE_SCORE + ply_from_root as Score;
             }
             return 0;
         }
 
         // TODO: add zugzwang protection
-        if do_null && !self.board.in_check() && depth >= 4 {
+        if do_null && !in_check && depth >= 4 {
             self.board.make_null_move();
             let score = -self.negamax(depth - 4, ply_from_root + 1, -beta, -beta + 1, false);
             self.board.unmake_null_move();
@@ -194,7 +195,7 @@ impl Searcher {
             }
         }
 
-        if self.board.in_check() {
+        if in_check {
             depth += 1;
         }
 
@@ -213,12 +214,29 @@ impl Searcher {
             }
         }
 
+        // do not reduce when in check or at low depth
+        let can_prune = moves.size() > 20 && !in_check && depth >= 3;
+
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
             let m = moves.get(i);
 
             self.board.make_move(m);
-            let score = -self.negamax(depth - 1, ply_from_root + 1, -beta, -alpha, true);
+
+            // Dot not reduce moves that give check, capture or promote
+            let search_depth = if can_prune && !self.board.in_check() && !BitMove::is_tactical(m) {
+                if i > 7 && depth > 3 {
+                    depth - 3
+                } else if i > 4 {
+                    depth - 2
+                } else {
+                    depth
+                }
+            } else {
+                depth
+            };
+
+            let score = -self.negamax(search_depth - 1, ply_from_root + 1, -beta, -alpha, true);
             self.board.unmake_move(m);
 
             if self.should_stop() {
