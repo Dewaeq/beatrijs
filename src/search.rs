@@ -181,8 +181,7 @@ impl Searcher {
             return 0;
         }
 
-        // TODO: add zugzwang protection
-        if do_null && !in_check && depth >= 4 {
+        if do_null && !in_check && depth >= 4 && self.board.has_big_piece(self.board.turn) {
             self.board.make_null_move();
             let score = -self.negamax(depth - 4, ply + 1, -beta, -beta + 1, false);
             self.board.unmake_null_move();

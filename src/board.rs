@@ -119,6 +119,12 @@ impl Board {
         }
     }
 
+    pub const fn has_big_piece(&self, side: Player) -> bool {
+        self.player_piece_bb(side, Piece::Bishop) != 0
+            || self.player_piece_bb(side, Piece::Rook) != 0
+            || self.player_piece_bb(side, Piece::Queen) != 0
+    }
+
     pub const fn blockers(&self, side: Player) -> u64 {
         unsafe { *self.pos.king_blockers.get_unchecked(side.as_usize()) }
     }
