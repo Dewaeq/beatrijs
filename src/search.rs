@@ -75,10 +75,6 @@ impl Searcher {
                 score = self.search(depth as u8, alpha, beta);
             }
 
-            if score >= IS_MATE || score <= -IS_MATE {
-                break;
-            }
-
             // aspiration search:
             // slightly shrink the search window
             alpha = score - 50;

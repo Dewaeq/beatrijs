@@ -157,9 +157,11 @@ impl Game {
                 self.board.make_move(m);
             } else {
                 eprintln!("failed to parse move {}", commands[i]);
-                break;
+                return;
             }
         }
+
+        println!("{:?}", self.board);
     }
 
     fn parse_moves(&mut self) {
