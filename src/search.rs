@@ -232,18 +232,16 @@ impl Searcher {
 
             self.board.make_move(m);
 
+            let mut search_depth = depth;
+            
             // Dot not reduce moves that give check, capture or promote
-            let search_depth = if can_prune && !self.board.in_check() && !BitMove::is_tactical(m) {
+            if can_prune && !self.board.in_check() && !BitMove::is_tactical(m) {
                 if i > 7 && depth > 3 {
-                    depth - 3
+                    search_depth = depth - 3;
                 } else if i > 4 {
-                    depth - 2
-                } else {
-                    depth
+                    search_depth = depth - 2;
                 }
-            } else {
-                depth
-            };
+            }
 
             let score = -self.negamax(search_depth - 1, ply_from_root + 1, -beta, -alpha, true);
             self.board.unmake_move(m);
