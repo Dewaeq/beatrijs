@@ -14,6 +14,8 @@ where T: Default + Copy,
 
     fn with_size(mb: usize) -> Self;
 
+    fn clear(&mut self);
+
     fn probe(&self, key: u64) -> Option<T>;
 
     fn store(&mut self, entry: T);
@@ -44,6 +46,10 @@ impl Table<HashEntry> for HashTable<HashEntry> {
     fn with_size(mb: usize) -> Self {
         let num_entries = mb * 1024 * 1024 / std::mem::size_of::<HashEntry>();
         Self::new(num_entries)
+    }
+
+    fn clear(&mut self) {
+        self.entries = vec![HashEntry::default(); self.size];
     }
 
     fn probe(&self, key: u64) -> Option<HashEntry> {
@@ -125,6 +131,12 @@ impl TWrapper {
     pub fn new() -> Self {
         TWrapper {
             inner: SyncUnsafeCell::new(TT::with_size(TABLE_SIZE_MB)),
+        }
+    }
+
+    pub fn clear(&self) {
+        unsafe {
+            (*self.inner.get()).clear()
         }
     }
 

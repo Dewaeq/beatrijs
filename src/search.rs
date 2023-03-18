@@ -48,6 +48,11 @@ impl Searcher {
         self.abort.load(Ordering::SeqCst)
     }
 
+    fn clear_for_search(&mut self) {
+        self.num_nodes = 0;
+        self.board.clear_killers();
+    }
+
     pub fn iterate(&mut self, max_depth: u8) {
         self.start();
 
@@ -79,7 +84,8 @@ impl Searcher {
     }
 
     fn search(&mut self, depth: u8, alpha: Score, beta: Score) -> Score {
-        self.num_nodes = 0;
+        self.clear_for_search();
+
         let score = self.negamax(depth, 0, alpha, beta, false);
         let elapsed = self.start_time.elapsed();
         let time = (elapsed.as_secs_f64() * 1000f64) as u64;

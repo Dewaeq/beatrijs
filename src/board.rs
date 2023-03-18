@@ -4,8 +4,8 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
-        Castling, Piece, Player, Square, Value, BLACK_IDX, FEN_START_STRING, MAX_MOVES, NUM_PIECES,
-        NUM_SIDES, NUM_SQUARES, WHITE_IDX, Score,
+        Castling, Piece, Player, Score, Square, Value, BLACK_IDX, FEN_START_STRING, MAX_MOVES,
+        NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX,
     },
     gen::{attack::attacks, between::between},
     history::History,
@@ -372,6 +372,10 @@ impl Board {
     pub fn unmake_null_move(&mut self) {
         self.pos = self.history.pop();
         self.turn = self.turn.opp();
+    }
+
+    pub fn clear_killers(&mut self) {
+        self.killers = [[0; MAX_MOVES]; 2];
     }
 
     pub fn see_capture(&self, m: u16) -> Score {

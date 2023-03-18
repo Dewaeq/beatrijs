@@ -98,6 +98,8 @@ impl Game {
         } else {
             eprintln!("Invalid position command!");
         }
+
+        self.table.clear();
     }
 
     fn parse_search(&mut self, commands: Vec<&str>) {
