@@ -99,7 +99,9 @@ impl HashTable<HashEntry> {
         let mut m = self.best_move(board.key());
 
         while let Some(pv_move) = m {
-            if pv_move == 0 {
+            // don't generate infinitely long pv's
+            // this is possible because we haven't yet implemented repetition detection
+            if pv_move == 0 || pv.len() > 40 {
                 break;
             }
 
