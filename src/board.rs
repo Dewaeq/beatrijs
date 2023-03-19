@@ -296,7 +296,7 @@ impl Board {
 
         // Promotion
         if is_prom {
-            let prom_type = BitMove::from_piece(flag);
+            let prom_type = BitMove::prom_type(flag);
             self.add_piece(self.turn, prom_type, dest);
             // target.pos.key ^= Zobrist::piece(self.turn, prom_type, dest);
         } else {

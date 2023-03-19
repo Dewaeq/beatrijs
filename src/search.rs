@@ -1,4 +1,4 @@
-use crate::defs::{Score, INFINITY};
+use crate::defs::{Score, INFINITY, MAX_DEPTH};
 use crate::eval::evaluate;
 use crate::table::{HashEntry, NodeType, TWrapper};
 use crate::utils::print_search_info;
@@ -17,31 +17,71 @@ use std::time::Instant;
 pub const IMMEDIATE_MATE_SCORE: Score = 30_000;
 pub const IS_MATE: Score = IMMEDIATE_MATE_SCORE - 64;
 
+#[derive(Clone, Copy, Debug)]
+pub struct SearchInfo {
+    pub depth: u8,
+    pub w_time: usize,
+    pub b_time: usize,
+    pub w_inc: usize,
+    pub b_inc: usize,
+    pub move_time: usize,
+}
+
+impl Default for SearchInfo {
+    fn default() -> Self {
+        Self {
+            depth: MAX_DEPTH,
+            w_time: 0,
+            b_time: 0,
+            w_inc: 0,
+            b_inc: 0,
+            move_time: 0,
+        }
+    }
+}
+
+impl SearchInfo {
+    pub fn depth(depth: u8) -> Self {
+        let mut info = SearchInfo::default();
+        info.depth = depth;
+        info
+    }
+
+    pub fn my_time(&self, side: Player) -> usize {
+        match side {
+            Player::White => self.w_time,
+            Player::Black => self.b_time,
+        }
+    }
+}
+
 pub struct Searcher {
     pub num_nodes: u64,
     pub board: Board,
     pub table: Arc<TWrapper>,
     abort: Arc<AtomicBool>,
     start_time: Instant,
+    info: SearchInfo,
 }
 
 impl Searcher {
-    pub fn new(board: Board, abort: Arc<AtomicBool>, tt: Arc<TWrapper>) -> Self {
+    pub fn new(board: Board, abort: Arc<AtomicBool>, tt: Arc<TWrapper>, info: SearchInfo) -> Self {
         Searcher {
             board,
             abort,
             num_nodes: 0,
             table: tt,
             start_time: Instant::now(),
+            info,
         }
     }
 
-    pub fn start(&mut self) {
+    fn start(&mut self) {
         self.start_time = Instant::now();
         self.abort.store(false, Ordering::Relaxed);
     }
 
-    pub fn stop(&mut self) {
+    fn stop(&mut self) {
         self.abort.store(true, Ordering::Relaxed);
     }
 
@@ -54,14 +94,14 @@ impl Searcher {
         self.board.clear_killers();
     }
 
-    pub fn iterate(&mut self, max_depth: u8) {
+    pub fn iterate(&mut self) {
         self.start();
 
         // save alpha and beta for aspiration search
         let mut alpha = -INFINITY;
         let mut beta = INFINITY;
 
-        for depth in 1..=max_depth {
+        for depth in 1..=self.info.depth {
             let mut score = self.search(depth as u8, alpha, beta);
 
             if self.should_stop() {
@@ -82,6 +122,9 @@ impl Searcher {
 
             self.num_nodes = 0;
         }
+
+        let best_move = self.table.best_move(self.board.key());
+        println!("bestmove {}", BitMove::pretty_move(best_move.unwrap_or(0)));
     }
 
     fn search(&mut self, depth: u8, alpha: Score, beta: Score) -> Score {

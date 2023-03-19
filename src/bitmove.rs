@@ -1,4 +1,7 @@
-use crate::{defs::{PieceType, Square}, utils::coord_from_square};
+use crate::{
+    defs::{PieceType, Square},
+    utils::coord_from_square,
+};
 
 /// Move encoded into a `u16`
 ///
@@ -51,7 +54,7 @@ impl BitMove {
         BitMove::is_cap(bitmove) || BitMove::is_prom(bitmove)
     }
 
-    pub fn from_piece(flag: u8) -> PieceType {
+    pub fn prom_type(flag: u8) -> PieceType {
         // Remove capture bit
         match flag & 0b1011 {
             MoveFlag::PROMOTE_KNIGHT => PieceType::Knight,
@@ -72,6 +75,10 @@ impl BitMove {
     }
 
     pub fn pretty_move(bitmove: u16) -> String {
+        if bitmove == 0 {
+            return "null".to_owned();
+        }
+
         fn file_idx_to_char(file: Square) -> String {
             match file {
                 0 => "a".to_owned(),
@@ -92,11 +99,22 @@ impl BitMove {
         let (src_x, src_y) = coord_from_square(src);
         let (dest_x, dest_y) = coord_from_square(dest);
 
-        let mut src_str = format!("{}{}", file_idx_to_char(src_x), src_y + 1);
+        let mut result = format!("{}{}", file_idx_to_char(src_x), src_y + 1);
         let dest_str = format!("{}{}", file_idx_to_char(dest_x), dest_y + 1);
-        src_str.push_str(&dest_str);
+        result.push_str(&dest_str);
 
-        src_str
+        if BitMove::is_prom(bitmove) {
+            let prom_str = match BitMove::prom_type(BitMove::flag(bitmove)) {
+                PieceType::Knight => "n",
+                PieceType::Bishop => "b",
+                PieceType::Rook => "r",
+                PieceType::Queen => "q",
+                _ => "",
+            };
+            result.push_str(prom_str);
+        }
+
+        result
     }
 }
 
