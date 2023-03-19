@@ -99,7 +99,7 @@ impl HashTable<HashEntry> {
         let mut m = self.best_move(board.key());
 
         while let Some(pv_move) = m {
-            if pv_move == 0 {
+            if pv_move == 0 || pv.len() > 40 {
                 break;
             }
 
