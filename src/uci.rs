@@ -23,14 +23,20 @@ impl Game {
     }
 
     pub fn position(&mut self, commands: Vec<&str>) {
+        let moves_idx = commands.iter().position(|&x| x == "moves");
+
         if commands.contains(&"fen") {
-            let fen_str = commands[2];
-            self.board = Board::from_fen(fen_str);
+            let fen_str = match moves_idx {
+                Some(idx) => commands[2..idx].join(" "),
+                None => commands[2..].join(" "),
+            };
+
+            self.board = Board::from_fen(&fen_str);
         } else if commands.contains(&"startpos") {
             self.board = Board::start_pos();
         }
 
-        match commands.iter().position(|&x| x == "moves") {
+        match moves_idx {
             Some(idx) => self.make_moves(&commands[(idx + 1)..]),
             _ => (),
         }
