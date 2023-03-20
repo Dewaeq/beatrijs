@@ -4,7 +4,7 @@ use std::{
 
 use crate::{board::Board, search::IS_MATE, defs::Score, movegen::is_legal_move};
 
-pub const TABLE_SIZE_MB: usize = 16;
+pub const TABLE_SIZE_MB: usize = 256;
 type TT = HashTable<HashEntry>;
 
 pub trait Table<T> 

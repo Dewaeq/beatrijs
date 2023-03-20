@@ -72,9 +72,9 @@ pub fn print_search_info(
     pv: &[u16],
 ) {
     let score_str = if score > IS_MATE {
-        format!("mate {}", (score - IMMEDIATE_MATE_SCORE) / 2)
+        format!("mate {}", (IMMEDIATE_MATE_SCORE - score) / 2 + 1)
     } else if score < -IS_MATE {
-        format!("mate {}", (score + IMMEDIATE_MATE_SCORE) / 2)
+        format!("mate {}", (score + IMMEDIATE_MATE_SCORE) / 2 - 1)
     } else {
         format!("cp {score}")
     };
