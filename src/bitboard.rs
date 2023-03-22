@@ -74,6 +74,10 @@ impl BitBoard {
         }
     }
 
+    pub const fn only_one(bb: u64) -> bool {
+        bb != 0 && (bb & (bb - 1)) == 0
+    }
+
     pub const fn triple_aligned(a: Square, b: Square, c: Square) -> bool {
         line(a, b) & BitBoard::from_sq(c) != 0
     }
