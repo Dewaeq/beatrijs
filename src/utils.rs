@@ -80,7 +80,7 @@ pub fn print_search_info(
     };
 
     print!(
-        "info depth {} score {} nodes {} time {} nps {}",
+        "info depth {} score {} nodes {} time {} nps {} ",
         depth,
         score_str,
         num_nodes,
@@ -91,7 +91,7 @@ pub fn print_search_info(
 }
 
 pub fn print_pv(pv: &[u16]) {
-    print!(" pv ");
+    print!("pv ");
     for &m in pv {
         if m == 0 {
             break;
