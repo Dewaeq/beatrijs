@@ -4,6 +4,7 @@ use std::{io, thread};
 
 use crate::eval::evaluate;
 use crate::table::TWrapper;
+use crate::utils::is_repetition;
 use crate::{
     bitmove::BitMove, board::Board, movelist::MoveList, perft::perft, search::Searcher,
     tests::perft::test_perft, utils::square_from_string,
@@ -73,16 +74,10 @@ impl Game {
                 game.parse_move(commands);
             } else if base_command == "moves" {
                 game.parse_moves();
-            } else if base_command == "pv" {
-                let pv = game.table.extract_pv(&mut game.board);
-
-                print!("pv ");
-                for m in pv {
-                    print!("{} ", BitMove::pretty_move(m));
-                }
-
-                println!();
+            } else if base_command == "rep" {
+                println!("{}", is_repetition(&game.board));
             }
+
         }
     }
 

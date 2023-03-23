@@ -1,5 +1,6 @@
 use crate::bitmove::BitMove;
-use crate::defs::Score;
+use crate::board::Board;
+use crate::defs::{PieceType, Player, Score};
 use crate::{bitboard::BitBoard, defs::Square};
 
 pub fn square_from_string(str: &str) -> Square {
@@ -93,6 +94,69 @@ pub fn print_search_info(
 
 pub const fn mirror(sq: Square) -> Square {
     unsafe { *MIRRORED.get_unchecked(sq as usize) }
+}
+
+pub const fn is_draw(board: &Board) -> bool {
+    board.pos.rule_fifty >= 100 || is_repetition(board) || is_material_draw(board)
+}
+
+pub const fn is_repetition(board: &Board) -> bool {
+    if board.pos.ply < 2 || board.pos.rule_fifty < 2 {
+        return false;
+    }
+
+    let mut count = 0;
+    let mut i = 1;
+
+    while i <= (board.pos.rule_fifty + 1) as usize {
+        let key = board.history.get_key(board.pos.ply - i);
+        if key == board.key() {
+            count += 1;
+        }
+
+        if count == 2 {
+            return true;
+        }
+
+        i += 2;
+    }
+
+    false
+}
+
+const fn is_material_draw(board: &Board) -> bool {
+    let only_white_king = BitBoard::only_one(board.player_bb(Player::White));
+    let only_black_king = BitBoard::only_one(board.player_bb(Player::Black));
+
+    if only_black_king && only_white_king {
+        return true;
+    }
+
+    let pawns = board.piece_bb(PieceType::Pawn);
+    if pawns != 0 {
+        return false;
+    }
+
+    let rooks = board.piece_bb(PieceType::Rook);
+    if rooks != 0 {
+        return false;
+    }
+
+    let queens = board.piece_bb(PieceType::Queen);
+    if queens != 0 {
+        return false;
+    }
+
+    let num_knights = BitBoard::count(board.piece_bb(PieceType::Knight));
+    let num_bishops = BitBoard::count(board.piece_bb(PieceType::Bishop));
+
+    if (only_white_king || only_black_king)
+        && ((num_knights < 2 && num_bishops == 0) || (num_knights == 0 && num_bishops < 2))
+    {
+        return true;
+    }
+
+    return false;
 }
 
 #[rustfmt::skip]
