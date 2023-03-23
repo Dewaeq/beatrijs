@@ -106,9 +106,9 @@ pub const fn is_repetition(board: &Board) -> bool {
     }
 
     let mut count = 0;
-    let mut i = 0;
+    let mut i = 1;
 
-    while i < (board.pos.rule_fifty + 1) as usize {
+    while i <= (board.pos.rule_fifty + 1) as usize {
         let key = board.history.get_key(board.pos.ply - i);
         if key == board.key() {
             count += 1;
@@ -118,7 +118,7 @@ pub const fn is_repetition(board: &Board) -> bool {
             return true;
         }
 
-        i += 1;
+        i += 2;
     }
 
     false
