@@ -1,6 +1,7 @@
 use crate::bitmove::BitMove;
 use crate::board::Board;
 use crate::defs::{PieceType, Player, Score};
+use crate::search::{IMMEDIATE_MATE_SCORE, IS_MATE};
 use crate::{bitboard::BitBoard, defs::Square};
 
 pub fn square_from_string(str: &str) -> Square {
@@ -70,18 +71,39 @@ pub fn print_search_info(
     best_move: u16,
     num_nodes: u64,
     pv: &[u16],
+    turn: Player,
 ) {
+    let score_str = if score.abs() == IMMEDIATE_MATE_SCORE {
+        format!(
+            "mate",
+        )
+    } else if score > IS_MATE {
+        format!(
+            "mate {}",
+            (IMMEDIATE_MATE_SCORE - score) / 2 + 1 + turn.as_usize() as Score
+        )
+    } else if score < -IS_MATE {
+        format!(
+            "mate {}",
+            (score + IMMEDIATE_MATE_SCORE) / 2 - 1 - turn.as_usize() as Score
+        )
+    } else {
+        format!("cp {score}")
+    };
+
     print!(
-        "info depth {} move {} cp {} nodes {} time {} nps {}",
+        "info depth {} score {} nodes {} time {} nps {} ",
         depth,
-        BitMove::pretty_move(best_move),
-        score,
+        score_str,
         num_nodes,
         total_time,
         (num_nodes as f64 / search_time) as u64
     );
+    print_pv(&pv);
+}
 
-    print!(" pv ");
+pub fn print_pv(pv: &[u16]) {
+    print!("pv ");
     for &m in pv {
         if m == 0 {
             break;

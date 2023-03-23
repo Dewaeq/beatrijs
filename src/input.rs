@@ -2,9 +2,11 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::{io, thread};
 
+use crate::defs::PieceType;
 use crate::eval::evaluate;
+use crate::search::SearchInfo;
 use crate::table::TWrapper;
-use crate::utils::is_repetition;
+use crate::utils::print_pv;
 use crate::{
     bitmove::BitMove, board::Board, movelist::MoveList, perft::perft, search::Searcher,
     tests::perft::test_perft, utils::square_from_string,
@@ -12,10 +14,10 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub struct Game {
-    board: Board,
-    abort_search: Arc<AtomicBool>,
-    search_thread: Option<JoinHandle<()>>,
-    table: Arc<TWrapper>,
+    pub board: Board,
+    pub abort_search: Arc<AtomicBool>,
+    pub search_thread: Option<JoinHandle<()>>,
+    pub table: Arc<TWrapper>,
 }
 
 impl Game {
@@ -28,10 +30,16 @@ impl Game {
         }
     }
 
-    fn create_searcher(&mut self) -> Searcher {
+    pub fn clear(&mut self) {
+        self.table.clear();
+        self.stop();
+        // self.board = Board::start_pos();
+    }
+
+    fn create_searcher(&mut self, info: SearchInfo) -> Searcher {
         let abort = self.abort_search.clone();
         let table = self.table.clone();
-        Searcher::new(self.board, abort, table)
+        Searcher::new(self.board, abort, table, info)
     }
 
     pub fn main_loop() {
@@ -46,75 +54,56 @@ impl Game {
                 continue;
             }
 
-            game.stop_search();
-
             let commands: Vec<&str> = buffer.split_whitespace().collect();
-            let base_command = commands[0];
-
-            if base_command == "d" {
-                println!("{:?}", game.board);
-            } else if base_command == "position" {
-                game.parse_position(commands);
-            } else if base_command == "search" {
-                game.parse_search(commands);
-            } else if base_command == "go" {
-                game.parse_go(255);
-            } else if base_command == "stop" {
-                game.stop_search();
-            } else if base_command == "perft" {
-                game.parse_perft(commands);
-            } else if base_command == "test" {
-                game.parse_test(commands);
-            } else if base_command == "static" {
-                game.parse_static(commands);
-            } else if base_command == "take" {
-                game.board.unmake_last_move();
-                println!("{:?}", game.board);
-            } else if base_command == "move" {
-                game.parse_move(commands);
-            } else if base_command == "moves" {
-                game.parse_moves();
-            } else if base_command == "rep" {
-                println!("{}", is_repetition(&game.board));
-            }
-
+            game.parse_commands(commands);
         }
     }
 
-    fn parse_position(&mut self, commands: Vec<&str>) {
-        if commands.contains(&"fen") {
-            let fen = commands[2..].join(" ");
-            self.board = Board::from_fen(fen.trim());
-        } else if commands.contains(&"startpos") {
-            self.board = Board::start_pos();
-        } else {
-            eprintln!("Invalid position command!");
+    fn parse_commands(&mut self, commands: Vec<&str>) {
+        let base_command = commands[0];
+
+        // UCI commands
+        if base_command == "uci" {
+            self.uci();
+        } else if base_command == "isready" {
+            self.is_ready();
+        } else if base_command == "ucinewgame" {
+            self.uci_new_game();
+        } else if base_command == "position" {
+            self.position(commands);
+        } else if base_command == "go" {
+            self.go(commands);
+        } else if base_command == "stop" {
+            self.stop();
+        } else if base_command == "quit" {
+            self.quit();
         }
-
-        self.table.clear();
+        // Custom commands
+        else if base_command == "d" {
+            println!("{:?}", self.board);
+        } else if base_command == "perft" {
+            self.parse_perft(commands);
+        } else if base_command == "test" {
+            self.parse_test(commands);
+        } else if base_command == "static" {
+            self.parse_static(commands);
+        } else if base_command == "take" {
+            self.board.unmake_last_move();
+            println!("{:?}", self.board);
+        } else if base_command == "move" {
+            self.parse_move(commands);
+        } else if base_command == "moves" {
+            self.print_moves();
+        }
     }
 
-    fn parse_search(&mut self, commands: Vec<&str>) {
-        assert!(commands.len() == 3);
-        assert!(commands[1] == "depth");
-
-        let depth = commands[2].parse::<u8>().unwrap();
-        self.parse_go(depth);
-    }
-
-    fn parse_go(&mut self, max_depth: u8) {
-        let mut searcher = self.create_searcher();
+    pub fn start_search(&mut self, info: SearchInfo) {
+        let mut searcher = self.create_searcher(info);
         let handle = thread::spawn(move || {
-            searcher.start();
-            searcher.iterate(max_depth);
+            searcher.iterate();
         });
 
         self.search_thread = Some(handle);
-    }
-
-    fn stop_search(&mut self) {
-        self.abort_search.store(true, Ordering::Release);
-        self.search_thread.take().map(JoinHandle::join);
     }
 
     fn parse_perft(&mut self, commands: Vec<&str>) {
@@ -141,25 +130,12 @@ impl Game {
     fn parse_move(&mut self, commands: Vec<&str>) {
         assert!(commands.len() >= 2);
 
-        let num_moves = commands.len();
-        for i in 1..num_moves {
-            let src = square_from_string(&commands[i][0..2]);
-            let dest = square_from_string(&commands[i][2..4]);
-
-            let mut moves = MoveList::legal(&mut self.board);
-            let m = moves.find(|&x| BitMove::src(x) == src && BitMove::dest(x) == dest);
-            if let Some(m) = m {
-                self.board.make_move(m);
-            } else {
-                eprintln!("failed to parse move {}", commands[i]);
-                return;
-            }
-        }
+        self.make_moves(&commands[1..]);
 
         println!("{:?}", self.board);
     }
 
-    fn parse_moves(&mut self) {
+    fn print_moves(&mut self) {
         let moves = MoveList::legal(&mut self.board);
         print!("{}: ", moves.size());
 
@@ -168,5 +144,38 @@ impl Game {
         }
 
         println!();
+    }
+
+    fn str_to_move(&mut self, move_str: &str) -> Option<u16> {
+        assert!(move_str.len() == 4 || move_str.len() == 5);
+
+        let src = square_from_string(&move_str[0..2]);
+        let dest = square_from_string(&move_str[2..4]);
+        let prom_type = match move_str.get(4..5) {
+            Some("n") => PieceType::Knight,
+            Some("b") => PieceType::Bishop,
+            Some("r") => PieceType::Rook,
+            Some("q") => PieceType::Queen,
+            _ => PieceType::None,
+        };
+
+        let mut moves = MoveList::legal(&mut self.board);
+        moves.find(|&x| {
+            BitMove::src(x) == src
+                && BitMove::dest(x) == dest
+                && BitMove::prom_type(BitMove::flag(x)) == prom_type
+        })
+    }
+
+    pub fn make_moves(&mut self, moves: &[&str]) {
+        for move_str in moves {
+            let bitmove = self.str_to_move(move_str);
+            if let Some(m) = bitmove {
+                self.board.make_move(m);
+            } else {
+                eprintln!("failed to parse move {}", move_str);
+                return;
+            }
+        }
     }
 }
