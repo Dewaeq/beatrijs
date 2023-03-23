@@ -147,6 +147,7 @@ impl Searcher {
                 best_move.unwrap_or(0),
                 self.num_nodes,
                 &pv,
+                self.board.turn,
             );
         }
 

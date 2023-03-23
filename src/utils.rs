@@ -1,6 +1,6 @@
 use crate::bitmove::BitMove;
 use crate::board::Board;
-use crate::defs::{Score, PieceType, Player};
+use crate::defs::{PieceType, Player, Score};
 use crate::search::{IMMEDIATE_MATE_SCORE, IS_MATE};
 use crate::{bitboard::BitBoard, defs::Square};
 
@@ -71,11 +71,22 @@ pub fn print_search_info(
     best_move: u16,
     num_nodes: u64,
     pv: &[u16],
+    turn: Player,
 ) {
-    let score_str = if score > IS_MATE {
-        format!("mate {}", (IMMEDIATE_MATE_SCORE - score) / 2 + 1)
+    let score_str = if score.abs() == IMMEDIATE_MATE_SCORE {
+        format!(
+            "mate",
+        )
+    } else if score > IS_MATE {
+        format!(
+            "mate {}",
+            (IMMEDIATE_MATE_SCORE - score) / 2 + 1 + turn.as_usize() as Score
+        )
     } else if score < -IS_MATE {
-        format!("mate {}", (score + IMMEDIATE_MATE_SCORE) / 2 - 1)
+        format!(
+            "mate {}",
+            (score + IMMEDIATE_MATE_SCORE) / 2 - 1 - turn.as_usize() as Score
+        )
     } else {
         format!("cp {score}")
     };
