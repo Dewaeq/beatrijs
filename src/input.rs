@@ -94,8 +94,6 @@ impl Game {
             self.parse_move(commands);
         } else if base_command == "moves" {
             self.print_moves();
-        } else if base_command == "pv" {
-            self.print_pv();
         }
     }
 
@@ -146,11 +144,6 @@ impl Game {
         }
 
         println!();
-    }
-
-    fn print_pv(&mut self) {
-        let pv = self.table.extract_pv(&mut self.board);
-        print_pv(&pv);
     }
 
     fn str_to_move(&mut self, move_str: &str) -> Option<u16> {

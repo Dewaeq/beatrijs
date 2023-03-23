@@ -94,14 +94,15 @@ impl HashTable<HashEntry> {
         }
     }
 
-    pub fn extract_pv(&self, board: &mut Board) -> Vec<u16> {
+    pub fn extract_pv(&self, board: &mut Board, depth: u8) -> Vec<u16> {
         let mut pv = vec![];
         let mut m = self.best_move(board.key());
+        let mut i = 0;
 
-        while let Some(pv_move) = m {
-            // don't generate infinitely long pv's
-            // this is possible because we haven't yet implemented repetition detection
-            if pv_move == 0 || pv.len() > 40 {
+        while i < depth && m.is_some() {
+            let pv_move = m.unwrap();
+
+            if pv_move == 0 {
                 break;
             }
 
@@ -112,6 +113,7 @@ impl HashTable<HashEntry> {
             pv.push(pv_move);
             board.make_move(pv_move);
             m = self.best_move(board.key());
+            i += 1;
         }
 
         for _ in 0..pv.len() {
@@ -176,9 +178,9 @@ impl TWrapper {
         }
     }
 
-    pub fn extract_pv(&self, board: &mut Board) -> Vec<u16> {
+    pub fn extract_pv(&self, board: &mut Board, depth: u8) -> Vec<u16> {
         unsafe {
-            (*self.inner.get()).extract_pv(board)
+            (*self.inner.get()).extract_pv(board, depth)
         }
     } 
 }

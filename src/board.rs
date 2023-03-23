@@ -4,8 +4,8 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
-        Castling, Piece, Player, Score, Square, Value, BLACK_IDX, FEN_START_STRING, MAX_MOVES,
-        NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX, PieceType,
+        Castling, Piece, PieceType, Player, Score, Square, Value, BLACK_IDX, FEN_START_STRING,
+        MAX_MOVES, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX,
     },
     gen::{attack::attacks, between::between},
     history::History,
@@ -22,7 +22,7 @@ pub struct Board {
     pub side_bb: [u64; NUM_SIDES],
     pub pieces: [Piece; NUM_SQUARES],
     pub pos: Position,
-    history: History,
+    pub history: History,
     /// Quiet moves that caused a beta-cutoff, used for ordering
     pub killers: [[u16; MAX_MOVES]; 2],
 }
@@ -306,6 +306,12 @@ impl Board {
 
         if self.pos.castling != old_castle {
             self.pos.key ^= Zobrist::castle(self.pos.castling);
+        }
+
+        if piece == PieceType::Pawn || is_cap {
+            self.pos.rule_fifty = 0;
+        } else {
+            self.pos.rule_fifty += 1;
         }
 
         self.pos.key ^= Zobrist::side();
@@ -692,7 +698,7 @@ impl std::fmt::Debug for Board {
             }
         )?;
         writeln!(f, "Ply        : {}", self.pos.ply)?;
-        writeln!(f, "Key        : {:x}", self.pos.key)?;
+        writeln!(f, "Key        : {}", self.pos.key)?;
         writeln!(f, "Castling   : {:b}", self.pos.castling)?;
         writeln!(f, "EP Square  : {}", square_to_string(self.pos.ep_square))?;
         write!(f, "Checkers   : ")?;

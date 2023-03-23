@@ -1,4 +1,4 @@
-use crate::{defs::MAX_MOVES, position::Position, board::Board};
+use crate::{board::Board, defs::MAX_MOVES, position::Position};
 
 #[derive(Copy, Clone)]
 pub struct History {
@@ -23,14 +23,16 @@ impl History {
 
     pub fn pop(&mut self) -> Position {
         assert!(self.count >= 1);
-        
+
         self.count -= 1;
-        unsafe {
-            *self.positions.get_unchecked(self.count)
-        }
+        unsafe { *self.positions.get_unchecked(self.count) }
     }
 
     pub const fn empty(&self) -> bool {
         self.count == 0
+    }
+
+    pub const fn get_key(&self, index: usize) -> u64 {
+        unsafe { self.positions.get_unchecked(index).key }
     }
 }

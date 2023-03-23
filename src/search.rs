@@ -1,7 +1,7 @@
 use crate::defs::{Score, INFINITY, MAX_DEPTH};
 use crate::eval::evaluate;
 use crate::table::{HashEntry, NodeType, TWrapper};
-use crate::utils::print_search_info;
+use crate::utils::{print_search_info, is_draw};
 use crate::{
     bitboard::BitBoard,
     bitmove::BitMove,
@@ -137,7 +137,7 @@ impl Searcher {
         let search_time = start.elapsed().as_secs_f64();
 
         if !self.should_stop() {
-            let pv = self.table.extract_pv(&mut self.board);
+            let pv = self.table.extract_pv(&mut self.board, depth);
             let best_move = self.table.best_move(self.board.key());
             print_search_info(
                 depth,
@@ -162,6 +162,10 @@ impl Searcher {
         do_null: bool,
     ) -> Score {
         if self.should_stop() {
+            return 0;
+        }
+
+        if is_draw(&self.board) {
             return 0;
         }
 
@@ -272,7 +276,12 @@ impl Searcher {
                 score = alpha + 1;
                 // LMR
                 // Dot not reduce moves that give check, capture or promote
-                if depth >= 3 && !BitMove::is_tactical(m) && !self.board.in_check() && i > 3 {
+                if depth >= 3
+                    && !BitMove::is_tactical(m)
+                    && !self.board.in_check()
+                    && i > 3
+                    && moves.size() > 20
+                {
                     let d = depth - depth / 5 - 2;
                     score = -self.negamax(d, ply + 1, -alpha - 1, -alpha, true);
                 }
@@ -338,6 +347,10 @@ impl Searcher {
     }
 
     fn quiesence(&mut self, mut alpha: Score, beta: Score) -> Score {
+        if is_draw(&self.board) {
+            return 0;
+        }
+
         self.num_nodes += 1;
 
         let stand_pat = evaluate(&self.board);
