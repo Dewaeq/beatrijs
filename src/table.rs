@@ -64,14 +64,18 @@ impl Table<HashEntry> for HashTable<HashEntry> {
 
     fn store(&mut self, entry: HashEntry) {
         let prev = self.get_mut(entry.key);
+        *prev = entry;
 
-        if !prev.valid() 
+
+        // TODO: add aging to table entries,
+        // the method below is very inefficient, especially in endgames
+        /* if !prev.valid() 
         // prioritize entries that add a move to a
         // position that previously didnt have a pv move stored
         || (!prev.has_move() && entry.has_move()) 
         || prev.depth < entry.depth {
             *prev = entry;
-        }
+        } */
     }
 
     fn get(&self, key: u64) -> HashEntry {
