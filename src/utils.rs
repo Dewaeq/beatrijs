@@ -73,9 +73,7 @@ pub fn print_search_info(
     turn: Player,
 ) {
     let score_str = if score.abs() == IMMEDIATE_MATE_SCORE {
-        format!(
-            "mate",
-        )
+        format!("mate",)
     } else if score > IS_MATE {
         format!(
             "mate {}",
@@ -114,7 +112,7 @@ pub fn print_pv(pv: &[u16]) {
 }
 
 pub const fn mirror(sq: Square) -> Square {
-    unsafe { *MIRRORED.get_unchecked(sq as usize) }
+    sq ^ 56
 }
 
 pub const fn is_draw(board: &Board) -> bool {

@@ -98,7 +98,8 @@ impl HashTable<HashEntry> {
         }
     }
 
-    pub fn extract_pv(&self, board: &mut Board, depth: u8) -> Vec<u16> {
+    pub fn extract_pv(&self, board: &Board, depth: u8) -> Vec<u16> {
+        let mut board = board.clone();
         let mut pv = vec![];
         let mut m = self.best_move(board.key());
         let mut i = 0;
@@ -110,7 +111,7 @@ impl HashTable<HashEntry> {
                 break;
             }
 
-            if !is_legal_move(board, pv_move) {
+            if !is_legal_move(&mut board, pv_move) {
                 break;
             }
 
@@ -118,10 +119,6 @@ impl HashTable<HashEntry> {
             board.make_move(pv_move);
             m = self.best_move(board.key());
             i += 1;
-        }
-
-        for _ in 0..pv.len() {
-            board.unmake_move(board.pos.last_move.unwrap());
         }
 
         pv

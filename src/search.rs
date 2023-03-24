@@ -169,7 +169,7 @@ impl Searcher {
             return 0;
         }
 
-        if is_draw(&self.board) {
+        if is_draw(&self.board) && ply > 0 {
             return 0;
         }
 
