@@ -1,7 +1,7 @@
 use crate::defs::{Score, INFINITY, MAX_DEPTH};
 use crate::eval::evaluate;
 use crate::table::{HashEntry, NodeType, TWrapper};
-use crate::utils::{is_draw, print_search_info};
+use crate::utils::{is_draw, is_repetition, print_search_info};
 use crate::{
     bitboard::BitBoard,
     bitmove::BitMove,
@@ -117,7 +117,7 @@ impl Searcher {
                 score = self.search(depth as u8, alpha, beta);
             }
 
-            if score.abs() > IS_MATE {
+            if score.abs() > IS_MATE || is_repetition(&self.board) {
                 break;
             }
 
@@ -173,7 +173,7 @@ impl Searcher {
             return 0;
         }
 
-        if is_draw(&self.board) && ply > 0 {
+        if is_draw(&self.board) {
             return 0;
         }
 
@@ -200,6 +200,17 @@ impl Searcher {
 
         if let Some(entry) = entry {
             pv_move = entry.m;
+            // check if the pv causes a 3 fold repetition
+            if pv_move != 0 {
+                self.board.make_move(pv_move);
+                if is_repetition(&self.board) {
+                    self.board.unmake_move(pv_move);
+                    // if so, delete the tt entry, as it's no longer valid
+                    self.table.delete(self.board.key());
+                    return 0;
+                }
+                self.board.unmake_move(pv_move);
+            }
 
             if entry.depth >= depth {
                 match entry.node_type {

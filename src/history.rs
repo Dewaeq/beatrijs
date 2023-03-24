@@ -3,7 +3,7 @@ use crate::{board::Board, defs::MAX_MOVES, position::Position};
 #[derive(Copy, Clone)]
 pub struct History {
     positions: [Position; MAX_MOVES],
-    count: usize,
+    pub count: usize,
 }
 
 impl History {
