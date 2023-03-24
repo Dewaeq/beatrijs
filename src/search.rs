@@ -117,6 +117,10 @@ impl Searcher {
                 score = self.search(depth as u8, alpha, beta);
             }
 
+            if score.abs() > IS_MATE {
+                break;
+            }
+
             // aspiration search:
             // slightly shrink the search window
             alpha = score - 50;
@@ -335,6 +339,10 @@ impl Searcher {
                     alpha = score;
                 }
             }
+        }
+
+        if self.should_stop() {
+            return 0;
         }
 
         let entry = if alpha != old_alpha {
