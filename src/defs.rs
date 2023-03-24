@@ -11,7 +11,7 @@ pub const NUM_SQUARES: usize = 64;
 pub const MAX_DEPTH: u8 = 255;
 
 pub type Square = i8;
-pub type Score = i16;
+pub type Score = i32;
 
 pub const INFINITY: Score = Score::MAX - 1;
 
