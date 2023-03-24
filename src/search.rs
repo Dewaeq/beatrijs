@@ -247,7 +247,7 @@ impl Searcher {
             }
         }
 
-        if in_check {
+        if in_check && ply > 0 {
             depth += 1;
         }
 
