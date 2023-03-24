@@ -68,7 +68,6 @@ pub fn print_search_info(
     score: Score,
     total_time: u64,
     search_time: f64,
-    best_move: u16,
     num_nodes: u64,
     pv: &[u16],
     turn: Player,

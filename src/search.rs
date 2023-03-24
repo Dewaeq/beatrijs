@@ -1,7 +1,7 @@
 use crate::defs::{Score, INFINITY, MAX_DEPTH};
 use crate::eval::evaluate;
 use crate::table::{HashEntry, NodeType, TWrapper};
-use crate::utils::{print_search_info, is_draw};
+use crate::utils::{is_draw, print_search_info};
 use crate::{
     bitboard::BitBoard,
     bitmove::BitMove,
@@ -62,6 +62,7 @@ pub struct Searcher {
     abort: Arc<AtomicBool>,
     start_time: Instant,
     info: SearchInfo,
+    best_root_move: u16,
 }
 
 impl Searcher {
@@ -73,6 +74,7 @@ impl Searcher {
             table: tt,
             start_time: Instant::now(),
             info,
+            best_root_move: 0,
         }
     }
 
@@ -123,8 +125,11 @@ impl Searcher {
             self.num_nodes = 0;
         }
 
-        let best_move = self.table.best_move(self.board.key());
-        println!("bestmove {}", BitMove::pretty_move(best_move.unwrap_or(0)));
+        let best_move = self
+            .table
+            .best_move(self.board.key())
+            .unwrap_or(self.best_root_move);
+        println!("bestmove {}", BitMove::pretty_move(best_move));
     }
 
     fn search(&mut self, depth: u8, alpha: Score, beta: Score) -> Score {
@@ -138,13 +143,11 @@ impl Searcher {
 
         if !self.should_stop() {
             let pv = self.table.extract_pv(&mut self.board, depth);
-            let best_move = self.table.best_move(self.board.key());
             print_search_info(
                 depth,
                 score,
                 total_time,
                 search_time,
-                best_move.unwrap_or(0),
                 self.num_nodes,
                 &pv,
                 self.board.turn,
@@ -304,6 +307,10 @@ impl Searcher {
             if score > best_score {
                 best_score = score;
                 best_move = m;
+
+                if ply == 0 {
+                    self.best_root_move = m;
+                }
 
                 if score > alpha {
                     if score >= beta {
