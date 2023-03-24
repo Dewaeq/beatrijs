@@ -211,5 +211,5 @@ impl Value {
     }
 }
 
-pub const MG_VALUE: [Score; NUM_PIECES] = [82, 337, 364, 477, 1025, 0];
-pub const EG_VALUE: [Score; NUM_PIECES] = [94, 281, 297, 512, 936, 0];
+pub const MG_VALUE: [Score; NUM_PIECES] = [104, 337, 364, 477, 1025, 0];
+pub const EG_VALUE: [Score; NUM_PIECES] = [112, 281, 338, 512, 936, 0];
