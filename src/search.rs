@@ -147,6 +147,7 @@ impl Searcher {
 
         if !self.should_stop() {
             let pv = self.table.extract_pv(&mut self.board, depth);
+            self.best_root_move = pv[0];
             print_search_info(
                 depth,
                 score,
