@@ -189,27 +189,5 @@ pub enum GenType {
     NonEvasions,
 }
 
-pub struct Value;
-
-impl Value {
-    pub const PAWN: Score = 100;
-    pub const KNIGHT: Score = 300;
-    pub const BISHOP: Score = 320;
-    pub const ROOK: Score = 520;
-    pub const QUEEN: Score = 900;
-
-    pub const fn of(piece: PieceType) -> Score {
-        match piece {
-            PieceType::Pawn => Value::PAWN,
-            PieceType::Knight => Value::KNIGHT,
-            PieceType::Bishop => Value::BISHOP,
-            PieceType::Rook => Value::ROOK,
-            PieceType::Queen => Value::QUEEN,
-            PieceType::King => 0,
-            PieceType::None => 0,
-        }
-    }
-}
-
 pub const MG_VALUE: [Score; NUM_PIECES] = [104, 337, 364, 477, 1025, 0];
 pub const EG_VALUE: [Score; NUM_PIECES] = [112, 281, 338, 512, 936, 0];

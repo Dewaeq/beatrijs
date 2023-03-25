@@ -4,8 +4,8 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
-        Castling, Piece, PieceType, Player, Score, Square, Value, BLACK_IDX, FEN_START_STRING,
-        MAX_MOVES, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX,
+        Castling, Piece, PieceType, Player, Score, Square, BLACK_IDX, FEN_START_STRING,
+        MAX_MOVES, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX, MG_VALUE,
     },
     gen::{attack::attacks, between::between},
     history::History,
@@ -406,7 +406,7 @@ impl Board {
         let mut new_board: Board = *self;
         new_board.make_move(m);
 
-        Value::of(captured) - new_board.see(BitMove::dest(m))
+        MG_VALUE[captured.as_usize()] - new_board.see(BitMove::dest(m))
     }
 
     fn see(&mut self, dest: Square) -> Score {
@@ -415,7 +415,7 @@ impl Board {
 
         if attacker != PieceType::None {
             self.move_piece_cheap(src, dest, attacker, captured);
-            cmp::max(0, Value::of(captured) - self.see(dest))
+            cmp::max(0, MG_VALUE[captured.as_usize()] - self.see(dest))
         } else {
             0
         }
@@ -513,7 +513,6 @@ impl Board {
             } else {
                 b.unmake_move(m);
             }
-            println!("{:?}", self.piece(32));
             println!("{b:?}");
         }
     }

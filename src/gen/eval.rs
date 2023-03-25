@@ -1,4 +1,4 @@
-use crate::defs::{PieceType, Value, NUM_PIECES};
+use crate::defs::{PieceType, NUM_PIECES};
 
 /// index by attacker and victim
 pub const MVV_LVA: [[i32; NUM_PIECES]; NUM_PIECES] = gen_mvvlva();

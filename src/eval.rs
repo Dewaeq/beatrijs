@@ -1,7 +1,7 @@
 use crate::{
     bitboard::BitBoard,
     board::Board,
-    defs::{PieceType, Player, Score, Value},
+    defs::{PieceType, Player, Score},
     gen::pesto::{EG_TABLE, MG_TABLE},
 };
 

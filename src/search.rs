@@ -6,7 +6,7 @@ use crate::{
     bitboard::BitBoard,
     bitmove::BitMove,
     board::Board,
-    defs::{PieceType, Player, Value},
+    defs::{PieceType, Player},
     movelist::MoveList,
     order::pick_next_move,
 };
