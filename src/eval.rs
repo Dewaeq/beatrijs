@@ -1,8 +1,9 @@
 use crate::{
     bitboard::BitBoard,
     board::Board,
-    defs::{PieceType, Player, Score, EG_VALUE},
+    defs::{Piece, PieceType, Player, Score, Square, EG_VALUE},
     gen::{
+        attack::attacks,
         pesto::{EG_TABLE, MG_TABLE},
         tables::{CENTER_DISTANCE, DISTANCE},
     },
@@ -28,6 +29,8 @@ pub fn evaluate(board: &Board) -> Score {
         mg[idx] += MG_TABLE[piece.as_usize()][sq];
         eg[idx] += EG_TABLE[piece.as_usize()][sq];
         game_phase += GAME_PHASE_INC[piece.t.as_usize()];
+
+        mg[idx] += mobility(board, piece, sq as Square);
 
         sq += 1;
     }
@@ -57,7 +60,7 @@ pub fn evaluate(board: &Board) -> Score {
     (mg_score * mg_phase + eg_score * eg_phase) / 24
 }
 
-pub fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
+fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
     // Don't apply mop-up when there are still pawns on the board
     if board.piece_bb(PieceType::Pawn) != 0 {
         return;
@@ -80,4 +83,22 @@ pub fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
     let mopup = (center_dist + kings_dist) as Score;
 
     eg[turn] += mopup;
+}
+
+fn mobility(board: &Board, piece: Piece, sq: Square) -> Score {
+    if piece.t == PieceType::Pawn || piece.t == PieceType::King {
+        return 0;
+    }
+
+    let moves = attacks(piece.t, sq, board.occ_bb(), piece.c);
+    let count = BitBoard::count(moves) as Score;
+
+    // TODO: find proper values, these are just my guesses and haven't been tested yet
+    match piece.t {
+        PieceType::Knight => 4 * count,
+        PieceType::Bishop => 6 * count,
+        PieceType::Rook => 5 * count,
+        PieceType::Queen => 4 * count,
+        _ => 0,
+    }
 }
