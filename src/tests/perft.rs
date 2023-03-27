@@ -1,9 +1,5 @@
 use std::{
-    rc::Rc,
-    sync::{
-        atomic::{AtomicI32, Ordering},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
     thread,
 };
 
@@ -11,7 +7,7 @@ use crate::{board::Board, perft::perft};
 
 pub fn test_perft() {
     let mut handles = vec![];
-    let mut result = Arc::new(Mutex::new((0, 0)));
+    let result = Arc::new(Mutex::new((0, 0)));
 
     for entry in POSITIONS {
         let counter = Arc::clone(&result);
@@ -39,7 +35,7 @@ pub fn test_perft() {
     }
 
     for handle in handles {
-        handle.join();
+        handle.join().unwrap();
     }
 
     let result = *result.lock().unwrap();

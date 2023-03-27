@@ -1,5 +1,5 @@
 use crate::{
-    defs::{Piece, PieceType, Player, Score, EG_VALUE, MG_VALUE, NUM_PIECES, NUM_SQUARES, PIECES, Square},
+    defs::{Score, EG_VALUE, MG_VALUE, NUM_PIECES, NUM_SQUARES, Square},
     psqt::{EG_PIECE_TABLE, MG_PIECE_TABLE},
     utils::mirror,
 };

@@ -1,4 +1,4 @@
-use crate::{defs::{Castling, PieceType, Square, MAX_MOVES, NUM_PIECES, NUM_SIDES}, bitmove::BitMove};
+use crate::defs::{Castling, PieceType, Square, NUM_PIECES, NUM_SIDES};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Position {

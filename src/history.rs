@@ -1,4 +1,4 @@
-use crate::{board::Board, defs::MAX_MOVES, position::Position};
+use crate::{ defs::MAX_MOVES, position::Position};
 
 #[derive(Copy, Clone)]
 pub struct History {

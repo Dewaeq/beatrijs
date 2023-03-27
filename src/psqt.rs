@@ -2,7 +2,7 @@ use crate::defs::{NUM_PIECES, NUM_SQUARES, Score};
 
 #[rustfmt::skip]
 mod tables {
-    use crate::defs::{NUM_SQUARES, NUM_SIDES, NUM_PIECES, Score};
+    use crate::defs::{NUM_SQUARES, Score};
     
     pub const MG_PAWN_TABLE: [Score; NUM_SQUARES] = [
       0,  0,  0,  0,  0,  0,  0,  0,

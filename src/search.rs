@@ -3,12 +3,7 @@ use crate::eval::evaluate;
 use crate::table::{HashEntry, NodeType, TWrapper};
 use crate::utils::{is_draw, is_repetition, print_search_info};
 use crate::{
-    bitboard::BitBoard,
-    bitmove::BitMove,
-    board::Board,
-    defs::{PieceType, Player},
-    movelist::MoveList,
-    order::pick_next_move,
+    bitmove::BitMove, board::Board, defs::Player, movelist::MoveList, order::pick_next_move,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

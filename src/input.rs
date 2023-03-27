@@ -6,12 +6,12 @@ use crate::defs::PieceType;
 use crate::eval::evaluate;
 use crate::search::SearchInfo;
 use crate::table::TWrapper;
-use crate::utils::{is_repetition, print_pv};
+use crate::utils::is_repetition;
 use crate::{
     bitmove::BitMove, board::Board, movelist::MoveList, perft::perft, search::Searcher,
     tests::perft::test_perft, utils::square_from_string,
 };
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
 pub struct Game {
     pub board: Board,
