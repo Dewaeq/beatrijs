@@ -9,6 +9,7 @@ use crate::{
 };
 
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
+const BISHOP_PAIR_BONUS: Score = 20;
 
 /// see https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function
 pub fn evaluate(board: &Board) -> Score {
@@ -32,6 +33,17 @@ pub fn evaluate(board: &Board) -> Score {
     }
 
     mopup_eval(board, &mut eg);
+
+    // Bishop pair bonus
+    let w_bishops = board.player_piece_bb(Player::White, PieceType::Bishop);
+    let b_bishops = board.player_piece_bb(Player::Black, PieceType::Bishop);
+
+    if BitBoard::more_than_one(w_bishops) {
+        mg[0] += BISHOP_PAIR_BONUS;
+    }
+    if BitBoard::more_than_one(b_bishops) {
+        mg[1] += BISHOP_PAIR_BONUS;
+    }
 
     // tapered eval
     let turn = board.turn.as_usize();
