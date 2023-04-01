@@ -35,10 +35,12 @@ pub fn evaluate(board: &Board) -> Score {
         game_phase += GAME_PHASE_INC[piece.t.as_usize()];
 
         mg[idx] += mobility(board, piece, sq as Square);
-        mg[idx] += match piece.c {
-            Player::White => pawn_structure(piece.c, sq as Square, w_pawns, b_pawns),
-            Player::Black => pawn_structure(piece.c, sq as Square, b_pawns, w_pawns),
-        };
+        if piece.t == PieceType::Pawn {
+            mg[idx] += match piece.c {
+                Player::White => pawn_structure(piece.c, sq as Square, w_pawns, b_pawns),
+                Player::Black => pawn_structure(piece.c, sq as Square, b_pawns, w_pawns),
+            };
+        }
 
         sq += 1;
     }
