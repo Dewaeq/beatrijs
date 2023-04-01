@@ -17,6 +17,7 @@ use crate::{
 const CAPTURE_BONUS: i32 = 1_000_000;
 const KILLER_1_BONUS: i32 = 900_000;
 const KILLER_2_BONUS: i32 = 800_000;
+const CASTLE_BONUS: i32 = 700_000;
 
 /// Bitboard of all the pieces that are attacking `square`
 #[inline]
@@ -82,6 +83,8 @@ fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board) {
         score = KILLER_1_BONUS;
     } else if board.killers[1][ply] == m {
         score = KILLER_2_BONUS;
+    } else if BitMove::is_castle(m) {
+        score = CASTLE_BONUS;
     }
 
     move_list.push(m, score);
