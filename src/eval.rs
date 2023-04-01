@@ -7,6 +7,7 @@ use crate::{
         pesto::{EG_TABLE, MG_TABLE},
         tables::{CENTER_DISTANCE, DISTANCE},
     },
+    movegen::pawn_caps,
 };
 
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
@@ -53,6 +54,19 @@ pub fn evaluate(board: &Board) -> Score {
     let b_knights = board.player_piece_bb(Player::Black, PieceType::Knight);
     mg[0] -= (BitBoard::count((w_knights | w_bishops) & BitBoard::RANK_1) * 5) as Score;
     mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 5) as Score;
+
+    // pawn attacks
+    let w_pawn_caps = pawn_caps(
+        board.player_piece_bb(Player::White, PieceType::Pawn),
+        Player::White,
+    ) & board.player_bb(Player::Black);
+    let b_pawn_caps = pawn_caps(
+        board.player_piece_bb(Player::Black, PieceType::Pawn),
+        Player::Black,
+    ) & board.player_bb(Player::White);
+
+    mg[0] += (BitBoard::count(w_pawn_caps) * 3) as Score;
+    mg[1] += (BitBoard::count(b_pawn_caps) * 3) as Score;
 
     // tapered eval
     let turn = board.turn.as_usize();
