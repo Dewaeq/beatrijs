@@ -25,6 +25,7 @@ impl BitBoard {
     pub const RANK_3: u64 = BitBoard::RANK_1 << 16;
     pub const RANK_6: u64 = BitBoard::RANK_1 << 40;
     pub const RANK_7: u64 = BitBoard::RANK_1 << 48;
+    pub const RANK_8: u64 = BitBoard::RANK_1 << 56;
     pub const FILE_A: u64 = 0x0101010101010101;
     pub const FILE_H: u64 = BitBoard::FILE_A << 7;
 }

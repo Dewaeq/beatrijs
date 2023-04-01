@@ -161,6 +161,11 @@ const fn pawn_cap_west(pawns: u64, player: Player) -> u64 {
     }
 }
 
+#[inline]
+pub const fn pawn_caps(pawns: u64, player: Player) -> u64 {
+    pawn_cap_east(pawns, player) | pawn_cap_east(pawns, player)
+}
+
 fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mut MoveList) {
     let opp = board.turn.opp();
     let opp_bb = board.player_bb(opp);

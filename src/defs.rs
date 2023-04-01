@@ -189,5 +189,8 @@ pub enum GenType {
     NonEvasions,
 }
 
-pub const MG_VALUE: [Score; NUM_PIECES] = [104, 337, 364, 477, 1025, 0];
-pub const EG_VALUE: [Score; NUM_PIECES] = [112, 281, 338, 512, 936, 0];
+pub const MG_VALUE: [Score; NUM_PIECES] = [126, 781, 825, 1276, 2538, 0];
+pub const EG_VALUE: [Score; NUM_PIECES] = [208, 854, 915, 1380, 2682, 0];
+
+/// Passed pawn bonus score, indexed by rank
+pub const PASSED_PAWN_SCORE: [Score; 8] = [0, 5, 10, 20, 35, 60, 100, 200];

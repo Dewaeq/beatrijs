@@ -1,4 +1,4 @@
-// #![allow(unused)]
+#![allow(unused)]
 #![feature(const_slice_index)]
 #![feature(sync_unsafe_cell)]
 
@@ -19,9 +19,9 @@ mod psqt;
 mod search;
 mod table;
 mod tests;
+mod uci;
 mod utils;
 mod zobrist;
-mod uci;
 
 use crate::input::Game;
 
