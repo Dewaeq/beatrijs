@@ -137,7 +137,7 @@ impl Searcher {
         self.clear_for_search();
 
         let start = Instant::now();
-        let score = self.negamax(depth, 0, alpha, beta, false);
+        let score = self.negamax(depth, alpha, beta, false);
         let elapsed = self.start_time.elapsed();
         let total_time = (elapsed.as_secs_f64() * 1000f64) as u64;
         let search_time = start.elapsed().as_secs_f64();
@@ -162,7 +162,6 @@ impl Searcher {
     fn negamax(
         &mut self,
         mut depth: u8,
-        ply: u8,
         mut alpha: Score,
         mut beta: Score,
         do_null: bool,
@@ -187,12 +186,12 @@ impl Searcher {
             };
 
             let entry = HashEntry::new(self.board.key(), depth, 0, score, node_type);
-            self.table.store(entry, ply);
+            self.table.store(entry, self.board.pos.ply);
 
             return score;
         }
 
-        let entry = self.table.probe(self.board.key(), ply);
+        let entry = self.table.probe(self.board.key(), self.board.pos.ply);
         let in_check = self.board.in_check();
         let mut pv_move = 0;
 
@@ -218,9 +217,9 @@ impl Searcher {
 
         self.num_nodes += 1;
 
-        if ply > 0 {
-            alpha = Score::max(-IMMEDIATE_MATE_SCORE + ply as Score, alpha);
-            beta = Score::min(IMMEDIATE_MATE_SCORE - ply as Score, beta);
+        if self.board.pos.ply > 0 {
+            alpha = Score::max(-IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score, alpha);
+            beta = Score::min(IMMEDIATE_MATE_SCORE - self.board.pos.ply as Score, beta);
 
             if alpha >= beta {
                 return alpha;
@@ -230,14 +229,14 @@ impl Searcher {
         let mut moves = MoveList::legal(&mut self.board);
         if moves.is_empty() {
             if in_check {
-                return -IMMEDIATE_MATE_SCORE + ply as Score;
+                return -IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score;
             }
             return 0;
         }
 
         if do_null && !in_check && depth >= 4 && self.board.has_big_piece(self.board.turn) {
             self.board.make_null_move();
-            let score = -self.negamax(depth - 4, ply + 1, -beta, -beta + 1, false);
+            let score = -self.negamax(depth - 4, -beta, -beta + 1, false);
             self.board.unmake_null_move();
 
             if self.should_stop() {
@@ -249,7 +248,7 @@ impl Searcher {
             }
         }
 
-        if in_check && ply > 0 {
+        if in_check && self.board.pos.ply > 0 {
             depth += 1;
         }
 
@@ -277,7 +276,7 @@ impl Searcher {
 
             // search pv move in a full window, at full depth
             if i == 0 {
-                score = -self.negamax(depth - 1, ply + 1, -beta, -alpha, true);
+                score = -self.negamax(depth - 1, -beta, -alpha, true);
             } else {
                 score = alpha + 1;
                 // LMR
@@ -287,15 +286,18 @@ impl Searcher {
                     && !self.board.in_check()
                     && i > 3
                     && moves.size() > 20
+                    && m != self.board.killers[0][self.board.pos.ply - 1]
+                    && m != self.board.killers[1][self.board.pos.ply - 1]
                 {
-                    let d = depth - depth / 5 - 2;
-                    score = -self.negamax(d, ply + 1, -alpha - 1, -alpha, true);
+                    let mut d = depth - 3;
+                    d = u8::min(d, d - (i / 20) as u8);
+                    score = -self.negamax(d, -alpha - 1, -alpha, true);
                 }
 
                 if score > alpha {
-                    score = -self.negamax(depth - 1, ply + 1, -alpha - 1, -alpha, true);
+                    score = -self.negamax(depth - 1, -alpha - 1, -alpha, true);
                     if score > alpha && score < beta {
-                        score = -self.negamax(depth - 1, ply + 1, -beta, -alpha, true);
+                        score = -self.negamax(depth - 1, -beta, -alpha, true);
                     }
                 }
             }
@@ -310,7 +312,7 @@ impl Searcher {
                 best_score = score;
                 best_move = m;
 
-                if ply == 0 {
+                if self.board.pos.ply == 0 {
                     self.best_root_move = m;
                 }
 
@@ -330,7 +332,7 @@ impl Searcher {
                             NodeType::Beta,
                         );
 
-                        self.table.store(entry, ply);
+                        self.table.store(entry, self.board.pos.ply);
                         return beta;
                     }
 
@@ -355,7 +357,7 @@ impl Searcher {
             HashEntry::new(self.board.key(), depth, best_move, alpha, NodeType::Alpha)
         };
 
-        self.table.store(entry, ply);
+        self.table.store(entry, self.board.pos.ply);
 
         alpha
     }
