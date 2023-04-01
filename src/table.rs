@@ -145,7 +145,7 @@ impl TWrapper {
         }
     }
 
-    pub fn probe(&self, key: u64, ply_from_root: u8) -> Option<HashEntry> {
+    pub fn probe(&self, key: u64, ply_from_root: usize) -> Option<HashEntry> {
         let mut entry = unsafe {
             (*self.inner.get()).probe(key)
         };
@@ -161,7 +161,7 @@ impl TWrapper {
         entry
     }
 
-    pub fn store(&self, mut entry: HashEntry, ply_from_root: u8) {
+    pub fn store(&self, mut entry: HashEntry, ply_from_root: usize) {
         if entry.score > IS_MATE {
             entry.score += ply_from_root as Score;
         } else if entry.score < -IS_MATE {

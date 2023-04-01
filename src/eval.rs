@@ -1,4 +1,5 @@
 use crate::{
+    bitboard::BitBoard,
     board::Board,
     defs::{Piece, PieceType, Player, Score, Square, EG_VALUE, PASSED_PAWN_SCORE},
     gen::{
@@ -6,7 +7,7 @@ use crate::{
         pesto::{EG_TABLE, MG_TABLE},
         tables::{CENTER_DISTANCE, DISTANCE, ISOLATED, PASSED},
     },
-    movegen::pawn_caps, bitboard::BitBoard,
+    movegen::pawn_caps,
 };
 
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
@@ -60,18 +61,12 @@ pub fn evaluate(board: &Board) -> Score {
     // undeveloped pieces penalty
     let w_knights = board.player_piece_bb(Player::White, PieceType::Knight);
     let b_knights = board.player_piece_bb(Player::Black, PieceType::Knight);
-    mg[0] -= (BitBoard::count((w_knights | w_bishops) & BitBoard::RANK_1) * 5) as Score;
-    mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 5) as Score;
+    mg[0] -= (BitBoard::count((w_knights | w_bishops) & BitBoard::RANK_1) * 10) as Score;
+    mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 10) as Score;
 
     // pawn attacks
-    let w_pawn_caps = pawn_caps(
-        board.player_piece_bb(Player::White, PieceType::Pawn),
-        Player::White,
-    ) & board.player_bb(Player::Black);
-    let b_pawn_caps = pawn_caps(
-        board.player_piece_bb(Player::Black, PieceType::Pawn),
-        Player::Black,
-    ) & board.player_bb(Player::White);
+    let w_pawn_caps = pawn_caps(w_pawns, Player::White) & board.player_bb(Player::Black);
+    let b_pawn_caps = pawn_caps(b_pawns, Player::Black) & board.player_bb(Player::White);
 
     mg[0] += (BitBoard::count(w_pawn_caps) * 3) as Score;
     mg[1] += (BitBoard::count(b_pawn_caps) * 3) as Score;
@@ -153,11 +148,11 @@ const fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) ->
     let file = sq % 8;
     // isolated pawn, as there are no pawns besides it
     if pawns & ISOLATED[file as usize] == 0 {
-        score -= 10;
+        score -= 20;
     }
     // doubled pawn
     if BitBoard::more_than_one(pawns & BitBoard::file_bb(sq)) {
-        score -= 15;
+        score -= 30;
     }
 
     // passed pawn
