@@ -86,19 +86,29 @@ fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
 }
 
 fn mobility(board: &Board, piece: Piece, sq: Square) -> Score {
-    if piece.t == PieceType::Pawn || piece.t == PieceType::King {
+    if piece.t == PieceType::Pawn {
         return 0;
     }
 
-    let moves = attacks(piece.t, sq, board.occ_bb(), piece.c);
-    let count = BitBoard::count(moves) as Score;
+    let occ = board.occ_bb();
+    let my_bb = board.player_bb(board.turn);
+    let opp_bb = occ & !my_bb;
 
-    // TODO: find proper values, these are just my guesses and haven't been tested yet
-    match piece.t {
-        PieceType::Knight => 4 * count,
-        PieceType::Bishop => 6 * count,
-        PieceType::Rook => 5 * count,
-        PieceType::Queen => 4 * count,
-        _ => 0,
-    }
+    let moves = attacks(piece.t, sq, board.occ_bb(), piece.c);
+
+    let open = BitBoard::count(moves & !occ);
+    let att = BitBoard::count(moves & opp_bb);
+    let def = BitBoard::count(moves & my_bb);
+
+    // This score is in millipawns
+    let score = match piece.t {
+        PieceType::Knight => 20 * open + 35 * att + 15 * def,
+        PieceType::Bishop => 17 * open + 30 * att + 15 * def,
+        PieceType::Rook => 15 * open + 20 * att + 15 * def,
+        PieceType::Queen => 5 * open + 15 * att + 8 * def,
+        PieceType::King => 4 * open + 15 * att + 10 * def,
+        _ => panic!(),
+    };
+
+    (score / 30) as Score
 }
