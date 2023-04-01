@@ -1,5 +1,6 @@
 use crate::{
-    defs::{NUM_SQUARES, Score},
+    bitboard::BitBoard,
+    defs::{Score, Square, NUM_SIDES, NUM_SQUARES},
     utils::{b_max, coord_from_square},
 };
 
@@ -7,6 +8,11 @@ use crate::{
 ///
 /// The minimal number of orthogonal king moves needed to go from square `a` to square `b`
 pub const DISTANCE: [[Score; NUM_SQUARES]; NUM_SQUARES] = gen_distance();
+
+/// Neighbouring files of a given file. If both of them are empty, the pawn is isolated
+pub const ISOLATED: [u64; 8] = gen_isolated();
+
+pub const PASSED: [[u64; NUM_SQUARES]; NUM_SIDES] = [gen_white_passed(), gen_black_passed()];
 
 const fn gen_distance() -> [[Score; NUM_SQUARES]; NUM_SQUARES] {
     let mut table = [[0; NUM_SQUARES]; NUM_SQUARES];
@@ -25,6 +31,58 @@ const fn gen_distance() -> [[Score; NUM_SQUARES]; NUM_SQUARES] {
         }
 
         src += 1;
+    }
+
+    table
+}
+
+const fn gen_isolated() -> [u64; 8] {
+    let mut table = [0; 8];
+    let mut file = 0;
+    while file < 8 {
+        if file != 0 {
+            table[file] |= BitBoard::file_bb((file - 1) as Square);
+        }
+        if file != 7 {
+            table[file] |= BitBoard::file_bb((file + 1) as Square);
+        }
+        file += 1;
+    }
+
+    table
+}
+
+const fn gen_white_passed() -> [u64; NUM_SQUARES] {
+    let mut table = [0; NUM_SQUARES];
+    let mut sq = 0;
+
+    while sq < 64 {
+        table[sq] = ISOLATED[sq % 8] | BitBoard::file_bb(sq as Square);
+        let mut prev = sq as Square;
+        while prev >= 0 {
+            table[sq] &= !BitBoard::rank_bb(prev);
+            prev -= 8;
+        }
+
+        sq += 1;
+    }
+
+    table
+}
+
+const fn gen_black_passed() -> [u64; NUM_SQUARES] {
+    let mut table = [0; NUM_SQUARES];
+    let mut sq = 0;
+
+    while sq < 64 {
+        table[sq] = ISOLATED[sq % 8] | BitBoard::file_bb(sq as Square);
+        let mut prev = sq as Square;
+        while prev < 64 {
+            table[sq] &= !BitBoard::rank_bb(prev);
+            prev += 8;
+        }
+
+        sq += 1;
     }
 
     table

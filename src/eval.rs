@@ -1,11 +1,11 @@
 use crate::{
     bitboard::BitBoard,
     board::Board,
-    defs::{Piece, PieceType, Player, Score, Square, EG_VALUE},
+    defs::{Piece, PieceType, Player, Score, Square, EG_VALUE, PASSED_PAWN_SCORE},
     gen::{
         attack::attacks,
         pesto::{EG_TABLE, MG_TABLE},
-        tables::{CENTER_DISTANCE, DISTANCE},
+        tables::{CENTER_DISTANCE, DISTANCE, ISOLATED, PASSED},
     },
     movegen::pawn_caps,
 };
@@ -18,6 +18,9 @@ pub fn evaluate(board: &Board) -> Score {
     let mut mg = [0; 2];
     let mut eg = [0; 2];
     let mut game_phase = 0;
+
+    let w_pawns = board.player_piece_bb(Player::White, PieceType::Pawn);
+    let b_pawns = board.player_piece_bb(Player::Black, PieceType::Pawn);
 
     let mut sq = 0;
     for piece in board.pieces {
@@ -32,6 +35,10 @@ pub fn evaluate(board: &Board) -> Score {
         game_phase += GAME_PHASE_INC[piece.t.as_usize()];
 
         mg[idx] += mobility(board, piece, sq as Square);
+        mg[idx] += match piece.c {
+            Player::White => pawn_structure(piece.c, sq as Square, w_pawns, b_pawns),
+            Player::Black => pawn_structure(piece.c, sq as Square, b_pawns, w_pawns),
+        };
 
         sq += 1;
     }
@@ -131,4 +138,29 @@ fn mobility(board: &Board, piece: Piece, sq: Square) -> Score {
     };
 
     (score / 30) as Score
+}
+
+const fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) -> Score {
+    let mut score = 0;
+
+    let file = sq % 8;
+    // isolated pawn, as there are no pawns besides it
+    if pawns & ISOLATED[file as usize] == 0 {
+        score -= 10;
+    }
+    // doubled pawn
+    if BitBoard::more_than_one(pawns & BitBoard::file_bb(sq)) {
+        score -= 15;
+    }
+
+    // passed pawn
+    if PASSED[side.as_usize()][sq as usize] & opp_pawns == 0 {
+        let rel_rank = match side {
+            Player::White => (sq / 8) as usize,
+            Player::Black => (7 - sq / 8) as usize,
+        };
+        score += PASSED_PAWN_SCORE[rel_rank];
+    }
+
+    score
 }

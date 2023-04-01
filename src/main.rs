@@ -19,9 +19,9 @@ mod psqt;
 mod search;
 mod table;
 mod tests;
+mod uci;
 mod utils;
 mod zobrist;
-mod uci;
 
 use crate::input::Game;
 
