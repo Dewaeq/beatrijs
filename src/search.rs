@@ -196,17 +196,6 @@ impl Searcher {
 
         if let Some(entry) = entry {
             pv_move = entry.m;
-            // check if the pv causes a 3 fold repetition
-            if pv_move != 0 {
-                self.board.make_move(pv_move);
-                if is_repetition(&self.board) {
-                    self.board.unmake_move(pv_move);
-                    // if so, delete the tt entry, as it's no longer valid
-                    self.table.delete(self.board.key());
-                    return 0;
-                }
-                self.board.unmake_move(pv_move);
-            }
 
             if entry.depth >= depth {
                 match entry.node_type {

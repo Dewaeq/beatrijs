@@ -124,16 +124,10 @@ pub const fn is_repetition(board: &Board) -> bool {
         return false;
     }
 
-    let mut count = 0;
     let mut i = 2;
-
     while i <= (board.pos.rule_fifty + 1) as usize {
         let key = board.history.get_key(board.history.count - i);
         if key == board.key() {
-            count += 1;
-        }
-
-        if count == 2 {
             return true;
         }
 
