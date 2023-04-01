@@ -48,6 +48,12 @@ pub fn evaluate(board: &Board) -> Score {
         mg[1] += BISHOP_PAIR_BONUS;
     }
 
+    // undeveloped pieces penalty
+    let w_knights = board.player_piece_bb(Player::White, PieceType::Knight);
+    let b_knights = board.player_piece_bb(Player::Black, PieceType::Knight);
+    mg[0] -= (BitBoard::count((w_knights | w_bishops) & BitBoard::RANK_1) * 5) as Score;
+    mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 5) as Score;
+
     // tapered eval
     let turn = board.turn.as_usize();
     let opp = 1 - turn;
