@@ -14,6 +14,10 @@ impl History {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.count = 0;
+    }
+
     pub fn push(&mut self, pos: Position) {
         unsafe {
             *self.positions.get_unchecked_mut(self.count) = pos;
