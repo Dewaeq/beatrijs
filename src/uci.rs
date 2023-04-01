@@ -77,8 +77,8 @@ impl Game {
 
         // TODO: improve time management
         if info.my_time(self.board.turn) > 0 {
-            let start = Instant::now();
-            while (start.elapsed().as_millis() as usize) < info.my_time(self.board.turn) / 30 {}
+            info.start();
+            while info.has_time(self.board.turn) {}
             self.stop();
         }
     }

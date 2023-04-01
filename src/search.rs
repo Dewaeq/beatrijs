@@ -20,6 +20,7 @@ pub struct SearchInfo {
     pub w_inc: usize,
     pub b_inc: usize,
     pub move_time: usize,
+    pub started: Instant,
 }
 
 impl Default for SearchInfo {
@@ -31,6 +32,7 @@ impl Default for SearchInfo {
             w_inc: 0,
             b_inc: 0,
             move_time: 0,
+            started: Instant::now(),
         }
     }
 }
@@ -47,6 +49,14 @@ impl SearchInfo {
             Player::White => self.w_time,
             Player::Black => self.b_time,
         }
+    }
+
+    pub fn start(&mut self) {
+        self.started = Instant::now();
+    }
+
+    pub fn has_time(&self, side: Player) -> bool {
+        (self.started.elapsed().as_millis() as usize + 50) < self.my_time(side) / 30
     }
 }
 
