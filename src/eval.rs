@@ -77,6 +77,12 @@ pub fn evaluate(board: &Board) -> Score {
     mg[0] += (BitBoard::count(w_pawn_caps) * 3) as Score;
     mg[1] += (BitBoard::count(b_pawn_caps) * 3) as Score;
 
+    // pawns defended by pawns
+    let w_defenders = pawn_caps(w_pawns, Player::Black);
+    let b_defenders = pawn_caps(b_pawns, Player::White);
+    mg[0] += (BitBoard::count(w_defenders & w_pawns) * 2) as Score;
+    mg[1] += (BitBoard::count(b_defenders & b_pawns) * 2) as Score;
+
     // tapered eval
     let turn = board.turn.as_usize();
     let opp = 1 - turn;
