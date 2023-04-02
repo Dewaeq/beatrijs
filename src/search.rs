@@ -99,7 +99,6 @@ impl Searcher {
     fn clear_for_search(&mut self) {
         self.num_nodes = 0;
         self.board.pos.ply = 0;
-        self.board.history.clear();
         self.board.clear_killers();
     }
 
