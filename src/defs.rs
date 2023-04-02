@@ -194,3 +194,8 @@ pub const EG_VALUE: [Score; NUM_PIECES] = [208, 854, 915, 1380, 2682, 0];
 
 /// Passed pawn bonus score, indexed by rank
 pub const PASSED_PAWN_SCORE: [Score; 8] = [0, 5, 10, 20, 35, 60, 100, 200];
+
+pub const CASTLE_KING_FILES: u64 = BitBoard::FILE_F | BitBoard::FILE_G | BitBoard::FILE_H;
+pub const CASTLE_QUEEN_FILES: u64 = BitBoard::FILE_A | BitBoard::FILE_B | BitBoard::FILE_C;
+
+pub const CENTER_FILES: u64 = BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F;
