@@ -68,6 +68,7 @@ pub struct Searcher {
     start_time: Instant,
     info: SearchInfo,
     best_root_move: u16,
+    root_moves: MoveList,
 }
 
 impl Searcher {
@@ -80,6 +81,7 @@ impl Searcher {
             start_time: Instant::now(),
             info,
             best_root_move: 0,
+            root_moves: MoveList::new(),
         }
     }
 
@@ -108,6 +110,8 @@ impl Searcher {
         // save alpha and beta for aspiration search
         let mut alpha = -INFINITY;
         let mut beta = INFINITY;
+
+        self.root_moves = MoveList::legal(&mut self.board);
 
         for depth in 1..=self.info.depth {
             let mut score = self.search(depth as u8, alpha, beta);
@@ -204,6 +208,7 @@ impl Searcher {
         let in_check = self.board.in_check();
         let mut pv_move = 0;
         let mut is_pv = false;
+        let is_root = self.board.pos.ply == 0;
 
         if let Some(entry) = entry {
             pv_move = entry.m;
@@ -237,7 +242,12 @@ impl Searcher {
             }
         }
 
-        let mut moves = MoveList::legal(&mut self.board);
+        let mut moves = if is_root {
+            self.root_moves
+        } else {
+            MoveList::legal(&mut self.board)
+        };
+
         if moves.is_empty() {
             if in_check {
                 return -IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score;
@@ -321,11 +331,15 @@ impl Searcher {
                 return 0;
             }
 
+            if is_root {
+                self.root_moves.set_score(i, score);
+            }
+
             if score > best_score {
                 best_score = score;
                 best_move = m;
 
-                if self.board.pos.ply == 0 {
+                if is_root {
                     self.best_root_move = m;
                 }
 
