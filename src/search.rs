@@ -203,9 +203,11 @@ impl Searcher {
         let entry = self.table.probe(self.board.key(), self.board.pos.ply);
         let in_check = self.board.in_check();
         let mut pv_move = 0;
+        let mut is_pv = false;
 
         if let Some(entry) = entry {
             pv_move = entry.m;
+            is_pv = true;
 
             if entry.depth >= depth {
                 match entry.node_type {
@@ -291,8 +293,10 @@ impl Searcher {
                 // LMR
                 // Dot not reduce moves that give check, capture or promote
                 if depth >= 3
+                    && !is_pv
                     && !BitMove::is_tactical(m)
                     && !self.board.in_check()
+                    && !in_check
                     && i > 3
                     && moves.size() > 20
                     && m != self.board.killers[0][self.board.pos.ply - 1]
