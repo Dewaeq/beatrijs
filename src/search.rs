@@ -269,7 +269,7 @@ impl Searcher {
             }
         }
 
-        if in_check && self.board.pos.ply > 0 {
+        if in_check && !is_root {
             depth += 1;
         }
 
@@ -303,7 +303,6 @@ impl Searcher {
                 // LMR
                 // Dot not reduce moves that give check, capture or promote
                 if depth >= 3
-                    && !is_pv
                     && !BitMove::is_tactical(m)
                     && !self.board.in_check()
                     && !in_check
@@ -314,6 +313,9 @@ impl Searcher {
                 {
                     let mut d = depth - 3;
                     d = u8::min(d, d - (i / 20) as u8);
+                    if is_pv {
+                        d = u8::min(d + 2, depth - 1);
+                    }
                     score = -self.negamax(d, -alpha - 1, -alpha, true);
                 }
 
