@@ -1,4 +1,4 @@
-use crate::defs::{Score, INFINITY, MAX_DEPTH};
+use crate::defs::{Score, INFINITY, MAX_DEPTH, MG_VALUE};
 use crate::eval::evaluate;
 use crate::table::{HashEntry, NodeType, TWrapper};
 use crate::utils::{is_draw, is_repetition, print_search_info};
@@ -9,8 +9,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-pub const IMMEDIATE_MATE_SCORE: Score = 30_000;
-pub const IS_MATE: Score = IMMEDIATE_MATE_SCORE - 64;
+pub const IMMEDIATE_MATE_SCORE: Score = 31_000;
+pub const IS_MATE: Score = IMMEDIATE_MATE_SCORE - 1000;
 
 #[derive(Clone, Copy, Debug)]
 pub struct SearchInfo {
@@ -255,6 +255,29 @@ impl Searcher {
             return 0;
         }
 
+        let eval = evaluate(&self.board);
+
+        // Futility pruning: frontier node
+        if depth == 1
+            && !in_check
+            && !is_pv
+            && eval + MG_VALUE[1] < alpha
+            && alpha > -IS_MATE
+            && beta < IS_MATE
+        {
+            return eval;
+        }
+
+        if !in_check
+            && !is_pv
+            && depth < 9
+            && eval - 154 * (depth as Score) >= beta
+            && alpha > -IS_MATE
+            && beta < IS_MATE
+        {
+            return eval;
+        }
+
         if do_null && !in_check && depth >= 4 && self.board.has_big_piece(self.board.turn) {
             self.board.make_null_move();
             let score = -self.negamax(depth - 4, -beta, -beta + 1, false);
@@ -288,12 +311,22 @@ impl Searcher {
             }
         }
 
+        let is_prunable = !in_check && !is_pv && (alpha > -IS_MATE && beta < IS_MATE);
+        let can_prune = is_prunable && depth <= 3 && (eval + MG_VALUE[1] <= alpha);
+
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
             let m = moves.get(i);
 
             self.board.make_move(m);
+            let gives_check = self.board.in_check();
             let mut score = 0;
+
+            // Futility pruning
+            if can_prune && !gives_check {
+                self.board.unmake_move(m);
+                continue;
+            }
 
             // search pv move in a full window, at full depth
             if i == 0 {
@@ -304,7 +337,7 @@ impl Searcher {
                 // Dot not reduce moves that give check, capture or promote
                 if depth >= 3
                     && !BitMove::is_tactical(m)
-                    && !self.board.in_check()
+                    && !gives_check
                     && !in_check
                     && i > 3
                     && moves.size() > 20
