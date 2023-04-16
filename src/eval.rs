@@ -119,8 +119,7 @@ pub fn evaluate(board: &Board) -> Score {
     );
 
     // Control of space on the player's side of the board
-    score += eval_space(&board, Player::White, w_pawns, &attacked_by);
-    score -= eval_space(&board, Player::Black, b_pawns, &attacked_by);
+    score += eval_space(&board, w_pawns, b_pawns, &attacked_by);
 
     // tapered eval
     let turn = board.turn.as_usize();
@@ -345,28 +344,24 @@ fn king_pawn_shield(
     }
 }
 
-/// Reward the control of space on our side of the board
+/// Reward the control of space on a player's side of the board
 #[inline(always)]
-const fn eval_space(board: &Board, side: Player, my_pawns: u64, attacked_by: &AttackedBy) -> Score {
-    let opp = side.opp();
+const fn eval_space(board: &Board, w_pawns: u64, b_pawns: u64, attacked_by: &AttackedBy) -> Score {
+    let safe_w =
+        SAFE_MASK[0] & !w_pawns & !attacked_by.b_pawns & (attacked_by.white | !attacked_by.black);
+    let mut behind_w = w_pawns | w_pawns >> 8 | w_pawns >> 16;
+    let safe_b =
+        SAFE_MASK[1] & !b_pawns & !attacked_by.w_pawns & (attacked_by.black | !attacked_by.white);
+    let mut behind_b = b_pawns | b_pawns << 8 | b_pawns << 16;
 
-    let safe = SAFE_MASK[side.as_usize()]
-        & !my_pawns
-        & !attacked_by.pawns(opp)
-        & (attacked_by.side(side) | !attacked_by.side(opp));
+    let bonus_w = (BitBoard::count(safe_w) + BitBoard::count(behind_w & safe_w)) as Score;
+    let bonus_b = (BitBoard::count(safe_b) + BitBoard::count(behind_b & safe_b)) as Score;
 
-    let mut behind = my_pawns;
-    match side {
-        Player::White => behind |= (behind >> 8) | (behind >> 16),
-        _ => behind |= (behind << 8) | (behind << 16),
-    }
-
-    let bonus = BitBoard::count(safe) + BitBoard::count(behind & safe);
     // Increase space evaluation weight in positions with many minor pieces
     let weight =
         BitBoard::count(board.piece_bb(PieceType::Knight) | board.piece_bb(PieceType::Bishop));
 
-    (bonus * weight * weight) as Score
+    ((bonus_w - bonus_b) * (weight * weight) as Score)
 }
 
 struct AttackedBy {
@@ -386,6 +381,7 @@ impl AttackedBy {
         }
     }
 
+    #[inline(always)]
     pub const fn side(&self, side: Player) -> u64 {
         match side {
             Player::White => self.white,
@@ -393,6 +389,7 @@ impl AttackedBy {
         }
     }
 
+    #[inline(always)]
     pub const fn pawns(&self, side: Player) -> u64 {
         match side {
             Player::White => self.w_pawns,
