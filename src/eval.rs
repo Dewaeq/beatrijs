@@ -3,10 +3,10 @@ use crate::{
     board::Board,
     defs::{
         Piece, PieceType, Player, Score, Square, CASTLE_KING_FILES, CASTLE_QUEEN_FILES,
-        CENTER_FILES, EG_VALUE, PASSED_PAWN_SCORE,
+        CENTER_FILES, CENTER_SQUARES, EG_VALUE, MG_VALUE, PASSED_PAWN_SCORE,
     },
     gen::{
-        attack::attacks,
+        attack::{attacks, king_attacks, KING_ATK},
         pesto::{EG_TABLE, MG_TABLE},
         tables::{CENTER_DISTANCE, DISTANCE, ISOLATED, PASSED},
     },
@@ -16,11 +16,20 @@ use crate::{
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
 const BISHOP_PAIR_BONUS: Score = 20;
 
-/// see https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function
+const SAFE_MASK: [u64; 2] = [
+    (BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F)
+        & (BitBoard::RANK_2 | BitBoard::RANK_3 | BitBoard::RANK_4),
+    (BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F)
+        & (BitBoard::RANK_5 | BitBoard::RANK_6 | BitBoard::RANK_7),
+];
+
 pub fn evaluate(board: &Board) -> Score {
+    // Score is from white's perspective
+    let mut score = 0;
     let mut mg = [0; 2];
     let mut eg = [0; 2];
     let mut game_phase = 0;
+    let mut attacked_by = AttackedBy::new();
 
     let w_pawns = board.player_piece_bb(Player::White, PieceType::Pawn);
     let b_pawns = board.player_piece_bb(Player::Black, PieceType::Pawn);
@@ -36,13 +45,15 @@ pub fn evaluate(board: &Board) -> Score {
         mg[idx] += MG_TABLE[piece.as_usize()][sq];
         eg[idx] += EG_TABLE[piece.as_usize()][sq];
         game_phase += GAME_PHASE_INC[piece.t.as_usize()];
+        score += mobility(board, piece, sq as Square, &mut attacked_by);
 
-        mg[idx] += mobility(board, piece, sq as Square);
         if piece.t == PieceType::Pawn {
-            mg[idx] += match piece.c {
+            let pawn_score = match piece.c {
                 Player::White => pawn_structure(piece.c, sq as Square, w_pawns, b_pawns),
                 Player::Black => pawn_structure(piece.c, sq as Square, b_pawns, w_pawns),
             };
+
+            score += pawn_score;
         }
 
         sq += 1;
@@ -55,10 +66,10 @@ pub fn evaluate(board: &Board) -> Score {
     let b_bishops = board.player_piece_bb(Player::Black, PieceType::Bishop);
 
     if BitBoard::more_than_one(w_bishops) {
-        mg[0] += BISHOP_PAIR_BONUS;
+        score += BISHOP_PAIR_BONUS;
     }
     if BitBoard::more_than_one(b_bishops) {
-        mg[1] += BISHOP_PAIR_BONUS;
+        score -= BISHOP_PAIR_BONUS;
     }
 
     // undeveloped pieces penalty
@@ -67,9 +78,18 @@ pub fn evaluate(board: &Board) -> Score {
     mg[0] -= (BitBoard::count((w_knights | w_bishops) & BitBoard::RANK_1) * 8) as Score;
     mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 8) as Score;
 
+    // pawns controlling center of the board
+    mg[0] += (BitBoard::count(w_pawns & CENTER_SQUARES) * 15) as Score;
+    mg[1] += (BitBoard::count(b_pawns & CENTER_SQUARES) * 15) as Score;
+
     // pawn attacks
     let w_pawn_caps = pawn_caps(w_pawns, Player::White) & board.player_bb(Player::Black);
     let b_pawn_caps = pawn_caps(b_pawns, Player::Black) & board.player_bb(Player::White);
+
+    attacked_by.w_pawns = w_pawn_caps;
+    attacked_by.white |= w_pawn_caps;
+    attacked_by.b_pawns = b_pawn_caps;
+    attacked_by.black |= b_pawn_caps;
 
     mg[0] += (BitBoard::count(w_pawn_caps) * 3) as Score;
     mg[1] += (BitBoard::count(b_pawn_caps) * 3) as Score;
@@ -77,24 +97,50 @@ pub fn evaluate(board: &Board) -> Score {
     // pawns defended by pawns
     let w_defenders = pawn_caps(w_pawns, Player::Black) & w_pawns;
     let b_defenders = pawn_caps(b_pawns, Player::White) & b_pawns;
-    mg[0] += (BitBoard::count(w_defenders & w_pawns) * 2) as Score;
-    mg[1] += (BitBoard::count(b_defenders & b_pawns) * 2) as Score;
+    score += (BitBoard::count(w_defenders & w_pawns) * 4) as Score;
+    score -= (BitBoard::count(b_defenders & b_pawns) * 4) as Score;
+
+    // attacks on king
+    let w_king_sq = board.king_square(Player::White);
+    let b_king_sq = board.king_square(Player::Black);
+
+    let w_king_bb = board.player_piece_bb(Player::White, PieceType::King);
+    let b_king_bb = board.player_piece_bb(Player::Black, PieceType::King);
+
+    score -= (BitBoard::count(attacked_by.black & king_attacks(w_king_sq)) * 40) as Score;
+    score -= (BitBoard::count(attacked_by.black & w_king_bb) * 60) as Score;
+
+    score += (BitBoard::count(attacked_by.white & king_attacks(b_king_sq)) * 40) as Score;
+    score += (BitBoard::count(attacked_by.white & b_king_bb) * 60) as Score;
 
     // pawn shield for king safety
-    king_pawn_shield(board, w_pawns, b_pawns, &mut mg);
+    king_pawn_shield(
+        board, w_pawns, b_pawns, &mut mg, w_king_sq, b_king_sq, w_king_bb, b_king_bb,
+    );
+
+    // Control of space on the player's side of the board
+    score += eval_space(&board, Player::White, w_pawns, &attacked_by);
+    score -= eval_space(&board, Player::Black, b_pawns, &attacked_by);
 
     // tapered eval
     let turn = board.turn.as_usize();
     let opp = 1 - turn;
 
-    let mg_score = mg[turn] - mg[opp];
-    let eg_score = eg[turn] - eg[opp];
+    let mg_score = mg[0] - mg[1];
+    let eg_score = eg[0] - eg[1];
     let mg_phase = Score::min(24, game_phase);
     let eg_phase = 24 - mg_phase;
 
-    (mg_score * mg_phase + eg_score * eg_phase) / 24
+    score += (mg_score * mg_phase + eg_score * eg_phase) / 24;
+
+    if board.turn == Player::White {
+        score
+    } else {
+        -score
+    }
 }
 
+#[inline(always)]
 fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
     // Don't apply mop-up when there are still pawns on the board
     if board.piece_bb(PieceType::Pawn) != 0 {
@@ -120,7 +166,9 @@ fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
     eg[turn] += mopup;
 }
 
-fn mobility(board: &Board, piece: Piece, sq: Square) -> Score {
+// Structural evaluation of a piece, from white's perspective
+#[inline(always)]
+fn mobility(board: &Board, piece: Piece, sq: Square, attacked_by: &mut AttackedBy) -> Score {
     if piece.t == PieceType::Pawn {
         return 0;
     }
@@ -128,26 +176,43 @@ fn mobility(board: &Board, piece: Piece, sq: Square) -> Score {
     let occ = board.occ_bb();
     let my_bb = board.player_bb(piece.c);
     let opp_bb = occ & !my_bb;
+    let mut score = 0;
 
     let moves = attacks(piece.t, sq, occ, piece.c);
+    if moves == 0 {
+        // penalize pieces that can't move
+        score = -MG_VALUE[piece.t.as_usize()] / 15;
+    } else {
+        let attacks = moves & opp_bb;
+        match piece.c {
+            Player::White => attacked_by.white |= attacks,
+            _ => attacked_by.black |= attacks,
+        };
 
-    let open = BitBoard::count(moves & !occ);
-    let att = BitBoard::count(moves & opp_bb);
-    let def = BitBoard::count(moves & my_bb);
+        let open = BitBoard::count(moves & !occ);
+        let att = BitBoard::count(attacks);
+        let def = BitBoard::count(moves & my_bb);
 
-    // This score is in millipawns
-    let score = match piece.t {
-        PieceType::Knight => 20 * open + 35 * att + 15 * def,
-        PieceType::Bishop => 17 * open + 30 * att + 15 * def,
-        PieceType::Rook => 15 * open + 20 * att + 15 * def,
-        PieceType::Queen => 5 * open + 15 * att + 8 * def,
-        PieceType::King => 4 * open + 15 * att + 10 * def,
-        _ => panic!(),
-    };
+        // This score is in millipawns
+        score = match piece.t {
+            PieceType::Knight => 20 * open + 35 * att + 15 * def,
+            PieceType::Bishop => 17 * open + 30 * att + 15 * def,
+            PieceType::Rook => 15 * open + 20 * att + 15 * def,
+            PieceType::Queen => 5 * open + 15 * att + 8 * def,
+            PieceType::King => 4 * open + 15 * att + 10 * def,
+            _ => panic!(),
+        } as Score;
 
-    (score / 30) as Score
+        score /= 30;
+    }
+
+    match piece.c {
+        Player::White => score,
+        _ => -score,
+    }
 }
 
+#[inline(always)]
 const fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) -> Score {
     let mut score = 0;
 
@@ -170,16 +235,23 @@ const fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) ->
         score += PASSED_PAWN_SCORE[rel_rank];
     }
 
-    score
+    match side {
+        Player::White => score,
+        _ => -score,
+    }
 }
 
-fn king_pawn_shield(board: &Board, w_pawns: u64, b_pawns: u64, mg: &mut [Score; 2]) {
-    let w_king_bb = board.player_piece_bb(Player::White, PieceType::King);
-    let b_king_bb = board.player_piece_bb(Player::Black, PieceType::King);
-
-    let w_king_sq = BitBoard::bit_scan_forward(w_king_bb);
-    let b_king_sq = BitBoard::bit_scan_forward(b_king_bb);
-    
+#[inline(always)]
+fn king_pawn_shield(
+    board: &Board,
+    w_pawns: u64,
+    b_pawns: u64,
+    mg: &mut [Score; 2],
+    w_king_sq: Square,
+    b_king_sq: Square,
+    w_king_bb: u64,
+    b_king_bb: u64,
+) {
     // punish king in centre
     if w_king_bb & CENTER_FILES != 0 {
         mg[0] -= 25;
@@ -187,25 +259,26 @@ fn king_pawn_shield(board: &Board, w_pawns: u64, b_pawns: u64, mg: &mut [Score; 
     if b_king_bb & CENTER_FILES != 0 {
         mg[1] -= 25;
     }
-    
+
     // punish king on open or semi-open file
     if (w_pawns | b_pawns) & BitBoard::file_bb(w_king_sq) == 0 {
-        mg[0] -= 30;
+        mg[0] -= 35;
     } else if w_pawns & BitBoard::file_bb(w_king_sq) == 0 {
         mg[0] -= 20;
     }
     if (w_pawns | b_pawns) & BitBoard::file_bb(b_king_sq) == 0 {
-        mg[1] -= 30;
+        mg[1] -= 35;
     } else if b_pawns & BitBoard::file_bb(b_king_sq) == 0 {
         mg[1] -= 20;
     }
 
     // If the king has wandered this far from home, he must have a reason to do so,
     // so don't evaluate a pawn shield
-    if w_king_bb < BitBoard::RANK_3 {
+    if w_king_sq < 16 {
         // white king side
-        if w_king_bb > BitBoard::FILE_E {
-            mg[0] += (BitBoard::count(w_pawns & CASTLE_KING_FILES & BitBoard::RANK_2) * 7) as Score;
+        if w_king_bb & (BitBoard::FILE_G | BitBoard::FILE_H) != 0 {
+            mg[0] +=
+                (BitBoard::count(w_pawns & CASTLE_KING_FILES & BitBoard::RANK_2) * 10) as Score;
             mg[0] += (BitBoard::count(w_pawns & CASTLE_KING_FILES & BitBoard::RANK_3) * 3) as Score;
 
             // punish empty file close to king
@@ -216,9 +289,9 @@ fn king_pawn_shield(board: &Board, w_pawns: u64, b_pawns: u64, mg: &mut [Score; 
             }
         }
         // white queen side
-        else {
+        else if w_king_bb & CASTLE_QUEEN_FILES != 0 {
             mg[0] +=
-                (BitBoard::count(w_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_2) * 7) as Score;
+                (BitBoard::count(w_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_2) * 10) as Score;
             mg[0] +=
                 (BitBoard::count(w_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_3) * 3) as Score;
 
@@ -229,14 +302,19 @@ fn king_pawn_shield(board: &Board, w_pawns: u64, b_pawns: u64, mg: &mut [Score; 
                 }
             }
         }
+        // Not castled yet
+        else {
+            mg[0] -= 15;
+        }
     }
 
     // If the king has wandered this far from home, he must have a reason to do so,
     // so don't evaluate a pawn shield
-    if b_king_bb > BitBoard::RANK_6 {
+    if b_king_sq > 47 {
         // black king side
-        if b_king_bb > BitBoard::FILE_E {
-            mg[1] += (BitBoard::count(b_pawns & CASTLE_KING_FILES & BitBoard::RANK_7) * 7) as Score;
+        if b_king_bb & (BitBoard::FILE_G | BitBoard::FILE_H) != 0 {
+            mg[1] +=
+                (BitBoard::count(b_pawns & CASTLE_KING_FILES & BitBoard::RANK_7) * 10) as Score;
             mg[1] += (BitBoard::count(b_pawns & CASTLE_KING_FILES & BitBoard::RANK_6) * 3) as Score;
 
             // punish empty file close to king
@@ -247,9 +325,9 @@ fn king_pawn_shield(board: &Board, w_pawns: u64, b_pawns: u64, mg: &mut [Score; 
             }
         }
         // black queen side
-        else {
+        else if b_king_bb & CASTLE_QUEEN_FILES != 0 {
             mg[1] +=
-                (BitBoard::count(b_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_7) * 7) as Score;
+                (BitBoard::count(b_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_7) * 10) as Score;
             mg[1] +=
                 (BitBoard::count(b_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_6) * 3) as Score;
 
@@ -259,6 +337,66 @@ fn king_pawn_shield(board: &Board, w_pawns: u64, b_pawns: u64, mg: &mut [Score; 
                     mg[1] -= 25;
                 }
             }
+        }
+        // Not castled yet
+        else {
+            mg[1] -= 15;
+        }
+    }
+}
+
+/// Reward the control of space on our side of the board
+#[inline(always)]
+const fn eval_space(board: &Board, side: Player, my_pawns: u64, attacked_by: &AttackedBy) -> Score {
+    let opp = side.opp();
+
+    let safe = SAFE_MASK[side.as_usize()]
+        & !my_pawns
+        & !attacked_by.pawns(opp)
+        & (attacked_by.side(side) | !attacked_by.side(opp));
+
+    let mut behind = my_pawns;
+    match side {
+        Player::White => behind |= (behind >> 8) | (behind >> 16),
+        _ => behind |= (behind << 8) | (behind << 16),
+    }
+
+    let bonus = BitBoard::count(safe) + BitBoard::count(behind & safe);
+    // Increase space evaluation weight in positions with many minor pieces
+    let weight =
+        BitBoard::count(board.piece_bb(PieceType::Knight) | board.piece_bb(PieceType::Bishop));
+
+    (bonus * weight * weight) as Score
+}
+
+struct AttackedBy {
+    pub white: u64,
+    pub black: u64,
+    pub w_pawns: u64,
+    pub b_pawns: u64,
+}
+
+impl AttackedBy {
+    pub const fn new() -> Self {
+        AttackedBy {
+            white: 0,
+            black: 0,
+            w_pawns: 0,
+            b_pawns: 0,
+        }
+    }
+
+    pub const fn side(&self, side: Player) -> u64 {
+        match side {
+            Player::White => self.white,
+            _ => self.black,
+        }
+    }
+
+    pub const fn pawns(&self, side: Player) -> u64 {
+        match side {
+            Player::White => self.w_pawns,
+            _ => self.b_pawns,
         }
     }
 }

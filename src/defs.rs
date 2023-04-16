@@ -199,3 +199,5 @@ pub const CASTLE_KING_FILES: u64 = BitBoard::FILE_F | BitBoard::FILE_G | BitBoar
 pub const CASTLE_QUEEN_FILES: u64 = BitBoard::FILE_A | BitBoard::FILE_B | BitBoard::FILE_C;
 
 pub const CENTER_FILES: u64 = BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F;
+pub const CENTER_SQUARES: u64 = (BitBoard::RANK_4 | BitBoard::RANK_5)
+    & (BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F);
