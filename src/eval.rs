@@ -108,6 +108,7 @@ pub fn evaluate(board: &Board) -> Score {
     }
 }
 
+#[inline(always)]
 fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
     // Don't apply mop-up when there are still pawns on the board
     if board.piece_bb(PieceType::Pawn) != 0 {
@@ -134,6 +135,7 @@ fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
 }
 
 // Structural evaluation of a piece, from white's perspective
+#[inline(always)]
 fn mobility(board: &Board, piece: Piece, sq: Square) -> Score {
     if piece.t == PieceType::Pawn {
         return 0;
@@ -172,8 +174,8 @@ fn mobility(board: &Board, piece: Piece, sq: Square) -> Score {
     }
 }
 
-// Structural evaluation of a pawn, from white's perspective
-fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) -> Score {
+#[inline(always)]
+const fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) -> Score {
     let mut score = 0;
 
     let file = sq % 8;
@@ -201,6 +203,7 @@ fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) -> Score
     }
 }
 
+#[inline(always)]
 fn king_pawn_shield(board: &Board, w_pawns: u64, b_pawns: u64, mg: &mut [Score; 2]) {
     let w_king_bb = board.player_piece_bb(Player::White, PieceType::King);
     let b_king_bb = board.player_piece_bb(Player::Black, PieceType::King);
