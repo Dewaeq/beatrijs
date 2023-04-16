@@ -1,4 +1,5 @@
-use crate::defs::{Score, INFINITY, MAX_DEPTH, MG_VALUE};
+use crate::bitmove::MoveFlag;
+use crate::defs::{PieceType, Score, INFINITY, MAX_DEPTH, MG_VALUE};
 use crate::eval::evaluate;
 use crate::table::{HashEntry, NodeType, TWrapper};
 use crate::utils::{is_draw, is_repetition, print_search_info};
@@ -11,6 +12,8 @@ use std::time::Instant;
 
 pub const IMMEDIATE_MATE_SCORE: Score = 31_000;
 pub const IS_MATE: Score = IMMEDIATE_MATE_SCORE - 1000;
+
+const DELTA_PRUNING: Score = 100;
 
 #[derive(Clone, Copy, Debug)]
 pub struct SearchInfo {
@@ -268,15 +271,15 @@ impl Searcher {
             return eval;
         }
 
-        if !in_check
+        /* if !in_check
             && !is_pv
             && depth < 9
-            && eval - 154 * (depth as Score) >= beta
+            && eval - 165 * (depth as Score) >= beta
             && alpha > -IS_MATE
             && beta < IS_MATE
         {
             return eval;
-        }
+        } */
 
         if do_null && !in_check && depth >= 4 && self.board.has_big_piece(self.board.turn) {
             self.board.make_null_move();
@@ -431,12 +434,19 @@ impl Searcher {
 
         self.num_nodes += 1;
 
-        let stand_pat = evaluate(&self.board);
-        if stand_pat >= beta {
+        // Stand pat
+        let eval = evaluate(&self.board);
+        if eval >= beta {
             return beta;
         }
-        if stand_pat > alpha {
-            alpha = stand_pat;
+        if eval > alpha {
+            alpha = eval;
+        }
+
+        // delta pruning
+        let diff = alpha - eval - DELTA_PRUNING;
+        if diff > 0 && diff > max_gain(&self.board) {
+            return eval;
         }
 
         let mut moves = MoveList::quiet(&mut self.board);
@@ -444,6 +454,11 @@ impl Searcher {
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
             let m = moves.get(i);
+
+            // This move (likely) won't raise alpha
+            if !passes_delta(&self.board, m, eval, alpha) {
+                continue;
+            }
 
             self.board.make_move(m);
             let score = -self.quiesence(-beta, -alpha);
@@ -459,4 +474,49 @@ impl Searcher {
 
         alpha
     }
+}
+
+#[inline(always)]
+/// Biggest possible material gain in this position
+const fn max_gain(board: &Board) -> Score {
+    let mut score = 0;
+
+    let opp = board.player_bb(board.turn.opp());
+    if opp & board.piece_bb(PieceType::Queen) != 0 {
+        score += MG_VALUE[PieceType::Queen.as_usize()];
+    } else if opp & board.piece_bb(PieceType::Rook) != 0 {
+        score += MG_VALUE[PieceType::Rook.as_usize()];
+    } else if opp & board.piece_bb(PieceType::Bishop) != 0 {
+        score += MG_VALUE[PieceType::Bishop.as_usize()];
+    } else if opp & board.piece_bb(PieceType::Knight) != 0 {
+        score += MG_VALUE[PieceType::Knight.as_usize()];
+    }
+
+    // Pawn about to promote
+    if board.player_piece_bb(board.turn, PieceType::Pawn) & board.turn.rank_7() != 0 {
+        score += MG_VALUE[PieceType::Queen.as_usize()] - MG_VALUE[PieceType::Pawn.as_usize()];
+    }
+
+    score
+}
+
+#[inline(always)]
+/// Is this move eligible to increase alpha?
+const fn passes_delta(board: &Board, m: u16, eval: Score, alpha: Score) -> bool {
+    if eval >= alpha {
+        return true;
+    }
+
+    if BitMove::is_prom(m) {
+        return true;
+    }
+
+    let captured = match BitMove::flag(m) {
+        MoveFlag::CAPTURE => board.piece(BitMove::dest(m)),
+        MoveFlag::EN_PASSANT => PieceType::Pawn,
+        /// if this move isn't a capture, then is must be a check, which we always want to search
+        _ => return true,
+    };
+
+    eval + MG_VALUE[captured.as_usize()] + DELTA_PRUNING >= alpha
 }
