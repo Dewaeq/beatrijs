@@ -4,6 +4,7 @@ use crate::{
     movegen::{generate_legal, generate_quiet},
 };
 
+#[derive(Clone, Copy)]
 pub struct MoveList {
     moves: [u16; MAX_MOVES],
     scores: [i32; MAX_MOVES],

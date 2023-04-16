@@ -68,6 +68,7 @@ pub struct Searcher {
     start_time: Instant,
     info: SearchInfo,
     best_root_move: u16,
+    root_moves: MoveList,
 }
 
 impl Searcher {
@@ -80,6 +81,7 @@ impl Searcher {
             start_time: Instant::now(),
             info,
             best_root_move: 0,
+            root_moves: MoveList::new(),
         }
     }
 
@@ -108,6 +110,8 @@ impl Searcher {
         // save alpha and beta for aspiration search
         let mut alpha = -INFINITY;
         let mut beta = INFINITY;
+
+        self.root_moves = MoveList::legal(&mut self.board);
 
         for depth in 1..=self.info.depth {
             let mut score = self.search(depth as u8, alpha, beta);
@@ -203,9 +207,12 @@ impl Searcher {
         let entry = self.table.probe(self.board.key(), self.board.pos.ply);
         let in_check = self.board.in_check();
         let mut pv_move = 0;
+        let mut is_pv = false;
+        let is_root = self.board.pos.ply == 0;
 
         if let Some(entry) = entry {
             pv_move = entry.m;
+            is_pv = true;
 
             if entry.depth >= depth {
                 match entry.node_type {
@@ -235,7 +242,12 @@ impl Searcher {
             }
         }
 
-        let mut moves = MoveList::legal(&mut self.board);
+        let mut moves = if is_root {
+            self.root_moves
+        } else {
+            MoveList::legal(&mut self.board)
+        };
+
         if moves.is_empty() {
             if in_check {
                 return -IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score;
@@ -257,7 +269,7 @@ impl Searcher {
             }
         }
 
-        if in_check && self.board.pos.ply > 0 {
+        if in_check && !is_root {
             depth += 1;
         }
 
@@ -293,6 +305,7 @@ impl Searcher {
                 if depth >= 3
                     && !BitMove::is_tactical(m)
                     && !self.board.in_check()
+                    && !in_check
                     && i > 3
                     && moves.size() > 20
                     && m != self.board.killers[0][self.board.pos.ply - 1]
@@ -300,6 +313,9 @@ impl Searcher {
                 {
                     let mut d = depth - 3;
                     d = u8::min(d, d - (i / 20) as u8);
+                    if is_pv {
+                        d = u8::min(d + 2, depth - 1);
+                    }
                     score = -self.negamax(d, -alpha - 1, -alpha, true);
                 }
 
@@ -317,11 +333,15 @@ impl Searcher {
                 return 0;
             }
 
+            if is_root {
+                self.root_moves.set_score(i, score);
+            }
+
             if score > best_score {
                 best_score = score;
                 best_move = m;
 
-                if self.board.pos.ply == 0 {
+                if is_root {
                     self.best_root_move = m;
                 }
 
