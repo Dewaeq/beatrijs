@@ -196,6 +196,16 @@ impl Searcher {
             return 0;
         }
 
+        // Mate distance pruning
+        if self.board.pos.ply > 0 {
+            alpha = Score::max(-IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score, alpha);
+            beta = Score::min(IMMEDIATE_MATE_SCORE - self.board.pos.ply as Score, beta);
+
+            if alpha >= beta {
+                return alpha;
+            }
+        }
+
         if depth == 0 {
             let score = self.quiesence(alpha, beta);
 
@@ -241,16 +251,6 @@ impl Searcher {
         }
 
         self.num_nodes += 1;
-
-        // Mate distance pruning
-        if self.board.pos.ply > 0 {
-            alpha = Score::max(-IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score, alpha);
-            beta = Score::min(IMMEDIATE_MATE_SCORE - self.board.pos.ply as Score, beta);
-
-            if alpha >= beta {
-                return alpha;
-            }
-        }
 
         let mut moves = if is_root {
             self.root_moves
