@@ -4,7 +4,7 @@ use std::{
 
 use crate::{board::Board, search::IS_MATE, defs::Score, movegen::is_legal_move};
 
-pub const TABLE_SIZE_MB: usize = 256;
+pub const TABLE_SIZE_MB: usize = 1024;
 type TT = HashTable<HashEntry>;
 
 pub trait Table<T> 
@@ -205,6 +205,7 @@ pub struct HashEntry {
     pub depth: u8,
     pub m: u16,
     pub score: Score,
+    pub static_eval: Score,
     pub node_type: NodeType,
 }
 
@@ -215,18 +216,20 @@ impl Default for HashEntry {
             depth: 0,
             m: 0,
             score: 0,
+            static_eval: 0,
             node_type: NodeType::Exact,
         }
     }
 }
 
 impl HashEntry {
-    pub fn new(key: u64, depth: i32, m: u16, score: Score, node_type: NodeType) -> Self {
+    pub fn new(key: u64, depth: i32, m: u16, score: Score, static_eval: Score, node_type: NodeType) -> Self {
         HashEntry {
             key,
             depth: depth as u8,
             m,
             score,
+            static_eval,
             node_type,
         }
     }

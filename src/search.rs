@@ -199,7 +199,7 @@ impl Searcher {
         // Mate distance pruning
         if self.board.pos.ply > 0 {
             alpha = Score::max(-IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score, alpha);
-            beta = Score::min(IMMEDIATE_MATE_SCORE - self.board.pos.ply as Score, beta);
+            beta = Score::min(IMMEDIATE_MATE_SCORE - 1 - self.board.pos.ply as Score, beta);
 
             if alpha >= beta {
                 return alpha;
@@ -207,19 +207,7 @@ impl Searcher {
         }
 
         if depth == 0 {
-            let score = self.quiesence(alpha, beta);
-
-            let node_type = if score >= beta {
-                NodeType::Beta
-            } else if score > alpha {
-                NodeType::Alpha
-            } else {
-                NodeType::Exact
-            };
-
-            let entry = HashEntry::new(self.board.key(), depth, 0, score, node_type);
-            self.table.store(entry, self.board.pos.ply);
-
+            let score = self.quiesence(alpha, beta, true);
             return score;
         }
 
@@ -233,20 +221,8 @@ impl Searcher {
             tt_move = entry.m;
             is_pv = true;
 
-            if entry.depth >= depth as u8 {
-                match entry.node_type {
-                    NodeType::Exact => return entry.score,
-                    NodeType::Alpha => {
-                        if alpha >= entry.score {
-                            return alpha;
-                        }
-                    }
-                    NodeType::Beta => {
-                        if beta <= entry.score {
-                            return beta;
-                        }
-                    }
-                }
+            if let Some(score) = table_cutoff(entry, depth, alpha, beta) {
+                return score;
             }
         }
 
@@ -265,7 +241,11 @@ impl Searcher {
             return 0;
         }
 
-        let eval = evaluate(&self.board);
+        let eval = if entry.is_some() {
+            entry.unwrap().static_eval
+        } else {
+            evaluate(&self.board)
+        };
 
         // Futility pruning: frontier node
         if depth == 1
@@ -316,7 +296,7 @@ impl Searcher {
         if !is_pv && !in_check && tt_move == 0 && do_null && depth <= 3 {
             let threshold = alpha - 300 - (depth as Score - 1) * 60;
             if eval < threshold {
-                let score = self.quiesence(alpha, beta);
+                let score = self.quiesence(alpha, beta, true);
                 // This might be a bit too bold, but it's worth a try
                 return score;
                 /* if score < threshold {
@@ -336,14 +316,7 @@ impl Searcher {
         let old_alpha = alpha;
 
         if tt_move != 0 {
-            let mut i = 0;
-            while i < moves.size() {
-                if moves.get(i) == tt_move {
-                    moves.set_score(i, 2_000_000);
-                    break;
-                }
-                i += 1;
-            }
+            set_tt_move_score(&mut moves, tt_move);
         }
 
         let is_prunable = !is_root && !in_check && !is_pv && (alpha > -IS_MATE && beta < IS_MATE);
@@ -479,8 +452,14 @@ impl Searcher {
                     }
                 }
 
-                let entry =
-                    HashEntry::new(self.board.pos.key, depth, best_move, beta, NodeType::Beta);
+                let entry = HashEntry::new(
+                    self.board.pos.key,
+                    depth,
+                    best_move,
+                    beta,
+                    eval,
+                    NodeType::Beta,
+                );
                 self.table.store(entry, self.board.pos.ply);
 
                 return beta;
@@ -500,10 +479,18 @@ impl Searcher {
                 depth,
                 best_move,
                 best_score,
+                eval,
                 NodeType::Exact,
             )
         } else {
-            HashEntry::new(self.board.key(), depth, best_move, alpha, NodeType::Alpha)
+            HashEntry::new(
+                self.board.key(),
+                depth,
+                best_move,
+                alpha,
+                eval,
+                NodeType::Alpha,
+            )
         };
 
         self.table.store(entry, self.board.pos.ply);
@@ -511,7 +498,7 @@ impl Searcher {
         alpha
     }
 
-    fn quiesence(&mut self, mut alpha: Score, beta: Score) -> Score {
+    fn quiesence(&mut self, mut alpha: Score, beta: Score, root: bool) -> Score {
         if is_draw(&self.board) {
             return 0;
         }
@@ -545,7 +532,7 @@ impl Searcher {
             }
 
             self.board.make_move(m);
-            let score = -self.quiesence(-beta, -alpha);
+            let score = -self.quiesence(-beta, -alpha, false);
             self.board.unmake_move(m);
 
             if score >= beta {
@@ -554,6 +541,18 @@ impl Searcher {
             if score > alpha {
                 alpha = score;
             }
+        }
+
+        if root {
+            let entry = HashEntry::new(
+                self.board.key(),
+                0,
+                self.table.best_move(self.board.key()).unwrap_or(0),
+                alpha,
+                eval,
+                NodeType::Exact,
+            );
+            self.table.store(entry, 0);
         }
 
         alpha
@@ -603,4 +602,40 @@ const fn passes_delta(board: &Board, m: u16, eval: Score, alpha: Score) -> bool 
     };
 
     eval + MG_VALUE[captured.as_usize()] + DELTA_PRUNING >= alpha
+}
+
+#[inline(always)]
+fn set_tt_move_score(moves: &mut MoveList, tt_move: u16) {
+    let mut i = 0;
+    while i < moves.size() {
+        if moves.get(i) == tt_move {
+            moves.set_score(i, 2_000_000);
+            break;
+        }
+        i += 1;
+    }
+}
+
+const fn table_cutoff(entry: HashEntry, depth: i32, alpha: Score, beta: Score) -> Option<Score> {
+    if entry.depth < depth as u8 {
+        return None;
+    }
+
+    match entry.node_type {
+        NodeType::Exact => Some(entry.score),
+        NodeType::Alpha => {
+            if alpha >= entry.score {
+                Some(alpha)
+            } else {
+                None
+            }
+        }
+        NodeType::Beta => {
+            if beta <= entry.score {
+                Some(beta)
+            } else {
+                None
+            }
+        }
+    }
 }
