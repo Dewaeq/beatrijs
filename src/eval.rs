@@ -70,6 +70,10 @@ pub fn evaluate(board: &Board) -> Score {
     mg[0] -= (BitBoard::count((w_knights | w_bishops) & BitBoard::RANK_1) * 8) as Score;
     mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 8) as Score;
 
+    // pawns controlling center of the board
+    mg[0] += (BitBoard::count(w_pawns & CENTER_SQUARES) * 15) as Score;
+    mg[1] += (BitBoard::count(b_pawns & CENTER_SQUARES) * 15) as Score;
+
     // pawn attacks
     let w_pawn_caps = pawn_caps(w_pawns, Player::White) & board.player_bb(Player::Black);
     let b_pawn_caps = pawn_caps(b_pawns, Player::Black) & board.player_bb(Player::White);
