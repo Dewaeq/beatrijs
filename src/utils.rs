@@ -64,7 +64,7 @@ pub const fn b_max(a: Square, b: Square) -> Square {
 }
 
 pub fn print_search_info(
-    depth: u8,
+    depth: i32,
     score: Score,
     total_time: u64,
     search_time: f64,

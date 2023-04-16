@@ -14,7 +14,7 @@ pub const IMMEDIATE_MATE_SCORE: Score = 31_000;
 pub const IS_MATE: Score = IMMEDIATE_MATE_SCORE - 1000;
 
 const DELTA_PRUNING: Score = 100;
-const STATIC_NULL_MOVE_DEPTH: u8 = 5;
+const STATIC_NULL_MOVE_DEPTH: i32 = 5;
 const STATIC_NULL_MOVE_MARGIN: Score = 120;
 
 #[derive(Clone, Copy, Debug)]
@@ -74,6 +74,8 @@ pub struct Searcher {
     info: SearchInfo,
     best_root_move: u16,
     root_moves: MoveList,
+    history_score: [[[Score; 64]; 64]; 2],
+    quiets_tried: [[Option<u16>; 128]; 128],
 }
 
 impl Searcher {
@@ -87,6 +89,8 @@ impl Searcher {
             info,
             best_root_move: 0,
             root_moves: MoveList::new(),
+            history_score: [[[0; 64]; 64]; 2],
+            quiets_tried: [[None; 128]; 128],
         }
     }
 
@@ -118,8 +122,8 @@ impl Searcher {
 
         self.root_moves = MoveList::legal(&mut self.board);
 
-        for depth in 1..=self.info.depth {
-            let mut score = self.search(depth as u8, alpha, beta);
+        for depth in 1..=self.info.depth as i32 {
+            let mut score = self.search(depth, alpha, beta);
 
             if self.should_stop() {
                 break;
@@ -129,7 +133,7 @@ impl Searcher {
             if score <= alpha || score >= beta {
                 alpha = -INFINITY;
                 beta = INFINITY;
-                score = self.search(depth as u8, alpha, beta);
+                score = self.search(depth, alpha, beta);
             }
 
             if score.abs() > IS_MATE || is_repetition(&self.board) {
@@ -151,7 +155,7 @@ impl Searcher {
         println!("bestmove {}", BitMove::pretty_move(best_move));
     }
 
-    fn search(&mut self, depth: u8, alpha: Score, beta: Score) -> Score {
+    fn search(&mut self, depth: i32, alpha: Score, beta: Score) -> Score {
         self.clear_for_search();
 
         let start = Instant::now();
@@ -179,7 +183,7 @@ impl Searcher {
 
     fn negamax(
         &mut self,
-        mut depth: u8,
+        mut depth: i32,
         mut alpha: Score,
         mut beta: Score,
         do_null: bool,
@@ -219,7 +223,7 @@ impl Searcher {
             tt_move = entry.m;
             is_pv = true;
 
-            if entry.depth >= depth {
+            if entry.depth >= depth as u8 {
                 match entry.node_type {
                     NodeType::Exact => return entry.score,
                     NodeType::Alpha => {
@@ -325,6 +329,8 @@ impl Searcher {
             depth += 1;
         }
 
+        let mut quiets_tried: usize = 0;
+        let mut search_quiets = true;
         let mut best_move = 0;
         let mut best_score = -INFINITY;
         let old_alpha = alpha;
@@ -340,19 +346,62 @@ impl Searcher {
             }
         }
 
-        let is_prunable = !in_check && !is_pv && (alpha > -IS_MATE && beta < IS_MATE);
+        let is_prunable = !is_root && !in_check && !is_pv && (alpha > -IS_MATE && beta < IS_MATE);
         let can_prune = is_prunable && depth <= 3 && (eval + MG_VALUE[1] <= alpha);
+
+        let turn = self.board.turn;
 
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
-            let m = moves.get(i);
+            let (m, move_score) = moves.get_all(i);
+            let is_cap = BitMove::is_cap(m);
+            let is_prom = BitMove::is_prom(m);
+            let is_quiet = !is_cap && !is_prom;
+            let src = BitMove::src(m) as usize;
+            let dest = BitMove::dest(m) as usize;
+
+            if !search_quiets && is_quiet {
+                continue;
+            }
 
             self.board.make_move(m);
             let gives_check = self.board.in_check();
             let mut score = 0;
 
-            // Futility pruning
-            if can_prune && !gives_check {
+            if !is_root
+                && is_quiet
+                && best_score > -IS_MATE
+                && self.board.has_big_piece(turn)
+                && !gives_check
+            {
+                // History pruning: skip quiet moves at low depth
+                // that yielded bad results in previous searches
+                if depth <= 2 && self.history_score[turn.as_usize()][src][dest] < 0 {
+                    self.board.unmake_move(m);
+                    continue;
+                }
+
+                // Futility pruning
+                if can_prune {
+                    self.board.unmake_move(m);
+                    search_quiets = false;
+                    continue;
+                }
+
+                if !in_check && depth <= 4 && quiets_tried as u32 > (3 * 2u32.pow(depth as u32 - 1))
+                {
+                    self.board.unmake_move(m);
+                    search_quiets = false;
+                    continue;
+                }
+            } else if !is_root
+                && !gives_check
+                && is_cap
+                && best_score > -IS_MATE
+                && depth <= 8
+                && move_score < -50 * depth * depth
+                && self.board.has_non_pawns(turn)
+            {
                 self.board.unmake_move(m);
                 continue;
             }
@@ -374,9 +423,9 @@ impl Searcher {
                     && m != self.board.killers[1][self.board.pos.ply - 1]
                 {
                     let mut d = depth - 3;
-                    d = u8::min(d, d - (i / 20) as u8);
+                    d = i32::min(d, d - (i / 20) as i32);
                     if is_pv {
-                        d = u8::min(d + 2, depth - 1);
+                        d = i32::min(d + 2, depth - 1);
                     }
                     score = -self.negamax(d, -alpha - 1, -alpha, true);
                 }
@@ -399,6 +448,10 @@ impl Searcher {
                 self.root_moves.set_score(i, score);
             }
 
+            if score > alpha {
+                alpha = score;
+            }
+
             if score > best_score {
                 best_score = score;
                 best_move = m;
@@ -406,29 +459,34 @@ impl Searcher {
                 if is_root {
                     self.best_root_move = m;
                 }
+            }
 
-                if score > alpha {
-                    if score >= beta {
-                        if !BitMove::is_cap(m) {
-                            let ply = self.board.pos.ply;
-                            self.board.killers[1][ply] = self.board.killers[0][ply];
-                            self.board.killers[0][ply] = m;
-                        }
+            let ply = self.board.pos.ply;
+            if score >= beta {
+                if !is_cap {
+                    self.board.killers[1][ply] = self.board.killers[0][ply];
+                    self.board.killers[0][ply] = m;
 
-                        let entry = HashEntry::new(
-                            self.board.pos.key,
-                            depth,
-                            best_move,
-                            beta,
-                            NodeType::Beta,
-                        );
+                    self.history_score[turn.as_usize()][src][dest] +=
+                        depth as Score * depth as Score;
 
-                        self.table.store(entry, self.board.pos.ply);
-                        return beta;
+                    for i in 0..quiets_tried {
+                        let mv = self.quiets_tried[ply][i].unwrap();
+                        let m_src = BitMove::src(mv) as usize;
+                        let m_dest = BitMove::dest(mv) as usize;
+                        self.history_score[turn.as_usize()][m_src][m_dest] -=
+                            depth as Score * depth as Score;
                     }
-
-                    alpha = score;
                 }
+
+                let entry =
+                    HashEntry::new(self.board.pos.key, depth, best_move, beta, NodeType::Beta);
+                self.table.store(entry, self.board.pos.ply);
+
+                return beta;
+            } else if !is_cap {
+                self.quiets_tried[ply][quiets_tried] = Some(m);
+                quiets_tried += 1;
             }
         }
 
