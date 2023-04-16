@@ -211,12 +211,12 @@ impl Searcher {
 
         let entry = self.table.probe(self.board.key(), self.board.pos.ply);
         let in_check = self.board.in_check();
-        let mut pv_move = 0;
+        let mut tt_move = 0;
         let mut is_pv = false;
         let is_root = self.board.pos.ply == 0;
 
         if let Some(entry) = entry {
-            pv_move = entry.m;
+            tt_move = entry.m;
             is_pv = true;
 
             if entry.depth >= depth {
@@ -238,6 +238,7 @@ impl Searcher {
 
         self.num_nodes += 1;
 
+        // Mate distance pruning
         if self.board.pos.ply > 0 {
             alpha = Score::max(-IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score, alpha);
             beta = Score::min(IMMEDIATE_MATE_SCORE - self.board.pos.ply as Score, beta);
@@ -307,6 +308,19 @@ impl Searcher {
             }
         }
 
+        // Razoring
+        if !is_pv && !in_check && tt_move == 0 && do_null && depth <= 3 {
+            let threshold = alpha - 300 - (depth as Score - 1) * 60;
+            if eval < threshold {
+                let score = self.quiesence(alpha, beta);
+                // This might be a bit too bold, but it's worth a try
+                return score;
+                /* if score < threshold {
+                    return alpha;
+                } */
+            }
+        }
+
         if in_check && !is_root {
             depth += 1;
         }
@@ -315,10 +329,10 @@ impl Searcher {
         let mut best_score = -INFINITY;
         let old_alpha = alpha;
 
-        if pv_move != 0 {
+        if tt_move != 0 {
             let mut i = 0;
             while i < moves.size() {
-                if moves.get(i) == pv_move {
+                if moves.get(i) == tt_move {
                     moves.set_score(i, 2_000_000);
                     break;
                 }
