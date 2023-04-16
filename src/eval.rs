@@ -342,7 +342,7 @@ fn king_pawn_shield(
 }
 
 /// Reward the control of space on our side of the board
-fn eval_space(board: &Board, side: Player, my_pawns: u64, attacked_by: &AttackedBy) -> Score {
+const fn eval_space(board: &Board, side: Player, my_pawns: u64, attacked_by: &AttackedBy) -> Score {
     let opp = side.opp();
 
     let safe = SAFE_MASK[side.as_usize()]
@@ -372,7 +372,7 @@ struct AttackedBy {
 }
 
 impl AttackedBy {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         AttackedBy {
             white: 0,
             black: 0,
@@ -381,14 +381,14 @@ impl AttackedBy {
         }
     }
 
-    pub fn side(&self, side: Player) -> u64 {
+    pub const fn side(&self, side: Player) -> u64 {
         match side {
             Player::White => self.white,
             _ => self.black,
         }
     }
 
-    pub fn pawns(&self, side: Player) -> u64 {
+    pub const fn pawns(&self, side: Player) -> u64 {
         match side {
             Player::White => self.w_pawns,
             _ => self.b_pawns,
