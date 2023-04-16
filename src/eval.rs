@@ -118,6 +118,7 @@ pub fn evaluate(board: &Board) -> Score {
         board, w_pawns, b_pawns, &mut mg, w_king_sq, b_king_sq, w_king_bb, b_king_bb,
     );
 
+    // Control of space on the player's side of the board
     score += eval_space(&board, Player::White, w_pawns, &attacked_by);
     score -= eval_space(&board, Player::Black, b_pawns, &attacked_by);
 
@@ -139,6 +140,7 @@ pub fn evaluate(board: &Board) -> Score {
     }
 }
 
+#[inline(always)]
 fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
     // Don't apply mop-up when there are still pawns on the board
     if board.piece_bb(PieceType::Pawn) != 0 {
@@ -165,6 +167,7 @@ fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
 }
 
 // Structural evaluation of a piece, from white's perspective
+#[inline(always)]
 fn mobility(board: &Board, piece: Piece, sq: Square, attacked_by: &mut AttackedBy) -> Score {
     if piece.t == PieceType::Pawn {
         return 0;
@@ -209,7 +212,7 @@ fn mobility(board: &Board, piece: Piece, sq: Square, attacked_by: &mut AttackedB
     }
 }
 
-// Structural evaluation of a pawn, from white's perspective
+#[inline(always)]
 const fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) -> Score {
     let mut score = 0;
 
@@ -238,6 +241,7 @@ const fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) ->
     }
 }
 
+#[inline(always)]
 fn king_pawn_shield(
     board: &Board,
     w_pawns: u64,
@@ -342,6 +346,7 @@ fn king_pawn_shield(
 }
 
 /// Reward the control of space on our side of the board
+#[inline(always)]
 const fn eval_space(board: &Board, side: Player, my_pawns: u64, attacked_by: &AttackedBy) -> Score {
     let opp = side.opp();
 
