@@ -14,6 +14,8 @@ pub const IMMEDIATE_MATE_SCORE: Score = 31_000;
 pub const IS_MATE: Score = IMMEDIATE_MATE_SCORE - 1000;
 
 const DELTA_PRUNING: Score = 100;
+const STATIC_NULL_MOVE_DEPTH: u8 = 5;
+const STATIC_NULL_MOVE_MARGIN: Score = 120;
 
 #[derive(Clone, Copy, Debug)]
 pub struct SearchInfo {
@@ -281,6 +283,16 @@ impl Searcher {
             return eval;
         } */
 
+        // Static null move pruning
+        if depth <= STATIC_NULL_MOVE_DEPTH
+            && !is_pv
+            && !in_check
+            && eval - STATIC_NULL_MOVE_MARGIN * (depth as Score) >= beta
+        {
+            return eval;
+        }
+
+        // Null move pruning
         if do_null && !in_check && depth >= 4 && self.board.has_big_piece(self.board.turn) {
             self.board.make_null_move();
             let score = -self.negamax(depth - 4, -beta, -beta + 1, false);
