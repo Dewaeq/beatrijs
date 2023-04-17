@@ -50,7 +50,7 @@ impl Game {
             match command {
                 "infinite" => info.depth = MAX_DEPTH,
                 "depth" => {
-                    info.depth = commands[i + 1].parse::<u8>().unwrap();
+                    info.depth = commands[i + 1].parse::<i32>().unwrap();
                     i += 1;
                 }
                 "wtime" => {

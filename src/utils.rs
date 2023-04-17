@@ -120,7 +120,7 @@ pub const fn is_draw(board: &Board) -> bool {
 }
 
 pub const fn is_repetition(board: &Board) -> bool {
-    if board.pos.ply < 2 || board.pos.rule_fifty < 2 {
+    if board.pos.rule_fifty < 2 {
         return false;
     }
 
