@@ -111,7 +111,6 @@ impl Searcher {
 
     fn clear_for_search(&mut self) {
         self.num_nodes = 0;
-        self.board.pos.ply = 0;
         self.board.clear_killers();
     }
 
@@ -161,7 +160,7 @@ impl Searcher {
         self.clear_for_search();
 
         let start = Instant::now();
-        let score = self.negamax(depth, alpha, beta, false);
+        let score = self.negamax(depth, 0, alpha, beta, false);
         let elapsed = self.start_time.elapsed();
         let total_time = (elapsed.as_secs_f64() * 1000f64) as u64;
         let search_time = start.elapsed().as_secs_f64();
@@ -187,6 +186,7 @@ impl Searcher {
     fn negamax(
         &mut self,
         mut depth: i32,
+        ply: usize,
         mut alpha: Score,
         mut beta: Score,
         do_null: bool,
@@ -199,11 +199,10 @@ impl Searcher {
             return 0;
         }
 
-        if depth >= MAX_DEPTH {
+        if ply >= 100 {
             return evaluate(&self.board);
         }
 
-        let ply = self.board.pos.ply;
         let is_root = ply == 0;
 
         // Mate distance pruning
@@ -289,7 +288,7 @@ impl Searcher {
         // Null move pruning
         if do_null && !in_check && depth >= 4 && self.board.has_big_piece(self.board.turn) {
             self.board.make_null_move();
-            let score = -self.negamax(depth - 4, -beta, -beta + 1, false);
+            let score = -self.negamax(depth - 4, ply + 1, -beta, -beta + 1, false);
             self.board.unmake_null_move();
 
             if self.should_stop() {
@@ -390,7 +389,7 @@ impl Searcher {
 
             // search pv move in a full window, at full depth
             if i == 0 {
-                score = -self.negamax(depth - 1, -beta, -alpha, true);
+                score = -self.negamax(depth - 1, ply + 1, -beta, -alpha, true);
             } else {
                 score = alpha + 1;
                 // LMR
@@ -401,8 +400,8 @@ impl Searcher {
                     // && !in_check
                     && i > 3
                     && moves.size() > 20
-                    // && m != self.board.killers[0][ply-1]
-                    // && m != self.board.killers[1][ply-1]
+                // && m != self.board.killers[0][ply-1]
+                // && m != self.board.killers[1][ply-1]
                 {
                     let mut r = 2;
                     if is_cap {
@@ -415,13 +414,13 @@ impl Searcher {
                         r = 1;
                     }
 
-                    score = -self.negamax(depth - 1 - r, -alpha - 1, -alpha, true);
+                    score = -self.negamax(depth - 1 - r, ply + 1, -alpha - 1, -alpha, true);
                 }
 
                 if score > alpha {
-                    score = -self.negamax(depth - 1, -alpha - 1, -alpha, true);
+                    score = -self.negamax(depth - 1, ply + 1, -alpha - 1, -alpha, true);
                     if score > alpha && score < beta {
-                        score = -self.negamax(depth - 1, -beta, -alpha, true);
+                        score = -self.negamax(depth - 1, ply + 1, -beta, -alpha, true);
                     }
                 }
             }
@@ -478,8 +477,6 @@ impl Searcher {
 
                 return beta;
             } else if !is_cap {
-                assert!(ply < 128);
-                assert!(quiets_tried < 128);
                 self.quiets_tried[ply][quiets_tried] = Some(m);
                 quiets_tried += 1;
             }
