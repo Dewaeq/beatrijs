@@ -475,6 +475,8 @@ impl Searcher {
 
                 return beta;
             } else if !is_cap {
+                assert!(ply < 128);
+                assert!(quiets_tried < 128);
                 self.quiets_tried[ply][quiets_tried] = Some(m);
                 quiets_tried += 1;
             }
