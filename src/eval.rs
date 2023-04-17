@@ -79,8 +79,8 @@ pub fn evaluate(board: &Board) -> Score {
     mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 8) as Score;
 
     // pawns controlling center of the board
-    mg[0] += (BitBoard::count(w_pawns & CENTER_SQUARES) * 15) as Score;
-    mg[1] += (BitBoard::count(b_pawns & CENTER_SQUARES) * 15) as Score;
+    mg[0] += (BitBoard::count(w_pawns & CENTER_SQUARES) * 4) as Score;
+    mg[1] += (BitBoard::count(b_pawns & CENTER_SQUARES) * 4) as Score;
 
     // pawn attacks
     let w_pawn_caps = pawn_caps(w_pawns, Player::White) & board.player_bb(Player::Black);
@@ -274,8 +274,12 @@ fn king_pawn_shield(
     // If the king has wandered this far from home, he must have a reason to do so,
     // so don't evaluate a pawn shield
     if w_king_sq < 16 {
+        let w_rook_bb = board.player_piece_bb(Player::White, PieceType::Rook)
+            & (BitBoard::RANK_1 | BitBoard::RANK_2);
+        let w_king_file = w_king_sq % 8;
+
         // white king side
-        if w_king_bb & (BitBoard::FILE_G | BitBoard::FILE_H) != 0 {
+        if w_king_file >= 5 && w_rook_bb & files_right_of(w_king_file) == 0 {
             mg[0] +=
                 (BitBoard::count(w_pawns & CASTLE_KING_FILES & BitBoard::RANK_2) * 10) as Score;
             mg[0] += (BitBoard::count(w_pawns & CASTLE_KING_FILES & BitBoard::RANK_3) * 3) as Score;
@@ -288,7 +292,7 @@ fn king_pawn_shield(
             }
         }
         // white queen side
-        else if w_king_bb & CASTLE_QUEEN_FILES != 0 {
+        else if w_king_file <= 3 && w_rook_bb & files_left_of(w_king_file) == 0 {
             mg[0] +=
                 (BitBoard::count(w_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_2) * 10) as Score;
             mg[0] +=
@@ -304,14 +308,21 @@ fn king_pawn_shield(
         // Not castled yet
         else {
             mg[0] -= 15;
+            if !board.can_castle(Player::White) {
+                mg[0] -= 45;
+            }
         }
     }
 
     // If the king has wandered this far from home, he must have a reason to do so,
     // so don't evaluate a pawn shield
     if b_king_sq > 47 {
+        let b_rook_bb = board.player_piece_bb(Player::Black, PieceType::Rook)
+            & (BitBoard::RANK_7 | BitBoard::RANK_8);
+        let b_king_file = b_king_sq % 8;
+
         // black king side
-        if b_king_bb & (BitBoard::FILE_G | BitBoard::FILE_H) != 0 {
+        if b_king_file >= 5 && b_rook_bb & files_right_of(b_king_file) == 0 {
             mg[1] +=
                 (BitBoard::count(b_pawns & CASTLE_KING_FILES & BitBoard::RANK_7) * 10) as Score;
             mg[1] += (BitBoard::count(b_pawns & CASTLE_KING_FILES & BitBoard::RANK_6) * 3) as Score;
@@ -324,7 +335,7 @@ fn king_pawn_shield(
             }
         }
         // black queen side
-        else if b_king_bb & CASTLE_QUEEN_FILES != 0 {
+        else if b_king_file <= 3 && b_rook_bb & files_left_of(b_king_file) == 0 {
             mg[1] +=
                 (BitBoard::count(b_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_7) * 10) as Score;
             mg[1] +=
@@ -340,6 +351,9 @@ fn king_pawn_shield(
         // Not castled yet
         else {
             mg[1] -= 15;
+            if !board.can_castle(Player::Black) {
+                mg[1] -= 45;
+            }
         }
     }
 }
@@ -362,6 +376,28 @@ const fn eval_space(board: &Board, w_pawns: u64, b_pawns: u64, attacked_by: &Att
         BitBoard::count(board.piece_bb(PieceType::Knight) | board.piece_bb(PieceType::Bishop));
 
     ((bonus_w - bonus_b) * (weight * weight) as Score)
+}
+
+#[inline(always)]
+const fn files_left_of(mut file: Square) -> u64 {
+    let mut result = 0;
+    while file > 0 {
+        file -= 1;
+        result |= BitBoard::file_bb(file);
+    }
+
+    result
+}
+
+#[inline(always)]
+const fn files_right_of(mut file: Square) -> u64 {
+    let mut result = 0;
+    while file < 7 {
+        file += 1;
+        result |= BitBoard::file_bb(file);
+    }
+
+    result
 }
 
 struct AttackedBy {
