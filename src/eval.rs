@@ -16,8 +16,9 @@ use crate::{
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
 const BISHOP_PAIR_BONUS: Score = 20;
 
-/// see https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function
 pub fn evaluate(board: &Board) -> Score {
+    // Score is from white's perspective
+    let mut score = 0;
     let mut mg = [0; 2];
     let mut eg = [0; 2];
     let mut game_phase = 0;
@@ -37,9 +38,10 @@ pub fn evaluate(board: &Board) -> Score {
         eg[idx] += EG_TABLE[piece.as_usize()][sq];
         game_phase += GAME_PHASE_INC[piece.t.as_usize()];
 
-        mg[idx] += mobility(board, piece, sq as Square);
+        score += mobility(board, piece, sq as Square);
+
         if piece.t == PieceType::Pawn {
-            mg[idx] += match piece.c {
+            score += match piece.c {
                 Player::White => pawn_structure(piece.c, sq as Square, w_pawns, b_pawns),
                 Player::Black => pawn_structure(piece.c, sq as Square, b_pawns, w_pawns),
             };
@@ -55,10 +57,10 @@ pub fn evaluate(board: &Board) -> Score {
     let b_bishops = board.player_piece_bb(Player::Black, PieceType::Bishop);
 
     if BitBoard::more_than_one(w_bishops) {
-        mg[0] += BISHOP_PAIR_BONUS;
+        score += BISHOP_PAIR_BONUS;
     }
     if BitBoard::more_than_one(b_bishops) {
-        mg[1] += BISHOP_PAIR_BONUS;
+        score -= BISHOP_PAIR_BONUS;
     }
 
     // undeveloped pieces penalty
@@ -77,8 +79,8 @@ pub fn evaluate(board: &Board) -> Score {
     // pawns defended by pawns
     let w_defenders = pawn_caps(w_pawns, Player::Black) & w_pawns;
     let b_defenders = pawn_caps(b_pawns, Player::White) & b_pawns;
-    mg[0] += (BitBoard::count(w_defenders & w_pawns) * 2) as Score;
-    mg[1] += (BitBoard::count(b_defenders & b_pawns) * 2) as Score;
+    score += (BitBoard::count(w_defenders & w_pawns) * 2) as Score;
+    score -= (BitBoard::count(b_defenders & b_pawns) * 2) as Score;
 
     // pawn shield for king safety
     king_pawn_shield(board, w_pawns, b_pawns, &mut mg);
@@ -87,12 +89,18 @@ pub fn evaluate(board: &Board) -> Score {
     let turn = board.turn.as_usize();
     let opp = 1 - turn;
 
-    let mg_score = mg[turn] - mg[opp];
-    let eg_score = eg[turn] - eg[opp];
+    let mg_score = mg[0] - mg[1];
+    let eg_score = eg[0] - eg[1];
     let mg_phase = Score::min(24, game_phase);
     let eg_phase = 24 - mg_phase;
 
-    (mg_score * mg_phase + eg_score * eg_phase) / 24
+    score += (mg_score * mg_phase + eg_score * eg_phase) / 24;
+
+    if board.turn == Player::White {
+        score
+    } else {
+        -score
+    }
 }
 
 fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
@@ -136,19 +144,25 @@ fn mobility(board: &Board, piece: Piece, sq: Square) -> Score {
     let def = BitBoard::count(moves & my_bb);
 
     // This score is in millipawns
-    let score = match piece.t {
+    let mut score = match piece.t {
         PieceType::Knight => 20 * open + 35 * att + 15 * def,
         PieceType::Bishop => 17 * open + 30 * att + 15 * def,
         PieceType::Rook => 15 * open + 20 * att + 15 * def,
         PieceType::Queen => 5 * open + 15 * att + 8 * def,
         PieceType::King => 4 * open + 15 * att + 10 * def,
         _ => panic!(),
-    };
+    } as Score;
 
-    (score / 30) as Score
+    score /= 30;
+
+    match piece.c {
+        Player::White => score,
+        _ => -score,
+    }
 }
 
-const fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) -> Score {
+// Structural evaluation of a pawn, from white's perspective
+fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) -> Score {
     let mut score = 0;
 
     let file = sq % 8;
@@ -170,7 +184,10 @@ const fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) ->
         score += PASSED_PAWN_SCORE[rel_rank];
     }
 
-    score
+    match side {
+        Player::White => score,
+        _ => -score,
+    }
 }
 
 fn king_pawn_shield(board: &Board, w_pawns: u64, b_pawns: u64, mg: &mut [Score; 2]) {
@@ -179,7 +196,7 @@ fn king_pawn_shield(board: &Board, w_pawns: u64, b_pawns: u64, mg: &mut [Score; 
 
     let w_king_sq = BitBoard::bit_scan_forward(w_king_bb);
     let b_king_sq = BitBoard::bit_scan_forward(b_king_bb);
-    
+
     // punish king in centre
     if w_king_bb & CENTER_FILES != 0 {
         mg[0] -= 25;
@@ -187,7 +204,7 @@ fn king_pawn_shield(board: &Board, w_pawns: u64, b_pawns: u64, mg: &mut [Score; 
     if b_king_bb & CENTER_FILES != 0 {
         mg[1] -= 25;
     }
-    
+
     // punish king on open or semi-open file
     if (w_pawns | b_pawns) & BitBoard::file_bb(w_king_sq) == 0 {
         mg[0] -= 30;
