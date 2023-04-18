@@ -196,10 +196,17 @@ impl Searcher {
             return 0;
         }
 
+        if depth >= 100 {
+            return evaluate(&self.board);
+        }
+
+        let ply = self.board.pos.ply;
+        let is_root = ply == 0;
+
         // Mate distance pruning
-        if self.board.pos.ply > 0 {
-            alpha = Score::max(-IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score, alpha);
-            beta = Score::min(IMMEDIATE_MATE_SCORE - 1 - self.board.pos.ply as Score, beta);
+        if !is_root {
+            alpha = Score::max(-IMMEDIATE_MATE_SCORE + ply as Score, alpha);
+            beta = Score::min(IMMEDIATE_MATE_SCORE - 1 - ply as Score, beta);
 
             if alpha >= beta {
                 return alpha;
@@ -211,7 +218,7 @@ impl Searcher {
             return score;
         }
 
-        let entry = self.table.probe(self.board.key(), self.board.pos.ply);
+        let entry = self.table.probe(self.board.key(), ply);
         let in_check = self.board.in_check();
         let mut tt_move = 0;
         let mut is_pv = false;
@@ -236,7 +243,7 @@ impl Searcher {
 
         if moves.is_empty() {
             if in_check {
-                return -IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score;
+                return -IMMEDIATE_MATE_SCORE + ply as Score;
             }
             return 0;
         }
@@ -272,7 +279,7 @@ impl Searcher {
         if depth <= STATIC_NULL_MOVE_DEPTH
             && !is_pv
             && !in_check
-            && eval - STATIC_NULL_MOVE_MARGIN * (depth as Score) >= beta
+            && eval - STATIC_NULL_MOVE_MARGIN * depth >= beta
         {
             return eval;
         }
@@ -294,7 +301,7 @@ impl Searcher {
 
         // Razoring
         if !is_pv && !in_check && tt_move == 0 && do_null && depth <= 3 {
-            let threshold = alpha - 300 - (depth as Score - 1) * 60;
+            let threshold = alpha - 300 - (depth - 1) * 60;
             if eval < threshold {
                 let score = self.quiesence(alpha, beta, true);
                 // This might be a bit too bold, but it's worth a try
@@ -385,22 +392,28 @@ impl Searcher {
             } else {
                 score = alpha + 1;
                 // LMR
-                // Dot not reduce moves that give check, capture or promote
+                // Dot not reduce moves that give check, capture (except bad captures) or promote
                 if depth >= 3
-                    && !BitMove::is_tactical(m)
-                    && !gives_check
-                    && !in_check
+                    && (!BitMove::is_tactical(m) || move_score < 0)
+                    // && !gives_check
+                    // && !in_check
                     && i > 3
                     && moves.size() > 20
-                    && m != self.board.killers[0][self.board.pos.ply - 1]
-                    && m != self.board.killers[1][self.board.pos.ply - 1]
+                    // && m != self.board.killers[0][self.board.pos.ply - 1]
+                    // && m != self.board.killers[1][self.board.pos.ply - 1]
                 {
-                    let mut d = depth - 3;
-                    d = i32::min(d, d - (i / 20) as i32);
-                    if is_pv {
-                        d = i32::min(d + 2, depth - 1);
+                    let mut r = 2;
+                    if is_cap {
+                        r = 1;
                     }
-                    score = -self.negamax(d, -alpha - 1, -alpha, true);
+                    if beta - alpha > 1 {
+                        r += 1;
+                    }
+                    if gives_check || in_check {
+                        r = 1;
+                    }
+
+                    score = -self.negamax(depth - 1 - r, -alpha - 1, -alpha, true);
                 }
 
                 if score > alpha {
@@ -434,7 +447,6 @@ impl Searcher {
                 }
             }
 
-            let ply = self.board.pos.ply;
             if score >= beta {
                 if !is_cap {
                     self.board.killers[1][ply] = self.board.killers[0][ply];
@@ -460,7 +472,7 @@ impl Searcher {
                     eval,
                     NodeType::Beta,
                 );
-                self.table.store(entry, self.board.pos.ply);
+                self.table.store(entry, ply);
 
                 return beta;
             } else if !is_cap {
@@ -493,7 +505,7 @@ impl Searcher {
             )
         };
 
-        self.table.store(entry, self.board.pos.ply);
+        self.table.store(entry, ply);
 
         alpha
     }
