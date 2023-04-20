@@ -1,14 +1,13 @@
-use std::{
-    cell::SyncUnsafeCell,
-};
+use std::cell::SyncUnsafeCell;
 
-use crate::{board::Board, search::IS_MATE, defs::Score, movegen::is_legal_move};
+use crate::{board::Board, defs::Score, movegen::is_legal_move, search::IS_MATE};
 
 pub const TABLE_SIZE_MB: usize = 1024;
 type TT = HashTable<HashEntry>;
 
-pub trait Table<T> 
-where T: Default + Copy,
+pub trait Table<T>
+where
+    T: Default + Copy,
 {
     fn new(num_entries: usize) -> Self;
 
@@ -66,13 +65,12 @@ impl Table<HashEntry> for HashTable<HashEntry> {
         let prev = self.get_mut(entry.key);
         *prev = entry;
 
-
         // TODO: add aging to table entries,
         // the method below is very inefficient, especially in endgames
-        /* if !prev.valid() 
+        /* if !prev.valid()
         // prioritize entries that add a move to a
         // position that previously didnt have a pv move stored
-        || (!prev.has_move() && entry.has_move()) 
+        || (!prev.has_move() && entry.has_move())
         || prev.depth < entry.depth {
             *prev = entry;
         } */
@@ -85,7 +83,6 @@ impl Table<HashEntry> for HashTable<HashEntry> {
     fn get_mut(&mut self, key: u64) -> &mut HashEntry {
         unsafe { self.entries.get_unchecked_mut(key as usize % self.size) }
     }
-
 }
 
 impl HashTable<HashEntry> {
@@ -140,15 +137,11 @@ impl TWrapper {
     }
 
     pub fn clear(&self) {
-        unsafe {
-            (*self.inner.get()).clear()
-        }
+        unsafe { (*self.inner.get()).clear() }
     }
 
     pub fn probe(&self, key: u64, ply_from_root: usize) -> Option<HashEntry> {
-        let mut entry = unsafe {
-            (*self.inner.get()).probe(key)
-        };
+        let mut entry = unsafe { (*self.inner.get()).probe(key) };
 
         if let Some(ref mut entry) = entry {
             if entry.score > IS_MATE {
@@ -180,20 +173,16 @@ impl TWrapper {
     }
 
     pub fn best_move(&self, key: u64) -> Option<u16> {
-        unsafe {
-            (*self.inner.get()).best_move(key)
-        }
+        unsafe { (*self.inner.get()).best_move(key) }
     }
 
     pub fn extract_pv(&self, board: &mut Board, depth: i32) -> Vec<u16> {
-        unsafe {
-            (*self.inner.get()).extract_pv(board, depth as u8)
-        }
-    } 
+        unsafe { (*self.inner.get()).extract_pv(board, depth as u8) }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum NodeType {
+pub enum HashFlag {
     Exact,
     Alpha,
     Beta,
@@ -206,7 +195,7 @@ pub struct HashEntry {
     pub m: u16,
     pub score: Score,
     pub static_eval: Score,
-    pub node_type: NodeType,
+    pub hash_flag: HashFlag,
 }
 
 impl Default for HashEntry {
@@ -217,20 +206,27 @@ impl Default for HashEntry {
             m: 0,
             score: 0,
             static_eval: 0,
-            node_type: NodeType::Exact,
+            hash_flag: HashFlag::Exact,
         }
     }
 }
 
 impl HashEntry {
-    pub fn new(key: u64, depth: i32, m: u16, score: Score, static_eval: Score, node_type: NodeType) -> Self {
+    pub fn new(
+        key: u64,
+        depth: i32,
+        m: u16,
+        score: Score,
+        static_eval: Score,
+        hash_flag: HashFlag,
+    ) -> Self {
         HashEntry {
             key,
             depth: depth as u8,
             m,
             score,
             static_eval,
-            node_type,
+            hash_flag,
         }
     }
 

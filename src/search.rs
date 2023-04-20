@@ -1,7 +1,7 @@
 use crate::bitmove::MoveFlag;
 use crate::defs::{PieceType, Score, INFINITY, MAX_DEPTH, MG_VALUE};
 use crate::eval::evaluate;
-use crate::table::{HashEntry, NodeType, TWrapper};
+use crate::table::{HashEntry, HashFlag, TWrapper};
 use crate::utils::{is_draw, is_repetition, print_search_info};
 use crate::{
     bitmove::BitMove, board::Board, defs::Player, movelist::MoveList, order::pick_next_move,
@@ -128,7 +128,7 @@ impl Searcher {
             if self.should_stop() {
                 break;
             }
-            
+
             let elapsed = self.start_time.elapsed().as_secs_f64() * 1000f64;
             let pv = self.table.extract_pv(&mut self.board, depth);
 
@@ -472,7 +472,7 @@ impl Searcher {
                     best_move,
                     beta,
                     eval,
-                    NodeType::Beta,
+                    HashFlag::Beta,
                 );
                 self.table.store(entry, ply);
 
@@ -494,7 +494,7 @@ impl Searcher {
                 best_move,
                 best_score,
                 eval,
-                NodeType::Exact,
+                HashFlag::Exact,
             )
         } else {
             HashEntry::new(
@@ -503,7 +503,7 @@ impl Searcher {
                 best_move,
                 alpha,
                 eval,
-                NodeType::Alpha,
+                HashFlag::Alpha,
             )
         };
 
@@ -567,7 +567,7 @@ impl Searcher {
                 self.table.best_move(self.board.key()).unwrap_or(0),
                 alpha,
                 eval,
-                NodeType::Exact,
+                HashFlag::Exact,
             );
             self.table.store(entry, 0);
         }
@@ -638,16 +638,16 @@ const fn table_cutoff(entry: HashEntry, depth: i32, alpha: Score, beta: Score) -
         return None;
     }
 
-    match entry.node_type {
-        NodeType::Exact => Some(entry.score),
-        NodeType::Alpha => {
+    match entry.hash_flag {
+        HashFlag::Exact => Some(entry.score),
+        HashFlag::Alpha => {
             if alpha >= entry.score {
                 Some(alpha)
             } else {
                 None
             }
         }
-        NodeType::Beta => {
+        HashFlag::Beta => {
             if beta <= entry.score {
                 Some(beta)
             } else {
