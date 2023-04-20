@@ -8,13 +8,17 @@ use crate::{
     gen::{
         attack::{attacks, king_attacks},
         pesto::{EG_TABLE, MG_TABLE},
-        tables::{CENTER_DISTANCE, DISTANCE, ISOLATED, PASSED},
+        tables::{CENTER_DISTANCE, DISTANCE, ISOLATED, PASSED, SHIELDING_PAWNS},
     },
     movegen::pawn_caps,
+    utils::ranks_in_front_of,
 };
 
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
 const BISHOP_PAIR_BONUS: Score = 20;
+
+const SHIELD_MISSING: [i32; 4] = [-2, -23, -38, -55];
+const SHIELD_MISSING_ON_OPEN_FILE: [i32; 4] = [-8, -10, -37, -66];
 
 pub fn evaluate(board: &Board) -> Score {
     // Score is from white's perspective
@@ -70,8 +74,8 @@ pub fn evaluate(board: &Board) -> Score {
     mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 8) as Score;
 
     // pawns controlling center of the board
-    mg[0] += (BitBoard::count(w_pawns & CENTER_SQUARES) * 15) as Score;
-    mg[1] += (BitBoard::count(b_pawns & CENTER_SQUARES) * 15) as Score;
+    mg[0] += (BitBoard::count(w_pawns & CENTER_SQUARES) * 6) as Score;
+    mg[1] += (BitBoard::count(b_pawns & CENTER_SQUARES) * 6) as Score;
 
     // pawn attacks
     let w_pawn_caps = pawn_caps(w_pawns, Player::White) & board.player_bb(Player::Black);
@@ -108,7 +112,7 @@ pub fn evaluate(board: &Board) -> Score {
     king_pawn_shield(
         board, w_pawns, b_pawns, &mut mg, w_king_sq, b_king_sq, w_king_bb, b_king_bb,
     );
-    
+
     // tapered eval
     let mg_score = mg[0] - mg[1];
     let eg_score = eg[0] - eg[1];
@@ -256,77 +260,41 @@ fn king_pawn_shield(
         mg[1] -= 20;
     }
 
-    // If the king has wandered this far from home, he must have a reason to do so,
-    // so don't evaluate a pawn shield
-    if w_king_sq < 16 {
-        // white king side
-        if w_king_bb & (BitBoard::FILE_G | BitBoard::FILE_H) != 0 {
-            mg[0] +=
-                (BitBoard::count(w_pawns & CASTLE_KING_FILES & BitBoard::RANK_2) * 10) as Score;
-            mg[0] += (BitBoard::count(w_pawns & CASTLE_KING_FILES & BitBoard::RANK_3) * 3) as Score;
+    let w_pawn_shield = SHIELDING_PAWNS[0][w_king_sq as usize];
+    let w_king_front_span = ranks_in_front_of(Player::White, w_king_sq);
+    mg[0] += missing_shield_pawns(w_pawn_shield, w_pawns, b_pawns, w_king_front_span);
 
-            // punish empty file close to king
-            for file in [BitBoard::FILE_G, BitBoard::FILE_H] {
-                if file & w_pawns == 0 {
-                    mg[0] -= 25;
-                }
+    let b_pawn_shield = SHIELDING_PAWNS[1][b_king_sq as usize];
+    let b_king_front_span = ranks_in_front_of(Player::Black, b_king_sq);
+    mg[1] += missing_shield_pawns(b_pawn_shield, b_pawns, w_pawns, b_king_front_span);
+}
+
+/// # Arguments
+///
+/// * `king_front_span` - All the squares in front of the king
+const fn missing_shield_pawns(
+    mut pawn_shield: u64,
+    pawns: u64,
+    opp_pawns: u64,
+    king_front_span: u64,
+) -> i32 {
+    let mut pawns_missing = 0;
+    let mut pawns_open_file_missing = 0;
+    while pawn_shield != 0 {
+        let sq = BitBoard::bit_scan_forward(pawn_shield);
+        let file_bb = BitBoard::file_bb(sq);
+        if pawn_shield & pawns & file_bb == 0 {
+            pawns_missing += 1;
+
+            if opp_pawns & king_front_span & file_bb == 0 {
+                pawns_open_file_missing += 1;
             }
         }
-        // white queen side
-        else if w_king_bb & CASTLE_QUEEN_FILES != 0 {
-            mg[0] +=
-                (BitBoard::count(w_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_2) * 10) as Score;
-            mg[0] +=
-                (BitBoard::count(w_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_3) * 3) as Score;
 
-            // punish empty file close to king
-            for file in [BitBoard::FILE_A, BitBoard::FILE_B, BitBoard::FILE_C] {
-                if file & w_pawns == 0 {
-                    mg[0] -= 25;
-                }
-            }
-        }
-        // Not castled yet
-        else {
-            mg[0] -= 15;
-        }
+        pawn_shield &= !file_bb;
     }
 
-    // If the king has wandered this far from home, he must have a reason to do so,
-    // so don't evaluate a pawn shield
-    if b_king_sq > 47 {
-        // black king side
-        if b_king_bb & (BitBoard::FILE_G | BitBoard::FILE_H) != 0 {
-            mg[1] +=
-                (BitBoard::count(b_pawns & CASTLE_KING_FILES & BitBoard::RANK_7) * 10) as Score;
-            mg[1] += (BitBoard::count(b_pawns & CASTLE_KING_FILES & BitBoard::RANK_6) * 3) as Score;
-
-            // punish empty file close to king
-            for file in [BitBoard::FILE_G, BitBoard::FILE_H] {
-                if file & b_pawns == 0 {
-                    mg[1] -= 25;
-                }
-            }
-        }
-        // black queen side
-        else if b_king_bb & CASTLE_QUEEN_FILES != 0 {
-            mg[1] +=
-                (BitBoard::count(b_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_7) * 10) as Score;
-            mg[1] +=
-                (BitBoard::count(b_pawns & CASTLE_QUEEN_FILES & BitBoard::RANK_6) * 3) as Score;
-
-            // punish empty file close to king
-            for file in [BitBoard::FILE_A, BitBoard::FILE_B, BitBoard::FILE_C] {
-                if file & b_pawns == 0 {
-                    mg[1] -= 25;
-                }
-            }
-        }
-        // Not castled yet
-        else {
-            mg[1] -= 15;
-        }
-    }
+    SHIELD_MISSING[pawns_missing] + SHIELD_MISSING_ON_OPEN_FILE[pawns_open_file_missing]
 }
 
 struct AttackedBy {

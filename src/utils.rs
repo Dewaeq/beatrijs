@@ -75,15 +75,9 @@ pub fn print_search_info(
     let score_str = if score.abs() == IMMEDIATE_MATE_SCORE {
         format!("mate",)
     } else if score > IS_MATE {
-        format!(
-            "mate {}",
-            (IMMEDIATE_MATE_SCORE - score + 1) / 2 as Score
-        )
+        format!("mate {}", (IMMEDIATE_MATE_SCORE - score + 1) / 2 as Score)
     } else if score < -IS_MATE {
-        format!(
-            "mate {}",
-            (score + IMMEDIATE_MATE_SCORE) / 2 as Score
-        )
+        format!("mate {}", (score + IMMEDIATE_MATE_SCORE) / 2 as Score)
     } else {
         format!("cp {score}")
     };
@@ -170,4 +164,37 @@ const fn is_material_draw(board: &Board) -> bool {
     }
 
     return false;
+}
+
+pub const fn ranks_in_front_of(side: Player, sq: Square) -> u64 {
+    let bb = BitBoard::rank_bb(sq);
+
+    match side {
+        Player::White => north_one(north_fill(bb)),
+        _ => south_one(south_fill(bb)),
+    }
+}
+
+pub const fn north_fill(mut bb: u64) -> u64 {
+    bb |= bb << 8;
+    bb |= bb << 16;
+    bb |= bb << 32;
+
+    bb
+}
+
+pub const fn south_fill(mut bb: u64) -> u64 {
+    bb |= bb >> 8;
+    bb |= bb >> 16;
+    bb |= bb >> 32;
+
+    bb
+}
+
+pub const fn north_one(bb: u64) -> u64 {
+    bb << 8
+}
+
+pub const fn south_one(bb: u64) -> u64 {
+    bb >> 8
 }
