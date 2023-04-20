@@ -208,6 +208,7 @@ impl Searcher {
         }
 
         let is_root = ply == 0;
+        let is_pv = beta - alpha > 1;
 
         // Mate distance pruning
         if !is_root {
@@ -227,12 +228,10 @@ impl Searcher {
         let entry = self.table.probe(self.board.key(), ply);
         let in_check = self.board.in_check();
         let mut tt_move = 0;
-        let mut is_pv = false;
         let is_root = self.board.pos.ply == 0;
 
         if let Some(entry) = entry {
             tt_move = entry.m;
-            is_pv = true;
 
             if let Some(score) = table_cutoff(entry, depth, alpha, beta) {
                 return score;
