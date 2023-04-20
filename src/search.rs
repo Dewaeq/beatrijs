@@ -196,11 +196,11 @@ impl Searcher {
             return 0;
         }
 
-        if depth >= 100 {
+        let ply = self.board.pos.ply;
+        if ply >= 100 {
             return evaluate(&self.board);
         }
 
-        let ply = self.board.pos.ply;
         let is_root = ply == 0;
 
         // Mate distance pruning
