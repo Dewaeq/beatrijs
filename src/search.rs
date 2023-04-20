@@ -67,6 +67,7 @@ impl SearchInfo {
 
 pub struct Searcher {
     pub num_nodes: u64,
+    pub sel_depth: usize,
     pub board: Board,
     pub table: Arc<TWrapper>,
     abort: Arc<AtomicBool>,
@@ -84,6 +85,7 @@ impl Searcher {
             board,
             abort,
             num_nodes: 0,
+            sel_depth: 0,
             table: tt,
             start_time: Instant::now(),
             info,
@@ -169,6 +171,7 @@ impl Searcher {
             self.best_root_move = pv[0];
             print_search_info(
                 depth,
+                self.sel_depth,
                 score,
                 total_time,
                 search_time,
@@ -214,7 +217,7 @@ impl Searcher {
         }
 
         if depth == 0 {
-            let score = self.quiesence(alpha, beta, true);
+            let score = self.quiesence(alpha, beta, true, ply);
             return score;
         }
 
@@ -303,7 +306,7 @@ impl Searcher {
         if !is_pv && !in_check && tt_move == 0 && do_null && depth <= 3 {
             let threshold = alpha - 300 - (depth - 1) * 60;
             if eval < threshold {
-                let score = self.quiesence(alpha, beta, true);
+                let score = self.quiesence(alpha, beta, true, ply);
                 // This might be a bit too bold, but it's worth a try
                 return score;
                 /* if score < threshold {
@@ -510,12 +513,15 @@ impl Searcher {
         alpha
     }
 
-    fn quiesence(&mut self, mut alpha: Score, beta: Score, root: bool) -> Score {
+    fn quiesence(&mut self, mut alpha: Score, beta: Score, root: bool, depth: usize) -> Score {
         if is_draw(&self.board) {
             return 0;
         }
 
         self.num_nodes += 1;
+        if depth > self.sel_depth {
+            self.sel_depth = depth;
+        }
 
         // Stand pat
         let eval = evaluate(&self.board);
@@ -544,7 +550,7 @@ impl Searcher {
             }
 
             self.board.make_move(m);
-            let score = -self.quiesence(-beta, -alpha, false);
+            let score = -self.quiesence(-beta, -alpha, false, depth + 1);
             self.board.unmake_move(m);
 
             if score >= beta {

@@ -65,6 +65,7 @@ pub const fn b_max(a: Square, b: Square) -> Square {
 
 pub fn print_search_info(
     depth: i32,
+    sel_depth: usize,
     score: Score,
     total_time: u64,
     search_time: f64,
@@ -83,8 +84,9 @@ pub fn print_search_info(
     };
 
     print!(
-        "info depth {} score {} nodes {} time {} nps {} ",
+        "info depth {} seldepth {} score {} nodes {} time {} nps {} ",
         depth,
+        sel_depth,
         score_str,
         num_nodes,
         total_time,
