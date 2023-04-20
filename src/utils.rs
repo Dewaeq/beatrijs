@@ -64,7 +64,7 @@ pub const fn b_max(a: Square, b: Square) -> Square {
 }
 
 pub fn print_search_info(
-    depth: u8,
+    depth: i32,
     score: Score,
     total_time: u64,
     search_time: f64,
@@ -114,18 +114,18 @@ pub const fn is_draw(board: &Board) -> bool {
 }
 
 pub const fn is_repetition(board: &Board) -> bool {
-    if board.pos.ply < 2 || board.pos.rule_fifty < 2 {
+    if board.pos.rule_fifty < 2 {
         return false;
     }
 
-    let mut i = 2;
-    while i <= (board.pos.rule_fifty + 1) as usize {
+    let mut i = 1;
+    while i <= board.pos.rule_fifty as usize {
         let key = board.history.get_key(board.history.count - i);
         if key == board.key() {
             return true;
         }
 
-        i += 2;
+        i += 1;
     }
 
     false

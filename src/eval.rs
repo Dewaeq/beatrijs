@@ -62,8 +62,10 @@ pub fn evaluate(board: &Board) -> Score {
 
     if BitBoard::more_than_one(w_bishops) {
         score += BISHOP_PAIR_BONUS;
+        score += BISHOP_PAIR_BONUS;
     }
     if BitBoard::more_than_one(b_bishops) {
+        score -= BISHOP_PAIR_BONUS;
         score -= BISHOP_PAIR_BONUS;
     }
 

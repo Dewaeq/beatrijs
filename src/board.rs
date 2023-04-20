@@ -4,8 +4,8 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
-        Castling, Piece, PieceType, Player, Score, Square, BLACK_IDX, FEN_START_STRING,
-        MAX_MOVES, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX, MG_VALUE,
+        Castling, Piece, PieceType, Player, Score, Square, BLACK_IDX, FEN_START_STRING, MAX_MOVES,
+        MG_VALUE, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX,
     },
     gen::{attack::attacks, between::between},
     history::History,
@@ -117,6 +117,13 @@ impl Board {
             Player::White => self.pos.castling & Castling::WHITE_ALL != 0,
             Player::Black => self.pos.castling & Castling::BLACK_ALL != 0,
         }
+    }
+
+    pub const fn has_non_pawns(&self, side: Player) -> bool {
+        self.player_piece_bb(side, PieceType::Knight) != 0
+            || self.player_piece_bb(side, PieceType::Bishop) != 0
+            || self.player_piece_bb(side, PieceType::Rook) != 0
+            || self.player_piece_bb(side, PieceType::Queen) != 0
     }
 
     pub const fn has_big_piece(&self, side: Player) -> bool {
