@@ -117,37 +117,31 @@ impl Searcher {
 
     pub fn iterate(&mut self) {
         self.start();
-
-        // save alpha and beta for aspiration search
-        let mut alpha = -INFINITY;
-        let mut beta = INFINITY;
+        self.clear_for_search();
 
         self.root_moves = MoveList::legal(&mut self.board);
+        let mut score = -INFINITY;
 
         for depth in 1..=self.info.depth as i32 {
-            let mut score = self.search(depth, alpha, beta);
+            score = self.aspiration_search(depth, score);
 
             if self.should_stop() {
                 break;
             }
+            
+            let elapsed = self.start_time.elapsed().as_secs_f64() * 1000f64;
+            let pv = self.table.extract_pv(&mut self.board, depth);
 
-            // score is outside of the window, so do a full-width search
-            if score <= alpha || score >= beta {
-                alpha = -INFINITY;
-                beta = INFINITY;
-                score = self.search(depth, alpha, beta);
-            }
-
-            if score.abs() > IS_MATE || is_repetition(&self.board) {
-                break;
-            }
-
-            // aspiration search:
-            // slightly shrink the search window
-            alpha = score - 50;
-            beta = score + 50;
-
-            self.num_nodes = 0;
+            self.best_root_move = pv[0];
+            print_search_info(
+                depth,
+                self.sel_depth,
+                score,
+                elapsed,
+                self.num_nodes,
+                &pv,
+                self.board.turn,
+            );
         }
 
         let best_move = self
@@ -157,31 +151,40 @@ impl Searcher {
         println!("bestmove {}", BitMove::pretty_move(best_move));
     }
 
-    fn search(&mut self, depth: i32, alpha: Score, beta: Score) -> Score {
-        self.clear_for_search();
+    fn aspiration_search(&mut self, depth: i32, eval: Score) -> Score {
+        let mut alpha = -INFINITY;
+        let mut beta = INFINITY;
 
-        let start = Instant::now();
-        let score = self.negamax(depth, alpha, beta, false);
-        let elapsed = self.start_time.elapsed();
-        let total_time = (elapsed.as_secs_f64() * 1000f64) as u64;
-        let search_time = start.elapsed().as_secs_f64();
-
-        if !self.should_stop() {
-            let pv = self.table.extract_pv(&mut self.board, depth);
-            self.best_root_move = pv[0];
-            print_search_info(
-                depth,
-                self.sel_depth,
-                score,
-                total_time,
-                search_time,
-                self.num_nodes,
-                &pv,
-                self.board.turn,
-            );
+        if depth > 4 {
+            alpha = eval - 16;
+            beta = eval + 16;
         }
 
-        score
+        let mut research = 0;
+        loop {
+            if self.should_stop() {
+                return 0;
+            }
+
+            if alpha < -3500 {
+                alpha = -INFINITY;
+            }
+
+            if beta > 3500 {
+                beta = INFINITY;
+            }
+
+            let best_eval = self.negamax(depth, alpha, beta, false);
+            research += 1;
+
+            if best_eval <= alpha {
+                alpha = (-INFINITY).max(alpha - research * research * 23);
+            } else if best_eval >= beta {
+                beta = INFINITY.min(beta + research * research * 23);
+            } else {
+                return best_eval;
+            }
+        }
     }
 
     fn negamax(
@@ -398,12 +401,8 @@ impl Searcher {
                 // Dot not reduce moves that give check, capture (except bad captures) or promote
                 if depth >= 3
                     && (!BitMove::is_tactical(m) || move_score < 0)
-                    // && !gives_check
-                    // && !in_check
                     && i > 3
                     && moves.size() > 20
-                    // && m != self.board.killers[0][self.board.pos.ply - 1]
-                    // && m != self.board.killers[1][self.board.pos.ply - 1]
                 {
                     let mut r = 2;
                     if is_cap {

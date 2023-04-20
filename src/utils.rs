@@ -63,12 +63,14 @@ pub const fn b_max(a: Square, b: Square) -> Square {
     }
 }
 
+/// # Arguments
+/// 
+/// * `elapsed` - Elapsed time from the start of the search, in milliseconds
 pub fn print_search_info(
     depth: i32,
     sel_depth: usize,
     score: Score,
-    total_time: u64,
-    search_time: f64,
+    elapsed: f64,
     num_nodes: u64,
     pv: &[u16],
     turn: Player,
@@ -89,8 +91,8 @@ pub fn print_search_info(
         sel_depth,
         score_str,
         num_nodes,
-        total_time,
-        (num_nodes as f64 / search_time) as u64
+        elapsed as u64,
+        (num_nodes as f64 / elapsed * 1000f64) as u64
     );
     print_pv(&pv);
 }
