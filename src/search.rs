@@ -77,6 +77,7 @@ pub struct Searcher {
     root_moves: MoveList,
     history_score: [[[Score; 64]; 64]; 2],
     quiets_tried: [[Option<u16>; 128]; 128],
+    eval_history: [Score; 128],
 }
 
 impl Searcher {
@@ -93,6 +94,7 @@ impl Searcher {
             root_moves: MoveList::new(),
             history_score: [[[0; 64]; 64]; 2],
             quiets_tried: [[None; 128]; 128],
+            eval_history: [0; 128],
         }
     }
 
@@ -259,6 +261,8 @@ impl Searcher {
             evaluate(&self.board)
         };
 
+        self.eval_history[ply] = eval;
+
         // Futility pruning: frontier node
         if depth == 1
             && !in_check
@@ -302,6 +306,13 @@ impl Searcher {
             if score >= beta {
                 return beta;
             }
+        }
+
+        let improving = (ply >= 2 && eval >= self.eval_history[ply - 2]) as i32;
+
+        // Reverse futility pruning
+        if !is_pv && !in_check && depth < 7 && beta < IS_MATE && eval - 67 * depth + 76 * improving >= beta {
+            return eval;
         }
 
         // Razoring
@@ -373,6 +384,7 @@ impl Searcher {
                     continue;
                 }
 
+                // Late move pruning
                 if !in_check && depth <= 4 && quiets_tried as u32 > (3 * 2u32.pow(depth as u32 - 1))
                 {
                     self.board.unmake_move(m);
