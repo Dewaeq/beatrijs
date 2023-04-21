@@ -33,13 +33,6 @@ impl Game {
     pub fn clear(&mut self) {
         self.table.clear();
         self.stop();
-        // self.board = Board::start_pos();
-    }
-
-    fn create_searcher(&mut self, info: SearchInfo) -> Searcher {
-        let abort = self.abort_search.clone();
-        let table = self.table.clone();
-        Searcher::new(self.board, abort, table, info)
     }
 
     pub fn main_loop() {
@@ -100,9 +93,15 @@ impl Game {
     }
 
     pub fn start_search(&mut self, info: SearchInfo) {
-        let mut searcher = self.create_searcher(info);
+        // We can't just move the whole searcher to a new thread,
+        // because moving that much data causes a stack overflow in debug builds
+        let abort = self.abort_search.clone();
+        let table = self.table.clone();
+        let info = info.clone();
+        let board = self.board.clone();
+
         let handle = thread::spawn(move || {
-            searcher.iterate();
+            Searcher::new(board, abort, table, info).iterate();
         });
 
         self.search_thread = Some(handle);
