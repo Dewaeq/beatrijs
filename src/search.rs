@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
+pub const MAX_SEARCH_DEPTH: usize = 100;
 pub const IMMEDIATE_MATE_SCORE: Score = 31_000;
 pub const IS_MATE: Score = IMMEDIATE_MATE_SCORE - 1000;
 
@@ -76,7 +77,7 @@ pub struct Searcher {
     best_root_move: u16,
     root_moves: MoveList,
     history_score: [[[Score; 64]; 64]; 2],
-    quiets_tried: [[Option<u16>; 128]; 128],
+    quiets_tried: [[Option<u16>; 128]; MAX_SEARCH_DEPTH],
     eval_history: [Score; 128],
 }
 
@@ -93,7 +94,7 @@ impl Searcher {
             best_root_move: 0,
             root_moves: MoveList::new(),
             history_score: [[[0; 64]; 64]; 2],
-            quiets_tried: [[None; 128]; 128],
+            quiets_tried: [[None; 128]; MAX_SEARCH_DEPTH],
             eval_history: [0; 128],
         }
     }
@@ -205,7 +206,7 @@ impl Searcher {
         }
 
         let ply = self.board.pos.ply;
-        if ply >= 100 {
+        if ply >= MAX_SEARCH_DEPTH {
             return evaluate(&self.board);
         }
 
