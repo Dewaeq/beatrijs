@@ -91,8 +91,8 @@ fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board) {
 }
 
 fn add_capture_move(m: u16, move_list: &mut MoveList, board: &Board) {
-    let move_piece = board.piece(BitMove::src(m));
-    let cap_piece = board.piece(BitMove::dest(m));
+    let move_piece = board.piece_type(BitMove::src(m));
+    let cap_piece = board.piece_type(BitMove::dest(m));
 
     assert!(move_piece != PieceType::None);
     assert!(cap_piece != PieceType::None);

@@ -1,5 +1,5 @@
 use crate::bitmove::MoveFlag;
-use crate::defs::{PieceType, Score, Square, INFINITY, MAX_DEPTH, MG_VALUE};
+use crate::defs::{PieceType, Score, Square, INFINITY, MG_VALUE};
 use crate::eval::evaluate;
 use crate::table::{HashEntry, HashFlag, TWrapper};
 use crate::utils::{is_draw, is_repetition, print_search_info};
@@ -20,7 +20,7 @@ const STATIC_NULL_MOVE_MARGIN: Score = 120;
 
 #[derive(Clone, Copy, Debug)]
 pub struct SearchInfo {
-    pub depth: u8,
+    pub depth: usize,
     pub w_time: usize,
     pub b_time: usize,
     pub w_inc: usize,
@@ -32,7 +32,7 @@ pub struct SearchInfo {
 impl Default for SearchInfo {
     fn default() -> Self {
         Self {
-            depth: MAX_DEPTH,
+            depth: MAX_SEARCH_DEPTH,
             w_time: 0,
             b_time: 0,
             w_inc: 0,
@@ -44,7 +44,7 @@ impl Default for SearchInfo {
 }
 
 impl SearchInfo {
-    pub fn depth(depth: u8) -> Self {
+    pub fn with_depth(depth: usize) -> Self {
         let mut info = SearchInfo::default();
         info.depth = depth;
         info
@@ -348,9 +348,6 @@ impl Searcher {
             set_tt_move_score(&mut moves, tt_move);
         }
 
-        let is_prunable = !is_root && !in_check && !is_pv && (alpha > -IS_MATE && beta < IS_MATE);
-        let can_prune = is_prunable && depth <= 3 && (eval + MG_VALUE[1] <= alpha);
-
         let turn = self.board.turn;
 
         for i in 0..moves.size() {
@@ -369,39 +366,46 @@ impl Searcher {
             let gives_check = self.board.gives_check(m);
             let mut score = 0;
 
-            if !is_root
-                && is_quiet
-                && best_score > -IS_MATE
-                && self.board.has_big_piece(turn)
-                && !gives_check
-            {
-                // History pruning: skip quiet moves at low depth
-                // that yielded bad results in previous searches
-                if depth <= 2 && self.history_score[turn.as_usize()][src][dest] < 0 {
-                    continue;
-                }
+            if !is_root && best_score > -IS_MATE && self.board.has_non_pawns(turn) {
+                if is_cap || is_prom || gives_check {
+                    // History pruning: skip quiet moves at low depth
+                    // that yielded bad results in previous searches
+                    if depth <= 2 && self.history_score[turn.as_usize()][src][dest] < 0 {
+                        continue;
+                    }
 
-                // Futility pruning
-                if can_prune {
-                    search_quiets = false;
-                    continue;
-                }
+                    // SEE pruning
+                    if !self.board.see_ge(m, -200 * depth) {
+                        continue;
+                    }
 
-                // Late move pruning
-                if !in_check && depth <= 4 && quiets_tried as u32 > (3 * 2u32.pow(depth as u32 - 1))
-                {
-                    search_quiets = false;
-                    continue;
+                    // Futility pruning
+                    if depth <= 8
+                        && move_score < -50 * depth * depth
+                    {
+                        continue;
+                    }
+                } else {
+                    // Futility pruning
+                    if depth <= 3 && (eval + MG_VALUE[1] <= alpha) {
+                        search_quiets = false;
+                        continue;
+                    }
+
+                    // Late move pruning
+                    if !in_check
+                        && depth <= 4
+                        && quiets_tried as u32 > (3 * 2u32.pow(depth as u32 - 1))
+                    {
+                        search_quiets = false;
+                        continue;
+                    }
+
+                    // SEE pruning
+                    if depth <= 8 && !self.board.see_ge(m, -21 * (depth * depth)) {
+                        continue;
+                    }
                 }
-            } else if !is_root
-                && !gives_check
-                && is_cap
-                && best_score > -IS_MATE
-                && depth <= 8
-                && move_score < -50 * depth * depth
-                && self.board.has_non_pawns(turn)
-            {
-                continue;
             }
 
             self.board.make_move(m);
@@ -414,7 +418,7 @@ impl Searcher {
                 // LMR
                 // Dot not reduce moves that give check, capture (except bad captures) or promote
                 if depth >= 3
-                    && (!BitMove::is_tactical(m) || move_score < 0)
+                    && (!(is_cap || is_prom) || move_score < 0)
                     && i > 3
                     && moves.size() > 20
                 {
@@ -626,7 +630,7 @@ const fn passes_delta(board: &Board, m: u16, eval: Score, alpha: Score) -> bool 
     }
 
     let captured = match BitMove::flag(m) {
-        MoveFlag::CAPTURE => board.piece(BitMove::dest(m)),
+        MoveFlag::CAPTURE => board.piece_type(BitMove::dest(m)),
         MoveFlag::EN_PASSANT => PieceType::Pawn,
         /// if this move isn't a capture, then is must be a check, which we always want to search
         _ => return true,

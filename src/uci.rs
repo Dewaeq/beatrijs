@@ -1,6 +1,7 @@
 use std::{process::exit, sync::atomic::Ordering, thread::JoinHandle, time::Instant};
 
-use crate::{bitmove::BitMove, board::Board, defs::MAX_DEPTH, input::Game, search::SearchInfo};
+use crate::search::MAX_SEARCH_DEPTH;
+use crate::{bitmove::BitMove, board::Board, input::Game, search::SearchInfo};
 
 /// Gui to engine
 impl Game {
@@ -48,9 +49,9 @@ impl Game {
         for mut i in 0..commands.len() {
             let command = commands[i];
             match command {
-                "infinite" => info.depth = MAX_DEPTH,
+                "infinite" => info.depth = MAX_SEARCH_DEPTH,
                 "depth" => {
-                    info.depth = commands[i + 1].parse::<u8>().unwrap();
+                    info.depth = commands[i + 1].parse::<usize>().unwrap();
                     i += 1;
                 }
                 "wtime" => {
