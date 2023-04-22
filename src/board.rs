@@ -37,8 +37,12 @@ impl Board {
         self.pos.key
     }
 
+    pub const fn piece(&self, square: Square) -> Piece {
+        unsafe { *self.pieces.get_unchecked(square as usize) }
+    }
+
     /// Get the [`PieceType`] of the piece on the provided square
-    pub const fn piece(&self, square: Square) -> PieceType {
+    pub const fn piece_type(&self, square: Square) -> PieceType {
         unsafe { self.pieces.get_unchecked(square as usize).t }
     }
 
@@ -99,7 +103,7 @@ impl Board {
         let dest = BitMove::dest(m);
         let from_bb = BitBoard::from_sq(src);
         let to_bb = BitBoard::from_sq(dest);
-        let piece = self.piece(src);
+        let piece = self.piece_type(src);
 
         // Direct check
         if self.pos.check_squares[piece.as_usize()] & to_bb != 0 {
@@ -290,7 +294,7 @@ impl Board {
         let is_prom = BitMove::is_prom(m);
         let is_castle = BitMove::is_castle(m);
         let is_ep = BitMove::is_ep(m);
-        let piece = self.piece(src);
+        let piece = self.piece_type(src);
         let opp = self.turn.opp();
         let old_castle = self.pos.castling;
 
@@ -307,7 +311,7 @@ impl Board {
 
         // Normal captures
         if is_cap && !is_ep {
-            let cap_pt = self.piece(dest);
+            let cap_pt = self.piece_type(dest);
             self.pos.captured_piece = cap_pt;
             self.remove_piece(opp, cap_pt, dest);
 
@@ -389,7 +393,7 @@ impl Board {
         let is_prom = BitMove::is_prom(m);
         let is_castle = BitMove::is_castle(m);
         let is_ep = BitMove::is_ep(m);
-        let piece = self.piece(dest);
+        let piece = self.piece_type(dest);
         let opp = self.turn.opp();
 
         self.remove_piece(opp, piece, dest);
@@ -459,7 +463,7 @@ impl Board {
             return 0;
         }
 
-        let captured = self.piece(BitMove::dest(m));
+        let captured = self.piece_type(BitMove::dest(m));
         let mut new_board: Board = *self;
         new_board.make_move(m);
 
@@ -467,7 +471,7 @@ impl Board {
     }
 
     fn see(&mut self, dest: Square) -> Score {
-        let captured = self.piece(dest);
+        let captured = self.piece_type(dest);
         let (attacker, src) = smallest_attacker(self, dest, self.turn);
 
         if attacker != PieceType::None {
@@ -476,6 +480,121 @@ impl Board {
         } else {
             0
         }
+    }
+
+    pub fn see_ge(&self, m: u16, threshold: Score) -> bool {
+        if !BitMove::is_cap(m) || BitMove::is_ep(m) {
+            return threshold <= 0;
+        }
+
+        let src = BitMove::src(m);
+        let dest = BitMove::dest(m);
+
+        let us: Player;
+        let mut stm: Player;
+
+        let piece = self.piece(src);
+        let captured = self.piece_type(dest);
+        if piece.is_none() {
+            return false;
+        } else {
+            us = piece.c;
+            stm = us.opp();
+        }
+
+        let mut balance = captured.mg_value() - threshold;
+        if balance < 0 {
+            return false;
+        }
+
+        // Recapture
+        balance -= piece.t.mg_value();
+        if balance >= 0 {
+            return true;
+        }
+
+        // Remove the two pieces we just evaluated
+        let mut occ = self.occ_bb() ^ BitBoard::from_sq(src) ^ BitBoard::from_sq(dest);
+        let mut attackers = attackers_to(&self, dest, occ) & occ;
+        let mut stm_attackers;
+        let mut next_capture;
+
+        loop {
+            stm_attackers = attackers & self.player_bb(stm);
+
+            if self.pos.pinners[stm.opp().as_usize()] & !occ == 0 {
+                stm_attackers &= !self.pos.king_blockers[stm.as_usize()];
+            }
+
+            if stm_attackers == 0 {
+                break;
+            }
+
+            next_capture = self.min_attacker(
+                PieceType::Pawn,
+                dest,
+                stm_attackers,
+                &mut occ,
+                &mut attackers,
+            );
+            stm = stm.opp();
+
+            balance = -balance - 1 - next_capture.mg_value();
+
+            if balance >= 0 {
+                if next_capture == PieceType::King && (attackers & self.player_bb(stm) != 0) {
+                    stm = stm.opp();
+                }
+                break;
+            }
+        }
+
+        us != stm
+    }
+
+    fn min_attacker(
+        &self,
+        piece: PieceType,
+        to: Square,
+        stm_attackers: u64,
+        occ: &mut u64,
+        attackers: &mut u64,
+    ) -> PieceType {
+        let bb = stm_attackers & self.piece_bb(piece);
+        if bb == 0 {
+            let np = match piece {
+                PieceType::Pawn => {
+                    self.min_attacker(PieceType::Knight, to, stm_attackers, occ, attackers)
+                }
+                PieceType::Knight => {
+                    self.min_attacker(PieceType::Bishop, to, stm_attackers, occ, attackers)
+                }
+                PieceType::Bishop => {
+                    self.min_attacker(PieceType::Rook, to, stm_attackers, occ, attackers)
+                }
+                PieceType::Rook => {
+                    self.min_attacker(PieceType::Queen, to, stm_attackers, occ, attackers)
+                }
+                _ => self.min_attacker(PieceType::King, to, stm_attackers, occ, attackers),
+            };
+
+            return np;
+        }
+
+        *occ ^= BitBoard::from_sq(BitBoard::bit_scan_forward(bb));
+
+        if piece == PieceType::Pawn || piece == PieceType::Bishop || piece == PieceType::Queen {
+            *attackers |= bishop_attacks(to, *occ)
+                & (self.piece_bb(PieceType::Bishop) | self.piece_bb(PieceType::Queen));
+        }
+        if piece == PieceType::Rook || piece == PieceType::Queen {
+            *attackers |= rook_attacks(to, *occ)
+                & (self.piece_bb(PieceType::Rook) | self.piece_bb(PieceType::Queen));
+        }
+
+        *attackers &= *occ;
+
+        piece
     }
 
     fn move_piece_cheap(
@@ -705,7 +824,7 @@ impl Board {
                 let is_white =
                     BitBoard::from_sq(square) & self.side_bb[Player::White.as_usize()] != 0;
 
-                let piece_str = match self.piece(square) {
+                let piece_str = match self.piece_type(square) {
                     PieceType::Pawn => " p ",
                     PieceType::Knight => " n ",
                     PieceType::Bishop => " b ",
