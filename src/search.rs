@@ -1,5 +1,5 @@
 use crate::bitmove::MoveFlag;
-use crate::defs::{PieceType, Score, INFINITY, MAX_DEPTH, MG_VALUE};
+use crate::defs::{PieceType, Score, Square, INFINITY, MAX_DEPTH, MG_VALUE};
 use crate::eval::evaluate;
 use crate::table::{HashEntry, HashFlag, TWrapper};
 use crate::utils::{is_draw, is_repetition, print_search_info};
@@ -312,7 +312,12 @@ impl Searcher {
         let improving = (ply >= 2 && eval >= self.eval_history[ply - 2]) as i32;
 
         // Reverse futility pruning
-        if !is_pv && !in_check && depth < 7 && beta < IS_MATE && eval - 67 * depth + 76 * improving >= beta {
+        if !is_pv
+            && !in_check
+            && depth < 7
+            && beta < IS_MATE
+            && eval - 67 * depth + 76 * improving >= beta
+        {
             return eval;
         }
 
@@ -361,8 +366,7 @@ impl Searcher {
                 continue;
             }
 
-            self.board.make_move(m);
-            let gives_check = self.board.in_check();
+            let gives_check = self.board.gives_check(m);
             let mut score = 0;
 
             if !is_root
@@ -374,13 +378,11 @@ impl Searcher {
                 // History pruning: skip quiet moves at low depth
                 // that yielded bad results in previous searches
                 if depth <= 2 && self.history_score[turn.as_usize()][src][dest] < 0 {
-                    self.board.unmake_move(m);
                     continue;
                 }
 
                 // Futility pruning
                 if can_prune {
-                    self.board.unmake_move(m);
                     search_quiets = false;
                     continue;
                 }
@@ -388,7 +390,6 @@ impl Searcher {
                 // Late move pruning
                 if !in_check && depth <= 4 && quiets_tried as u32 > (3 * 2u32.pow(depth as u32 - 1))
                 {
-                    self.board.unmake_move(m);
                     search_quiets = false;
                     continue;
                 }
@@ -400,9 +401,10 @@ impl Searcher {
                 && move_score < -50 * depth * depth
                 && self.board.has_non_pawns(turn)
             {
-                self.board.unmake_move(m);
                 continue;
             }
+
+            self.board.make_move(m);
 
             // search pv move in a full window, at full depth
             if i == 0 {

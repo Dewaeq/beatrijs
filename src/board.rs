@@ -7,12 +7,16 @@ use crate::{
         Castling, Piece, PieceType, Player, Score, Square, BLACK_IDX, FEN_START_STRING, MAX_MOVES,
         MG_VALUE, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX,
     },
-    gen::{attack::attacks, between::between},
+    gen::{
+        attack::{attacks, bishop_attacks, knight_attacks, pawn_attacks, rook_attacks},
+        between::between,
+    },
     history::History,
     movegen::{attackers_to, smallest_attacker},
     position::Position,
+    search::MAX_SEARCH_DEPTH,
     utils::{square_from_string, square_to_string},
-    zobrist::Zobrist, search::MAX_SEARCH_DEPTH,
+    zobrist::Zobrist,
 };
 
 #[derive(Clone, Copy)]
@@ -90,6 +94,66 @@ impl Board {
         self.pos.checkers_bb != 0
     }
 
+    pub const fn gives_check(&self, m: u16) -> bool {
+        let src = BitMove::src(m);
+        let dest = BitMove::dest(m);
+        let from_bb = BitBoard::from_sq(src);
+        let to_bb = BitBoard::from_sq(dest);
+        let piece = self.piece(src);
+
+        // Direct check
+        if self.pos.check_squares[piece.as_usize()] & to_bb != 0 {
+            return true;
+        }
+
+        // Discovered check
+        let opp = self.turn.opp();
+        let opp_king_sq = self.king_square(opp);
+        if self.blockers(opp) & from_bb != 0 && !BitBoard::triple_aligned(src, dest, opp_king_sq) {
+            return true;
+        }
+
+        let flag = BitMove::flag(m);
+        if BitMove::is_normal(m) {
+            return false;
+        }
+
+        let opp_king_bb = BitBoard::from_sq(opp_king_sq);
+
+        if BitMove::is_prom(m) {
+            let prom_type = BitMove::prom_type(flag);
+            let occ = self.occ_bb() ^ from_bb;
+
+            return attacks(prom_type, dest, occ, self.turn) & opp_king_bb != 0;
+        }
+
+        if BitMove::is_ep(m) {
+            let captured_sq = dest - self.turn.pawn_dir();
+            let occ = (self.occ_bb() ^ from_bb ^ BitBoard::from_sq(captured_sq)) | to_bb;
+
+            let bishop_attacks = bishop_attacks(opp_king_sq, occ)
+                & self.player_piece_like_bb(self.turn, PieceType::Bishop);
+            if bishop_attacks != 0 {
+                return true;
+            }
+
+            let rook_attacks = rook_attacks(opp_king_sq, occ)
+                & self.player_piece_like_bb(self.turn, PieceType::Rook);
+            if rook_attacks != 0 {
+                return true;
+            }
+        }
+
+        if BitMove::is_castle(m) {
+            let rook_dest = if dest > src { dest - 1 } else { dest + 1 };
+            let occ = self.occ_bb() ^ from_bb ^ to_bb;
+
+            return rook_attacks(rook_dest, occ) & opp_king_bb != 0;
+        }
+
+        return false;
+    }
+
     pub const fn can_ep(&self) -> bool {
         self.pos.ep_square < 64
     }
@@ -136,25 +200,28 @@ impl Board {
         unsafe { *self.pos.king_blockers.get_unchecked(side.as_usize()) }
     }
 
-    pub fn slider_blockers(&self, sq: Square, us_bb: u64, opp_bb: u64) -> u64 {
-        let opp = self.turn.opp();
-        // Every piece of the opponent which is a possible pinner
-        let mut pinners = attacks(PieceType::Bishop, sq, opp_bb, opp)
-            & self.player_piece_like_bb(opp, PieceType::Bishop)
-            | attacks(PieceType::Rook, sq, opp_bb, opp)
-                & self.player_piece_like_bb(opp, PieceType::Rook);
-        let mut pinned_bb = BitBoard::EMPTY;
+    pub fn slider_blockers(&self, us_bb: u64, opp_bb: u64, sq: Square) -> (u64, u64) {
+        let mut blockers = 0;
+        let mut pinners = 0;
 
-        while pinners != 0 {
-            let pinner_sq = BitBoard::pop_lsb(&mut pinners);
-            // Possibly pinned pieces
-            let possibly_pinned_bb = between(sq, pinner_sq) & us_bb;
-            if !BitBoard::more_than_one(possibly_pinned_bb) {
-                pinned_bb |= possibly_pinned_bb;
+        let mut snipers = ((bishop_attacks(sq, 0) & self.piece_like_bb(PieceType::Bishop))
+            | (rook_attacks(sq, 0) & self.piece_like_bb(PieceType::Rook)))
+            & opp_bb;
+        let occ = self.occ_bb() ^ snipers;
+
+        while snipers != 0 {
+            let sniper_sq = BitBoard::pop_lsb(&mut snipers);
+            let b = between(sq, sniper_sq) & occ;
+
+            if b != 0 && !BitBoard::more_than_one(b) {
+                blockers |= b;
+                if b & us_bb != 0 {
+                    pinners |= BitBoard::from_sq(sniper_sq);
+                }
             }
         }
 
-        pinned_bb
+        (blockers, pinners)
     }
 }
 
@@ -169,59 +236,42 @@ impl Board {
         let king_sq = self.cur_king_square();
         let opp_king_sq = self.king_square(opp);
 
-        if king_sq >= 64 {
-            self.debug();
-        }
+        self.pos.checkers_bb = attackers_to(self, king_sq, occ) & opp_bb;
 
-        assert!(king_sq < 64);
-        assert!(opp_king_sq < 64);
+        let (w_pieces, b_pieces, w_king_sq, b_king_sq) = match self.turn {
+            Player::White => (us_bb, opp_bb, king_sq, opp_king_sq),
+            _ => (opp_bb, us_bb, opp_king_sq, king_sq),
+        };
 
-        // Reset checkers and pinners
-        self.pos.checkers_bb = 0;
-        self.pos.king_blockers = [0, 0];
+        let (w_blockers, b_pinners) = self.slider_blockers(w_pieces, b_pieces, w_king_sq);
+        let (b_blockers, w_pinners) = self.slider_blockers(b_pieces, w_pieces, b_king_sq);
 
-        self.pos.checkers_bb = attackers_to(self, king_sq, occ) & self.player_bb(opp);
+        self.pos.king_blockers = [w_blockers, b_blockers];
+        self.pos.pinners = [w_pinners, b_pinners];
 
-        unsafe {
-            *self
-                .pos
-                .king_blockers
-                .get_unchecked_mut(self.turn.as_usize()) =
-                self.slider_blockers(king_sq, us_bb, opp_bb);
-            *self.pos.king_blockers.get_unchecked_mut(opp.as_usize()) =
-                self.slider_blockers(opp_king_sq, us_bb, opp_bb);
+        self.set_check_squares(PieceType::Pawn, pawn_attacks(opp_king_sq, self.turn.opp()));
+        self.set_check_squares(PieceType::Knight, knight_attacks(opp_king_sq));
 
-            self.set_check_squares(
-                PieceType::Pawn,
-                attacks(PieceType::Pawn, opp_king_sq, 0, self.turn),
-            );
-            self.set_check_squares(
-                PieceType::Knight,
-                attacks(PieceType::Knight, opp_king_sq, 0, self.turn),
-            );
-            self.set_check_squares(
-                PieceType::Bishop,
-                attacks(PieceType::Bishop, opp_king_sq, occ, self.turn),
-            );
-            self.set_check_squares(
-                PieceType::Rook,
-                attacks(PieceType::Rook, opp_king_sq, occ, self.turn),
-            );
-            self.set_check_squares(
-                PieceType::Queen,
-                self.pos
-                    .check_squares
-                    .get_unchecked(PieceType::Bishop.as_usize())
-                    | self
-                        .pos
-                        .check_squares
-                        .get_unchecked(PieceType::Rook.as_usize()),
-            );
-        }
+        self.set_check_squares(
+            PieceType::Bishop,
+            attacks(PieceType::Bishop, opp_king_sq, occ, self.turn),
+        );
+        self.set_check_squares(
+            PieceType::Rook,
+            attacks(PieceType::Rook, opp_king_sq, occ, self.turn),
+        );
+        self.set_check_squares(
+            PieceType::Queen,
+            self.check_squares(PieceType::Bishop) | self.check_squares(PieceType::Rook),
+        );
     }
 
     fn set_check_squares(&mut self, piece: PieceType, bb: u64) {
         unsafe { *self.pos.check_squares.get_unchecked_mut(piece.as_usize()) = bb }
+    }
+
+    const fn check_squares(&self, piece: PieceType) -> u64 {
+        unsafe { *self.pos.check_squares.get_unchecked(piece.as_usize()) }
     }
 
     /// Removes castling permissions for the given side

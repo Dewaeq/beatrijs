@@ -152,6 +152,17 @@ impl PieceType {
             PieceType::None => 6,
         }
     }
+
+    pub const fn is_none(&self) -> bool {
+        matches!(self, PieceType::None)
+    }
+
+    pub const fn mg_value(&self) -> Score {
+        match self {
+            PieceType::None => 0,
+            _ => MG_VALUE[self.as_usize()],
+        }
+    }
 }
 
 /// Rook directions are 0-3
