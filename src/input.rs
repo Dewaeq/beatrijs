@@ -160,7 +160,11 @@ impl Game {
             _ => PieceType::None,
         };
 
+        let temp_ply = self.board.pos.ply;
+        self.board.pos.ply = 0;
         let mut moves = MoveList::legal(&mut self.board);
+        self.board.pos.ply = temp_ply;
+        
         moves.find(|&x| {
             BitMove::src(x) == src
                 && BitMove::dest(x) == dest
