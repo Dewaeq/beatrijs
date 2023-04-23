@@ -223,7 +223,7 @@ impl Searcher {
             }
         }
 
-        if depth == 0 {
+        if depth <= 0 {
             let score = self.quiesence(alpha, beta, true, ply);
             return score;
         }
@@ -309,14 +309,14 @@ impl Searcher {
             }
         }
 
-        let improving = (ply >= 2 && eval >= self.eval_history[ply - 2]) as i32;
+        let improving = (ply >= 2 && eval >= self.eval_history[ply - 2]);
 
         // Reverse futility pruning
         if !is_pv
             && !in_check
             && depth < 7
             && beta < IS_MATE
-            && eval - 67 * depth + 76 * improving >= beta
+            && eval - 67 * depth + 76 * (improving as i32) >= beta
         {
             return eval;
         }
@@ -358,6 +358,7 @@ impl Searcher {
             let is_quiet = !is_cap && !is_prom;
             let src = BitMove::src(m) as usize;
             let dest = BitMove::dest(m) as usize;
+            let history_score = self.history_score[turn.as_usize()][src][dest];
 
             if !search_quiets && is_quiet {
                 continue;
@@ -370,7 +371,7 @@ impl Searcher {
                 if is_cap || is_prom || gives_check {
                     // History pruning: skip quiet moves at low depth
                     // that yielded bad results in previous searches
-                    if depth <= 2 && self.history_score[turn.as_usize()][src][dest] < 0 {
+                    if depth <= 2 && history_score < 0 {
                         continue;
                     }
 
@@ -380,9 +381,7 @@ impl Searcher {
                     }
 
                     // Futility pruning
-                    if depth <= 8
-                        && move_score < -50 * depth * depth
-                    {
+                    if depth <= 8 && move_score < -50 * depth * depth {
                         continue;
                     }
                 } else {
@@ -408,39 +407,34 @@ impl Searcher {
                 }
             }
 
+            let mut reduction = 0;
+            if depth > 2 && (!is_cap || move_score < 0) && i > 1 && (!is_root || i > 4) {
+                reduction = lmr_reduction(
+                    depth,
+                    i,
+                    is_pv,
+                    is_cap || is_prom,
+                    improving,
+                    gives_check,
+                    in_check,
+                    history_score,
+                );
+            }
+
             self.board.make_move(m);
 
             // search pv move in a full window, at full depth
-            if i == 0 {
-                score = -self.negamax(depth - 1, -beta, -alpha, true);
-            } else {
-                score = alpha + 1;
-                // LMR
-                // Dot not reduce moves that give check, capture (except bad captures) or promote
-                if depth >= 3
-                    && (!(is_cap || is_prom) || move_score < 0)
-                    && i > 3
-                    && moves.size() > 20
-                {
-                    let mut r = 2;
-                    if is_cap {
-                        r = 1;
-                    }
-                    if beta - alpha > 1 {
-                        r += 1;
-                    }
-                    if gives_check || in_check {
-                        r = 1;
-                    }
+            if i == 0 || depth <= 2 || !is_pv {
+                score = -self.negamax(depth - 1 - reduction, -beta, -alpha, true);
 
-                    score = -self.negamax(depth - 1 - r, -alpha - 1, -alpha, true);
+                if reduction > 0 && score > alpha {
+                    score = -self.negamax(depth - 1, -beta, -alpha, true);
                 }
-
-                if score > alpha {
-                    score = -self.negamax(depth - 1, -alpha - 1, -alpha, true);
-                    if score > alpha && score < beta {
-                        score = -self.negamax(depth - 1, -beta, -alpha, true);
-                    }
+            } else {
+                // Search every other move in a zero window
+                score = -self.negamax(depth - 1 - reduction, -alpha - 1, -alpha, true);
+                if score > alpha && score < beta {
+                    score = -self.negamax(depth - 1, -beta, -alpha, true);
                 }
             }
 
@@ -566,15 +560,20 @@ impl Searcher {
                 continue;
             }
 
+            if !self.board.see_ge(m, 0) {
+                continue;
+            }
+
             self.board.make_move(m);
             let score = -self.quiesence(-beta, -alpha, false, depth + 1);
             self.board.unmake_move(m);
 
-            if score >= beta {
-                return beta;
-            }
             if score > alpha {
                 alpha = score;
+            }
+
+            if score >= beta {
+                return beta;
             }
         }
 
@@ -673,4 +672,51 @@ const fn table_cutoff(entry: HashEntry, depth: i32, alpha: Score, beta: Score) -
             }
         }
     }
+}
+
+fn lmr_reduction(
+    depth: i32,
+    index: usize,
+    is_pv: bool,
+    is_tactical: bool,
+    improving: bool,
+    gives_check: bool,
+    in_check: bool,
+    history_score: i32,
+) -> i32 {
+    let depth_ln = (depth as f32).ln();
+    let index_ln = (index as f32).ln();
+    let mut reduction = (0.8422840719846748 * index_ln * depth_ln
+        - 0.4 * index_ln
+        - 0.22572624883839026 * depth_ln
+        + 1.2)
+        .max(0f32);
+
+    if is_tactical {
+        reduction /= 2f32;
+    }
+
+    if is_pv {
+        reduction = reduction * 0.66;
+    }
+
+    if !improving {
+        reduction += 1f32;
+    }
+
+    if gives_check {
+        reduction -= 1f32;
+    }
+
+    if in_check {
+        reduction -= 2f32;
+    }
+
+    if history_score > 0 {
+        reduction -= 1f32;
+    }
+
+    reduction = reduction.min(depth as f32 - 1f32);
+
+    reduction.max(1f32) as i32
 }
