@@ -410,10 +410,6 @@ impl Searcher {
 
             self.board.unmake_move(m);
 
-            if self.should_stop() {
-                return 0;
-            }
-
             if is_root {
                 self.root_moves.set_score(i, score);
             }
@@ -422,7 +418,7 @@ impl Searcher {
                 alpha = score;
             }
 
-            if score > best_score {
+            if score > best_score && !self.should_stop() {
                 best_score = score;
                 best_move = m;
 
@@ -465,31 +461,22 @@ impl Searcher {
             }
         }
 
-        if self.should_stop() {
-            return 0;
-        }
-
-        let entry = if alpha != old_alpha {
-            HashEntry::new(
-                self.board.key(),
-                depth,
-                best_move,
-                best_score,
-                eval,
-                HashFlag::Exact,
-            )
-        } else {
-            HashEntry::new(
+        if !self.should_stop() {
+            let mut entry = HashEntry::new(
                 self.board.key(),
                 depth,
                 best_move,
                 alpha,
                 eval,
                 HashFlag::Alpha,
-            )
-        };
+            );
+            if alpha != old_alpha {
+                entry.score = best_score;
+                entry.hash_flag = HashFlag::Exact;
+            }
 
-        self.table.store(entry, ply);
+            self.table.store(entry, ply);
+        }
 
         alpha
     }
@@ -507,6 +494,14 @@ impl Searcher {
             return 0;
         }
 
+        let entry = self.table.probe(self.board.key(), self.board.pos.ply);
+
+        if let Some(entry) = entry {
+            if let Some(score) = table_cutoff(entry, depth as i32 - 4, alpha, beta) {
+                return score;
+            }
+        }
+
         self.num_nodes += 1;
         if depth > self.sel_depth {
             self.sel_depth = depth;
@@ -515,6 +510,15 @@ impl Searcher {
         // Stand pat
         let eval = evaluate(&self.board);
         if eval >= beta {
+            let entry = HashEntry::new(
+                self.board.key(),
+                0,
+                self.table.best_move(self.board.key()).unwrap_or(0),
+                eval,
+                eval,
+                HashFlag::Beta,
+            );
+            self.table.store(entry, self.board.pos.ply);
             return beta;
         }
         if eval > alpha {
@@ -528,6 +532,8 @@ impl Searcher {
         }
 
         let mut moves = MoveList::quiet(&mut self.board);
+        let mut best_score = eval;
+        let old_alpha = alpha;
 
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
@@ -546,28 +552,38 @@ impl Searcher {
             let score = -self.quiesence(-beta, -alpha, false, depth + 1);
             self.board.unmake_move(m);
 
+            if score > best_score {
+                best_score = score;
+            }
+
             if score > alpha {
                 alpha = score;
             }
 
             if score >= beta {
-                return beta;
+                break;
             }
         }
 
-        if root {
-            let entry = HashEntry::new(
-                self.board.key(),
-                0,
-                self.table.best_move(self.board.key()).unwrap_or(0),
-                alpha,
-                eval,
-                HashFlag::Exact,
-            );
-            self.table.store(entry, 0);
-        }
+        // if root {
+        let entry = HashEntry::new(
+            self.board.key(),
+            depth as i32,
+            self.table.best_move(self.board.key()).unwrap_or(0),
+            best_score,
+            eval,
+            if best_score >= beta {
+                HashFlag::Beta
+            } else if best_score != old_alpha {
+                HashFlag::Exact
+            } else {
+                HashFlag::Alpha
+            },
+        );
+        self.table.store(entry, self.board.pos.ply);
+        // }
 
-        alpha
+        best_score
     }
 }
 
