@@ -181,6 +181,7 @@ impl Searcher {
 
         let is_root = ply == 0;
         let is_pv = beta - alpha > 1;
+        let in_check = self.board.in_check();
 
         // Mate distance pruning
         if !is_root {
@@ -192,13 +193,16 @@ impl Searcher {
             }
         }
 
-        if depth <= 0 {
+        if in_check && !is_root {
+            depth += 1;
+        }
+
+        if depth == 0 {
             let score = self.quiesence(alpha, beta, true, ply);
             return score;
         }
 
         let entry = self.table.probe(self.board.key(), ply);
-        let in_check = self.board.in_check();
         let mut tt_move = 0;
         let is_root = self.board.pos.ply == 0;
 
@@ -302,11 +306,7 @@ impl Searcher {
                 } */
             }
         }
-
-        if in_check && !is_root {
-            depth += 1;
-        }
-
+        
         let mut quiets_tried: usize = 0;
         let mut search_quiets = true;
         let mut best_move = 0;
