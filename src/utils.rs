@@ -80,7 +80,7 @@ pub fn print_search_info(
     } else if score > IS_MATE {
         format!("mate {}", (IMMEDIATE_MATE_SCORE - score + 1) / 2 as Score)
     } else if score < -IS_MATE {
-        format!("mate {}", (score + IMMEDIATE_MATE_SCORE) / 2 as Score)
+        format!("mate {}", -(score + IMMEDIATE_MATE_SCORE) / 2 as Score)
     } else {
         format!("cp {score}")
     };
