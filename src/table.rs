@@ -120,6 +120,31 @@ impl HashTable<HashEntry> {
 
         pv
     }
+
+    pub fn hash_full(&self) -> usize {
+        let mut filled = 0;
+        let mut total = 0;
+
+        let mut index = 0;
+        while index < self.size && filled < 500 {
+            if self.entries[index].valid() {
+                filled += 1;
+            }
+            total += 1;
+            index += 1;
+        }
+
+        index = self.size - 1;
+        while filled < 1000 && index > 0 {
+            if self.entries[index].valid() {
+                filled += 1;
+            }
+            total += 1;
+            index -= 1;
+        }
+
+        (filled as f64 / total as f64 * 1000f64) as usize
+    }
 }
 
 unsafe impl Sync for TWrapper {}
@@ -178,6 +203,10 @@ impl TWrapper {
 
     pub fn extract_pv(&self, board: &mut Board, depth: i32) -> Vec<u16> {
         unsafe { (*self.inner.get()).extract_pv(board, depth as u8) }
+    }
+
+    pub fn hash_full(&self) -> usize {
+        unsafe { (*self.inner.get()).hash_full() }
     }
 }
 

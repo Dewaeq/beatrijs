@@ -72,6 +72,7 @@ pub fn print_search_info(
     score: Score,
     elapsed: f64,
     num_nodes: u64,
+    hash_full: usize,
     pv: &[u16],
     turn: Player,
 ) {
@@ -86,13 +87,14 @@ pub fn print_search_info(
     };
 
     print!(
-        "info depth {} seldepth {} score {} nodes {} time {} nps {} ",
+        "info depth {} seldepth {} score {} nodes {} time {} nps {} hashfull {} ",
         depth,
         sel_depth,
         score_str,
         num_nodes,
         elapsed as u64,
-        (num_nodes as f64 / elapsed * 1000f64) as u64
+        (num_nodes as f64 / elapsed * 1000f64) as u64,
+        hash_full,
     );
     print_pv(&pv);
 }

@@ -19,7 +19,6 @@ const DELTA_PRUNING: Score = 100;
 const STATIC_NULL_MOVE_DEPTH: i32 = 5;
 const STATIC_NULL_MOVE_MARGIN: Score = 120;
 
-
 pub struct Searcher {
     pub num_nodes: u64,
     pub sel_depth: usize,
@@ -99,6 +98,7 @@ impl Searcher {
 
             let elapsed = self.info.started.elapsed().as_secs_f64() * 1000f64;
             let pv = self.table.extract_pv(&mut self.board, depth);
+            let hash_full = self.table.hash_full();
 
             self.best_root_move = pv[0];
             print_search_info(
@@ -107,6 +107,7 @@ impl Searcher {
                 score,
                 elapsed,
                 self.num_nodes,
+                hash_full,
                 &pv,
                 self.board.turn,
             );
@@ -306,7 +307,7 @@ impl Searcher {
                 } */
             }
         }
-        
+
         let mut quiets_tried: usize = 0;
         let mut search_quiets = true;
         let mut best_move = 0;
