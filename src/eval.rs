@@ -20,11 +20,19 @@ const BISHOP_PAIR_BONUS: Score = 7;
 const SHIELD_MISSING: [i32; 4] = [-2, -23, -38, -55];
 const SHIELD_MISSING_ON_OPEN_FILE: [i32; 4] = [-8, -10, -37, -66];
 
+const SAFE_MASK: [u64; 2] = [
+    (BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F)
+        & (BitBoard::RANK_2 | BitBoard::RANK_3 | BitBoard::RANK_4),
+    (BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F)
+        & (BitBoard::RANK_5 | BitBoard::RANK_6 | BitBoard::RANK_7),
+];
+
 pub fn evaluate(board: &Board) -> Score {
     // Score is from white's perspective
     let mut score = 0;
     let mut mg = [0; 2];
     let mut eg = [0; 2];
+    let mut non_pawn_material = 0;
     let mut game_phase = 0;
     let mut attacked_by = AttackedBy::new();
 
@@ -49,6 +57,8 @@ pub fn evaluate(board: &Board) -> Score {
                 Player::White => pawn_structure(piece.c, sq as Square, w_pawns, b_pawns),
                 Player::Black => pawn_structure(piece.c, sq as Square, b_pawns, w_pawns),
             };
+        } else {
+            non_pawn_material += MG_VALUE[piece.t.as_usize()]
         }
 
         sq += 1;
@@ -115,10 +125,26 @@ pub fn evaluate(board: &Board) -> Score {
         board, w_pawns, b_pawns, &mut mg, w_king_sq, b_king_sq, w_king_bb, b_king_bb,
     );
 
+    // Control of space on the player's side of the board
+    score += eval_space(
+        &board,
+        Player::White,
+        w_pawns,
+        &attacked_by,
+        non_pawn_material,
+    );
+    score -= eval_space(
+        &board,
+        Player::Black,
+        b_pawns,
+        &attacked_by,
+        non_pawn_material,
+    );
+
     // tapered eval
     let mg_score = mg[0] - mg[1];
     let eg_score = eg[0] - eg[1];
-    let mg_phase = Score::min(24, game_phase);
+    let mg_phase = game_phase.min(24);
     let eg_phase = 24 - mg_phase;
 
     score += (mg_score * mg_phase + eg_score * eg_phase) / 24;
@@ -282,6 +308,41 @@ const fn missing_shield_pawns(
     }
 
     SHIELD_MISSING[pawns_missing] + SHIELD_MISSING_ON_OPEN_FILE[pawns_open_file_missing]
+}
+
+/// Reward the control of space on our side of the board
+#[inline(always)]
+const fn eval_space(
+    board: &Board,
+    side: Player,
+    my_pawns: u64,
+    attacked_by: &AttackedBy,
+    non_pawn_material: Score,
+) -> Score {
+    // Space isn't important if there aren't pieces to control it, so return early
+    if non_pawn_material < 11551 {
+        return 0;
+    }
+
+    let opp = side.opp();
+
+    let safe = SAFE_MASK[side.as_usize()]
+        & !my_pawns
+        & !attacked_by.pawns(opp)
+        & (attacked_by.side(side) | !attacked_by.side(opp));
+
+    let mut behind = my_pawns;
+    match side {
+        Player::White => behind |= (behind >> 8) | (behind >> 16),
+        _ => behind |= (behind << 8) | (behind << 16),
+    }
+
+    let bonus = BitBoard::count(safe) + BitBoard::count(behind & safe);
+    // Increase space evaluation weight in positions with many minor pieces
+    let weight =
+        BitBoard::count(board.piece_bb(PieceType::Knight) | board.piece_bb(PieceType::Bishop));
+
+    (bonus * weight * weight / 16) as Score
 }
 
 struct AttackedBy {
