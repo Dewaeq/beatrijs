@@ -3,7 +3,7 @@ use crate::{
     board::Board,
     defs::{
         Piece, PieceType, Player, Score, Square, CASTLE_KING_FILES, CASTLE_QUEEN_FILES,
-        CENTER_FILES, CENTER_SQUARES, EG_VALUE, MG_VALUE, PASSED_PAWN_SCORE,
+        CENTER_SQUARES, EG_VALUE, MG_VALUE, PASSED_PAWN_SCORE,
     },
     gen::{
         attack::{attacks, king_attacks},
@@ -82,8 +82,8 @@ pub fn evaluate(board: &Board) -> Score {
     // undeveloped pieces penalty
     let w_knights = board.player_piece_bb(Player::White, PieceType::Knight);
     let b_knights = board.player_piece_bb(Player::Black, PieceType::Knight);
-    mg[0] -= (BitBoard::count((w_knights | w_bishops) & BitBoard::RANK_1) * 8) as Score;
-    mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 8) as Score;
+    mg[0] -= (BitBoard::count((w_knights | w_bishops) & BitBoard::RANK_1) * 6) as Score;
+    mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 6) as Score;
 
     // pawns controlling center of the board
     mg[0] += (BitBoard::count(w_pawns & CENTER_SQUARES) * 4) as Score;
@@ -326,10 +326,7 @@ const fn eval_space(
 
     let opp = side.opp();
 
-    let safe = SAFE_MASK[side.as_usize()]
-        & !my_pawns
-        & !attacked_by.pawns(opp)
-        & (attacked_by.side(side) | !attacked_by.side(opp));
+    let safe = SAFE_MASK[side.as_usize()] & !my_pawns & !attacked_by.pawns(opp);
 
     let mut behind = my_pawns;
     match side {
@@ -337,7 +334,7 @@ const fn eval_space(
         _ => behind |= (behind << 8) | (behind << 16),
     }
 
-    let bonus = BitBoard::count(safe) + BitBoard::count(behind & safe);
+    let bonus = BitBoard::count(safe) + BitBoard::count(behind & safe & !attacked_by.side(opp));
     // Increase space evaluation weight in positions with many minor pieces
     let weight =
         BitBoard::count(board.piece_bb(PieceType::Knight) | board.piece_bb(PieceType::Bishop));
