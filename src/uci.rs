@@ -1,7 +1,7 @@
 use std::{process::exit, sync::atomic::Ordering, thread::JoinHandle, time::Instant};
 
 use crate::search::MAX_SEARCH_DEPTH;
-use crate::{bitmove::BitMove, board::Board, input::Game, search::SearchInfo};
+use crate::{bitmove::BitMove, board::Board, input::Game, search_info::SearchInfo};
 
 /// Gui to engine
 impl Game {
@@ -49,25 +49,32 @@ impl Game {
         for mut i in 0..commands.len() {
             let command = commands[i];
             match command {
-                "infinite" => info.depth = MAX_SEARCH_DEPTH,
+                "infinite" => {
+                    info.depth = MAX_SEARCH_DEPTH;
+                    info.time_set = false;
+                }
                 "depth" => {
                     info.depth = commands[i + 1].parse::<usize>().unwrap();
                     i += 1;
                 }
                 "wtime" => {
                     info.w_time = commands[i + 1].parse::<usize>().unwrap();
+                    info.time_set = true;
                     i += 1;
                 }
                 "btime" => {
                     info.b_time = commands[i + 1].parse::<usize>().unwrap();
+                    info.time_set = true;
                     i += 1;
                 }
                 "winc" => {
                     info.w_inc = commands[i + 1].parse::<usize>().unwrap();
+                    info.time_set = true;
                     i += 1;
                 }
                 "binc" => {
                     info.b_inc = commands[i + 1].parse::<usize>().unwrap();
+                    info.time_set = true;
                     i += 1;
                 }
                 _ => (),
@@ -75,13 +82,6 @@ impl Game {
         }
 
         self.start_search(info);
-
-        // TODO: improve time management
-        if info.my_time(self.board.turn) > 0 {
-            info.start();
-            while info.has_time(self.board.turn) {}
-            self.stop();
-        }
     }
 
     pub fn stop(&mut self) {

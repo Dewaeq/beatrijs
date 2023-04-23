@@ -1,6 +1,7 @@
 use crate::bitmove::MoveFlag;
 use crate::defs::{PieceType, Score, Square, INFINITY, MG_VALUE};
 use crate::eval::evaluate;
+use crate::search_info::SearchInfo;
 use crate::table::{HashEntry, HashFlag, TWrapper};
 use crate::utils::{is_draw, is_repetition, print_search_info};
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub const MAX_SEARCH_DEPTH: usize = 100;
 pub const IMMEDIATE_MATE_SCORE: Score = 31_000;
@@ -18,53 +19,6 @@ const DELTA_PRUNING: Score = 100;
 const STATIC_NULL_MOVE_DEPTH: i32 = 5;
 const STATIC_NULL_MOVE_MARGIN: Score = 120;
 
-#[derive(Clone, Copy, Debug)]
-pub struct SearchInfo {
-    pub depth: usize,
-    pub w_time: usize,
-    pub b_time: usize,
-    pub w_inc: usize,
-    pub b_inc: usize,
-    pub move_time: usize,
-    pub started: Instant,
-}
-
-impl Default for SearchInfo {
-    fn default() -> Self {
-        Self {
-            depth: MAX_SEARCH_DEPTH,
-            w_time: 0,
-            b_time: 0,
-            w_inc: 0,
-            b_inc: 0,
-            move_time: 0,
-            started: Instant::now(),
-        }
-    }
-}
-
-impl SearchInfo {
-    pub fn with_depth(depth: usize) -> Self {
-        let mut info = SearchInfo::default();
-        info.depth = depth;
-        info
-    }
-
-    pub fn my_time(&self, side: Player) -> usize {
-        match side {
-            Player::White => self.w_time,
-            Player::Black => self.b_time,
-        }
-    }
-
-    pub fn start(&mut self) {
-        self.started = Instant::now();
-    }
-
-    pub fn has_time(&self, side: Player) -> bool {
-        (self.started.elapsed().as_millis() as usize + 50) < self.my_time(side) / 30
-    }
-}
 
 pub struct Searcher {
     pub num_nodes: u64,
@@ -72,7 +26,7 @@ pub struct Searcher {
     pub board: Board,
     pub table: Arc<TWrapper>,
     abort: Arc<AtomicBool>,
-    start_time: Instant,
+    stop: bool,
     info: SearchInfo,
     best_root_move: u16,
     root_moves: MoveList,
@@ -86,10 +40,10 @@ impl Searcher {
         Searcher {
             board,
             abort,
+            stop: false,
             num_nodes: 0,
             sel_depth: 0,
             table: tt,
-            start_time: Instant::now(),
             info,
             best_root_move: 0,
             root_moves: MoveList::new(),
@@ -100,16 +54,27 @@ impl Searcher {
     }
 
     fn start(&mut self) {
-        self.start_time = Instant::now();
+        self.info.start(self.board.turn);
         self.abort.store(false, Ordering::Relaxed);
     }
 
     fn stop(&mut self) {
         self.abort.store(true, Ordering::Relaxed);
+        self.stop = true;
     }
 
-    fn should_stop(&self) -> bool {
-        self.abort.load(Ordering::SeqCst)
+    fn should_stop(&mut self) -> bool {
+        if !self.stop {
+            self.stop = self.abort.load(Ordering::SeqCst);
+        }
+
+        self.stop
+    }
+
+    fn checkup(&mut self) {
+        if !self.info.has_time() {
+            self.stop();
+        }
     }
 
     fn clear_for_search(&mut self) {
@@ -132,7 +97,7 @@ impl Searcher {
                 break;
             }
 
-            let elapsed = self.start_time.elapsed().as_secs_f64() * 1000f64;
+            let elapsed = self.info.started.elapsed().as_secs_f64() * 1000f64;
             let pv = self.table.extract_pv(&mut self.board, depth);
 
             self.best_root_move = pv[0];
@@ -197,6 +162,10 @@ impl Searcher {
         mut beta: Score,
         do_null: bool,
     ) -> Score {
+        if self.num_nodes & 4096 == 0 {
+            self.checkup();
+        }
+
         if self.should_stop() {
             return 0;
         }
@@ -525,6 +494,14 @@ impl Searcher {
     }
 
     fn quiesence(&mut self, mut alpha: Score, beta: Score, root: bool, depth: usize) -> Score {
+        if self.num_nodes & 4096 == 0 {
+            self.checkup();
+        }
+
+        if self.should_stop() {
+            return 0;
+        }
+
         if is_draw(&self.board) {
             return 0;
         }

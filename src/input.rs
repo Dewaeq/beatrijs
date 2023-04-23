@@ -4,7 +4,7 @@ use std::{io, thread};
 
 use crate::defs::PieceType;
 use crate::eval::evaluate;
-use crate::search::SearchInfo;
+use crate::search_info::SearchInfo;
 use crate::table::TWrapper;
 use crate::utils::is_repetition;
 use crate::{
@@ -164,7 +164,7 @@ impl Game {
         self.board.pos.ply = 0;
         let mut moves = MoveList::legal(&mut self.board);
         self.board.pos.ply = temp_ply;
-        
+
         moves.find(|&x| {
             BitMove::src(x) == src
                 && BitMove::dest(x) == dest
