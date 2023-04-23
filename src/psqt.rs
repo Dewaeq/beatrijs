@@ -1,4 +1,4 @@
-use crate::defs::{NUM_PIECES, NUM_SQUARES, Score};
+use crate::defs::{Score, NUM_PIECES, NUM_SQUARES};
 
 #[rustfmt::skip]
 mod tables {
@@ -17,9 +17,9 @@ mod tables {
 
     pub const EG_PAWN_TABLE: [Score; NUM_SQUARES] = [
       0,   0,   0,   0,   0,   0,   0,   0,
-    178, 173, 158, 134, 147, 132, 165, 187,
-     94, 100,  85,  67,  56,  53,  82,  84,
-     32,  24,  13,   5,  -2,   4,  17,  17,
+     35,  27,  22,  19,  21,  19,  24,  28,
+     28,  17,  16,  11,  14,  14,  18,  22,
+     23,  12,  13,   5,  -2,   4,  14,  12,
      13,   9,  -3,  -7,  -7,  -8,   3,  -1,
      4,    7,  -6,   1,   0,  -5,  -1,  -8,
      13,   8,   8,  10,  13,   0,   2,  -7,
