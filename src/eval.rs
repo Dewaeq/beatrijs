@@ -15,7 +15,7 @@ use crate::{
 };
 
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
-const BISHOP_PAIR_BONUS: Score = 20;
+const BISHOP_PAIR_BONUS: Score = 7;
 
 const SHIELD_MISSING: [i32; 4] = [-2, -23, -38, -55];
 const SHIELD_MISSING_ON_OPEN_FILE: [i32; 4] = [-8, -10, -37, -66];
@@ -76,8 +76,8 @@ pub fn evaluate(board: &Board) -> Score {
     mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 8) as Score;
 
     // pawns controlling center of the board
-    mg[0] += (BitBoard::count(w_pawns & CENTER_SQUARES) * 6) as Score;
-    mg[1] += (BitBoard::count(b_pawns & CENTER_SQUARES) * 6) as Score;
+    mg[0] += (BitBoard::count(w_pawns & CENTER_SQUARES) * 4) as Score;
+    mg[1] += (BitBoard::count(b_pawns & CENTER_SQUARES) * 4) as Score;
 
     // pawn attacks
     let w_pawn_caps = pawn_caps(w_pawns, Player::White) & board.player_bb(Player::Black);
