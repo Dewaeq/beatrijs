@@ -104,11 +104,11 @@ pub fn evaluate(board: &Board) -> Score {
     let w_king_bb = BitBoard::from_sq(w_king_sq);
     let b_king_bb = BitBoard::from_sq(b_king_sq);
 
-    score -= (BitBoard::count(attacked_by.black & king_attacks(w_king_sq)) * 4) as Score;
-    score -= (BitBoard::count(attacked_by.black & w_king_bb) * 6) as Score;
+    score -= (BitBoard::count(attacked_by.black & king_attacks(w_king_sq)) * 9) as Score;
+    score -= (BitBoard::count(attacked_by.black & w_king_bb) * 16) as Score;
 
-    score += (BitBoard::count(attacked_by.white & king_attacks(b_king_sq)) * 4) as Score;
-    score += (BitBoard::count(attacked_by.white & b_king_bb) * 6) as Score;
+    score += (BitBoard::count(attacked_by.white & king_attacks(b_king_sq)) * 9) as Score;
+    score += (BitBoard::count(attacked_by.white & b_king_bb) * 16) as Score;
 
     // pawn shield for king safety
     king_pawn_shield(
@@ -166,35 +166,28 @@ fn mobility(board: &Board, piece: Piece, sq: Square, attacked_by: &mut AttackedB
     let occ = board.occ_bb();
     let my_bb = board.player_bb(piece.c);
     let opp_bb = occ & !my_bb;
-    let mut score = 0;
 
     let moves = attacks(piece.t, sq, occ, piece.c);
-    if moves == 0 {
-        // penalize pieces that can't move
-        score = -MG_VALUE[piece.t.as_usize()] / 15;
-    } else {
-        let att = moves & opp_bb;
-        match piece.c {
-            Player::White => attacked_by.white |= att,
-            _ => attacked_by.black |= att,
-        }
+    let att = moves & opp_bb;
 
-        let open = BitBoard::count(moves & !occ);
-        let att = BitBoard::count(att);
-        let def = BitBoard::count(moves & my_bb);
-
-        // This score is in millipawns
-        score = match piece.t {
-            PieceType::Knight => 20 * open + 35 * att + 15 * def,
-            PieceType::Bishop => 17 * open + 30 * att + 15 * def,
-            PieceType::Rook => 15 * open + 20 * att + 15 * def,
-            PieceType::Queen => 5 * open + 15 * att + 8 * def,
-            PieceType::King => 4 * open + 15 * att + 10 * def,
-            _ => panic!(),
-        } as Score;
-
-        score /= 30;
+    match piece.c {
+        Player::White => attacked_by.white |= att,
+        _ => attacked_by.black |= att,
     }
+
+    let open = BitBoard::count(moves & !occ);
+    let att = BitBoard::count(att);
+    let def = BitBoard::count(moves & my_bb);
+
+    // This score is in millipawns
+    let score = (match piece.t {
+        PieceType::Knight => 20 * open + 35 * att + 15 * def,
+        PieceType::Bishop => 17 * open + 30 * att + 15 * def,
+        PieceType::Rook => 15 * open + 20 * att + 15 * def,
+        PieceType::Queen => 5 * open + 15 * att + 8 * def,
+        PieceType::King => 4 * open + 15 * att + 10 * def,
+        _ => panic!(),
+    } / 30) as Score;
 
     match piece.c {
         Player::White => score,
@@ -209,11 +202,11 @@ const fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) ->
     let file = sq % 8;
     // isolated pawn, as there are no pawns besides it
     if pawns & ISOLATED[file as usize] == 0 {
-        score -= 20;
+        score -= 8;
     }
     // doubled pawn
     if BitBoard::more_than_one(pawns & BitBoard::file_bb(sq)) {
-        score -= 30;
+        score -= 12;
     }
 
     // passed pawn
@@ -242,24 +235,16 @@ fn king_pawn_shield(
     w_king_bb: u64,
     b_king_bb: u64,
 ) {
-    // punish king in centre
-    if w_king_bb & CENTER_FILES != 0 {
-        mg[0] -= 25;
-    }
-    if b_king_bb & CENTER_FILES != 0 {
-        mg[1] -= 25;
-    }
-
     // punish king on open or semi-open file
     if (w_pawns | b_pawns) & BitBoard::file_bb(w_king_sq) == 0 {
-        mg[0] -= 35;
+        mg[0] -= 13;
     } else if w_pawns & BitBoard::file_bb(w_king_sq) == 0 {
-        mg[0] -= 20;
+        mg[0] -= 5;
     }
     if (w_pawns | b_pawns) & BitBoard::file_bb(b_king_sq) == 0 {
-        mg[1] -= 35;
+        mg[1] -= 13;
     } else if b_pawns & BitBoard::file_bb(b_king_sq) == 0 {
-        mg[1] -= 20;
+        mg[1] -= 5;
     }
 
     let w_pawn_shield = SHIELDING_PAWNS[0][w_king_sq as usize];
