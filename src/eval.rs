@@ -72,10 +72,8 @@ pub fn evaluate(board: &Board) -> Score {
 
     if BitBoard::more_than_one(w_bishops) {
         score += BISHOP_PAIR_BONUS;
-        score += BISHOP_PAIR_BONUS;
     }
     if BitBoard::more_than_one(b_bishops) {
-        score -= BISHOP_PAIR_BONUS;
         score -= BISHOP_PAIR_BONUS;
     }
 
@@ -104,8 +102,8 @@ pub fn evaluate(board: &Board) -> Score {
     // pawns defended by pawns
     let w_defenders = pawn_caps(w_pawns, Player::Black) & w_pawns;
     let b_defenders = pawn_caps(b_pawns, Player::White) & b_pawns;
-    score += (BitBoard::count(w_defenders & w_pawns) * 4) as Score;
-    score -= (BitBoard::count(b_defenders & b_pawns) * 4) as Score;
+    score += (BitBoard::count(w_defenders) * 4) as Score;
+    score -= (BitBoard::count(b_defenders) * 4) as Score;
 
     // attacks on king
     let w_king_sq = board.king_square(Player::White);
