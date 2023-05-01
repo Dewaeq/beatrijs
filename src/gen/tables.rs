@@ -154,7 +154,7 @@ const fn gen_black_shielding() -> [u64; NUM_SQUARES] {
 
         let mut next = sq - 24;
         while next >= 0 {
-            shield &= BitBoard::rank_bb(next);
+            shield &= !BitBoard::rank_bb(next);
             next -= 8;
         }
 
