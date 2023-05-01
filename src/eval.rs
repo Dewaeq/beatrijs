@@ -32,7 +32,8 @@ pub fn evaluate(board: &Board) -> Score {
     let mut score = 0;
     let mut mg = [0; 2];
     let mut eg = [0; 2];
-    let mut non_pawn_material = 0;
+    let mut piece_material = [0; 2];
+    let mut pawn_material = [0; 2];
     let mut game_phase = 0;
     let mut attacked_by = AttackedBy::new();
 
@@ -57,8 +58,9 @@ pub fn evaluate(board: &Board) -> Score {
                 Player::White => pawn_structure(piece.c, sq as Square, w_pawns, b_pawns),
                 Player::Black => pawn_structure(piece.c, sq as Square, b_pawns, w_pawns),
             };
+            pawn_material[idx] += MG_VALUE[0];
         } else {
-            non_pawn_material += MG_VALUE[piece.t.as_usize()]
+            piece_material[idx] += MG_VALUE[piece.t.as_usize()];
         }
 
         sq += 1;
@@ -124,20 +126,9 @@ pub fn evaluate(board: &Board) -> Score {
     );
 
     // Control of space on the player's side of the board
-    score += eval_space(
-        &board,
-        Player::White,
-        w_pawns,
-        &attacked_by,
-        non_pawn_material,
-    );
-    score -= eval_space(
-        &board,
-        Player::Black,
-        b_pawns,
-        &attacked_by,
-        non_pawn_material,
-    );
+    let total_non_pawn = piece_material[0] + piece_material[1];
+    score += eval_space(&board, Player::White, w_pawns, &attacked_by, total_non_pawn);
+    score -= eval_space(&board, Player::Black, b_pawns, &attacked_by, total_non_pawn);
 
     // tapered eval
     let mg_score = mg[0] - mg[1];
@@ -146,6 +137,41 @@ pub fn evaluate(board: &Board) -> Score {
     let eg_phase = 24 - mg_phase;
 
     score += (mg_score * mg_phase + eg_score * eg_phase) / 24;
+
+    let (stronger, weaker) = if score > 0 {
+        (Player::White.as_usize(), Player::Black.as_usize())
+    } else {
+        (Player::Black.as_usize(), Player::White.as_usize())
+    };
+
+    // Low material correction. Guard against an imaginary material advantage
+    // that actually is a draw
+    if pawn_material[stronger] == 0 {
+        if piece_material[stronger] < PieceType::Rook.mg_value() {
+            return 0;
+        }
+
+        if pawn_material[weaker] == 0
+            && (piece_material[stronger] == 2 * PieceType::Knight.mg_value())
+        {
+            return 0;
+        }
+
+        if piece_material[stronger] == PieceType::Rook.mg_value()
+            && (piece_material[weaker] == PieceType::Bishop.mg_value()
+                || piece_material[weaker] == PieceType::Knight.mg_value())
+        {
+            score /= 2;
+        }
+
+        if (piece_material[stronger] == PieceType::Rook.mg_value() + PieceType::Bishop.mg_value()
+            || piece_material[stronger]
+                == PieceType::Rook.mg_value() + PieceType::Knight.mg_value())
+            && piece_material[weaker] == PieceType::Rook.mg_value()
+        {
+            score /= 2;
+        }
+    }
 
     if board.turn == Player::White {
         score
