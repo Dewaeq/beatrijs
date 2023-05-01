@@ -240,34 +240,21 @@ impl Searcher {
 
         self.eval_history[ply] = eval;
 
-        /* if !in_check
-            && !is_pv
-            && depth < 9
-            && eval - 165 * (depth as Score) >= beta
-            && alpha > -IS_MATE
-            && beta < IS_MATE
-        {
-            return eval;
-        } */
-
-        // Static null move pruning
-        if depth <= STATIC_NULL_MOVE_DEPTH
+        // Static null move pruning (= reverse futility pruning)
+        /* if depth <= STATIC_NULL_MOVE_DEPTH
             && !is_pv
             && !in_check
             && eval - STATIC_NULL_MOVE_MARGIN * depth >= beta
         {
             return eval;
         }
+        */
 
         // Null move pruning
         if do_null && !in_check && depth >= 4 && self.board.has_big_piece(self.board.turn) {
             self.board.make_null_move();
             let score = -self.negamax(depth - 4, -beta, -beta + 1, false);
             self.board.unmake_null_move();
-
-            if self.should_stop() {
-                return 0;
-            }
 
             if score >= beta {
                 return beta;
@@ -276,7 +263,7 @@ impl Searcher {
 
         let improving: bool = (ply >= 2 && eval >= self.eval_history[ply - 2]);
 
-        // Futility pruning: child node
+        // Reverse futility pruning
         if !is_pv
             && !in_check
             && depth < 9
@@ -297,26 +284,10 @@ impl Searcher {
             return eval;
         }
 
-        // Reverse futility pruning
-        /* if !is_pv
-            && !in_check
-            && depth < 7
-            && beta < IS_MATE
-            && eval - 67 * depth + 76 * (improving as i32) >= beta
-        {
-            return eval;
-        } */
-
         // Razoring
         if !is_pv && !in_check && tt_move == 0 && do_null && depth <= 3 {
-            let threshold = alpha - 300 - (depth - 1) * 60;
-            if eval < threshold {
-                let score = self.quiesence(alpha, beta, true);
-                // This might be a bit too bold, but it's worth a try
-                return score;
-                /* if score < threshold {
-                    return alpha;
-                } */
+            if eval + 300 + (depth - 1) * 60 < alpha {
+                return self.quiesence(alpha, beta, true);
             }
         }
 
@@ -367,8 +338,7 @@ impl Searcher {
                     }
                 } else {
                     // Futility pruning: parent node
-                    if depth <= 8 && (eval + 172 + 145 * (depth - 3).max(1) <= alpha) {
-                    // if depth <= 8 && (eval + MG_VALUE[1] <= alpha) {
+                    if depth <= 8 && (eval + MG_VALUE[1] <= alpha) {
                         search_quiets = false;
                         continue;
                     }
