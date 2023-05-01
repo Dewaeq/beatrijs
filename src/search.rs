@@ -1,6 +1,7 @@
 use crate::bitmove::MoveFlag;
 use crate::defs::{PieceType, Score, Square, INFINITY, MG_VALUE};
 use crate::eval::evaluate;
+use crate::movegen::is_legal_move;
 use crate::search_info::SearchInfo;
 use crate::table::{HashEntry, HashFlag, TWrapper};
 use crate::utils::{is_draw, is_repetition, print_search_info};
@@ -257,7 +258,7 @@ impl Searcher {
             self.board.unmake_null_move();
 
             if score >= beta {
-                return beta;
+                return score;
             }
         }
 
@@ -291,6 +292,7 @@ impl Searcher {
             }
         }
 
+        let mut legals = 0;
         let mut quiets_tried: usize = 0;
         let mut search_quiets = true;
         let mut best_move = 0;
@@ -306,6 +308,13 @@ impl Searcher {
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
             let (m, move_score) = moves.get_all(i);
+
+            if !is_legal_move(&self.board, m) {
+                continue;
+            }
+
+            legals += 1;
+
             let is_cap = BitMove::is_cap(m);
             let is_prom = BitMove::is_prom(m);
             let is_quiet = !is_cap && !is_prom;
@@ -323,7 +332,7 @@ impl Searcher {
                 if is_cap || is_prom || gives_check {
                     // History pruning: skip quiet moves at low depth
                     // that yielded bad results in previous searches
-                    if depth <= 2 && history_score < 0 {
+                    if depth <= 2 && history_score < 0 && !gives_check {
                         continue;
                     }
 
@@ -333,12 +342,12 @@ impl Searcher {
                     }
 
                     // Futility pruning
-                    if depth <= 8 && move_score < -50 * depth * depth {
+                    if depth <= 8 && move_score < -50 * depth * depth && !gives_check {
                         continue;
                     }
                 } else {
                     // Futility pruning: parent node
-                    if depth <= 8 && (eval + MG_VALUE[1] <= alpha) {
+                    if !in_check && depth <= 8 && (eval + MG_VALUE[1] + 30 * depth <= alpha) {
                         search_quiets = false;
                         continue;
                     }
@@ -353,17 +362,17 @@ impl Searcher {
                     }
 
                     // SEE pruning
-                    if depth <= 8 && !self.board.see_ge(m, -21 * (depth * depth)) {
+                    if depth <= 8 && !self.board.see_ge(m, -21 * depth * depth) {
                         continue;
                     }
                 }
             }
 
             let mut reduction = 0;
-            if depth > 2 && (!is_cap || move_score < 0) && i > 1 && (!is_root || i > 4) {
+            if depth > 2 && (!is_cap || move_score < 0) && legals > 1 && (!is_root || legals > 4) {
                 reduction = lmr_reduction(
                     depth,
-                    i,
+                    legals,
                     is_pv,
                     is_cap || is_prom,
                     improving,
@@ -377,7 +386,7 @@ impl Searcher {
             let mut score = 0;
 
             // search pv move in a full window, at full depth
-            if i == 0 || depth <= 2 || !is_pv {
+            if legals == 0 || depth <= 2 || !is_pv {
                 score = -self.negamax(depth - 1 - reduction, -beta, -alpha, true);
 
                 if reduction > 0 && score > alpha {
@@ -427,20 +436,18 @@ impl Searcher {
                     }
                 }
 
-                let entry = HashEntry::new(
-                    self.board.pos.key,
-                    depth,
-                    best_move,
-                    best_score,
-                    eval,
-                    HashFlag::Beta,
-                );
-                self.table.store(entry, ply);
-
-                return best_score;
+                break;
             } else if !is_cap {
                 self.quiets_tried[ply][quiets_tried] = Some(m);
                 quiets_tried += 1;
+            }
+        }
+
+        if legals == 0 {
+            if in_check {
+                best_score = -IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score;
+            } else {
+                best_score = 0;
             }
         }
 
@@ -451,11 +458,14 @@ impl Searcher {
                 best_move,
                 best_score,
                 eval,
-                HashFlag::Alpha,
+                if best_score >= beta {
+                    HashFlag::Beta
+                } else if alpha != old_alpha {
+                    HashFlag::Exact
+                } else {
+                    HashFlag::Alpha
+                },
             );
-            if alpha != old_alpha {
-                entry.hash_flag = HashFlag::Exact;
-            }
 
             self.table.store(entry, ply);
         }
@@ -521,6 +531,10 @@ impl Searcher {
             pick_next_move(&mut moves, i);
             let m = moves.get(i);
 
+            if !is_legal_move(&self.board, m) {
+                continue;
+            }
+
             // This move (likely) won't raise alpha
             if !passes_delta(&self.board, m, eval, alpha) {
                 continue;
@@ -556,7 +570,7 @@ impl Searcher {
                 eval,
                 if best_score >= beta {
                     HashFlag::Beta
-                } else if best_score != old_alpha {
+                } else if alpha != old_alpha {
                     HashFlag::Exact
                 } else {
                     HashFlag::Alpha

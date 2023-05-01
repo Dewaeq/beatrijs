@@ -401,41 +401,19 @@ fn generate_all(board: &Board, gen_type: GenType, move_list: &mut MoveList) {
 
 /// Wrapper around [`generate_all`]
 pub fn generate_legal(board: &mut Board, move_list: &mut MoveList) {
-    let mut pseudo = MoveList::new();
-
     if board.in_check() {
-        generate_all(board, GenType::Evasions, &mut pseudo);
+        generate_all(board, GenType::Evasions, move_list);
     } else {
-        generate_all(board, GenType::NonEvasions, &mut pseudo);
-    }
-
-    let mut i = 0;
-    while i < pseudo.size() {
-        let (m, score) = pseudo.get_all(i);
-        if is_legal_move(board, m) {
-            move_list.push(m, score);
-        }
-        i += 1;
+        generate_all(board, GenType::NonEvasions, move_list);
     }
 }
 
 pub fn generate_quiet(board: &mut Board, move_list: &mut MoveList) {
-    let mut pseudo = MoveList::new();
-
     if board.in_check() {
-        generate_all(board, GenType::EvadingCaptures, &mut pseudo);
+        generate_all(board, GenType::EvadingCaptures, move_list);
     } else {
-        generate_all(board, GenType::Captures, &mut pseudo);
-        generate_all(board, GenType::QuietChecks, &mut pseudo);
-    }
-
-    let mut i = 0;
-    while i < pseudo.size() {
-        let (m, score) = pseudo.get_all(i);
-        if is_legal_move(board, m) {
-            move_list.push(m, score);
-        }
-        i += 1;
+        generate_all(board, GenType::Captures, move_list);
+        // generate_all(board, GenType::QuietChecks, move_list);
     }
 }
 
