@@ -482,6 +482,26 @@ impl Board {
         }
     }
 
+    pub fn see_approximate(&self, m: u16) -> Score {
+        let src = BitMove::src(m);
+        let dest = BitMove::dest(m);
+
+        let piece = self.piece_type(src);
+        let captured = if BitMove::is_ep(m) {
+            PieceType::Pawn
+        } else {
+            self.piece_type(dest)
+        };
+
+        let mut score = captured.mg_value();
+        
+        if BitMove::is_prom(m) {
+            score += BitMove::prom_type(BitMove::flag(m)).mg_value() - piece.mg_value();
+        }
+
+        score - piece.mg_value()
+    }
+
     pub fn see_ge(&self, m: u16, threshold: Score) -> bool {
         if !BitMove::is_cap(m) || BitMove::is_ep(m) {
             return threshold <= 0;

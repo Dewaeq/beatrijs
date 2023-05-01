@@ -426,15 +426,13 @@ impl Searcher {
                     self.board.killers[1][ply] = self.board.killers[0][ply];
                     self.board.killers[0][ply] = m;
 
-                    self.history_score[turn.as_usize()][src][dest] +=
-                        depth as Score * depth as Score;
+                    self.history_score[turn.as_usize()][src][dest] += depth * depth;
 
                     for i in 0..quiets_tried {
                         let mv = self.quiets_tried[ply][i].unwrap();
                         let m_src = BitMove::src(mv) as usize;
                         let m_dest = BitMove::dest(mv) as usize;
-                        self.history_score[turn.as_usize()][m_src][m_dest] -=
-                            depth as Score * depth as Score;
+                        self.history_score[turn.as_usize()][m_src][m_dest] -= depth * depth;
                     }
                 }
 
@@ -540,6 +538,14 @@ impl Searcher {
             // This move (likely) won't raise alpha
             if !passes_delta(&self.board, m, eval, alpha) {
                 continue;
+            }
+
+            // if eval + SEE exceeds beta, return early, as the opponent should've
+            // had a better option earlier
+            let see = self.board.see_approximate(m);
+            if see + eval > beta {
+                best_score = see;
+                break;
             }
 
             if !self.board.see_ge(m, 0) {
