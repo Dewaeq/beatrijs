@@ -166,6 +166,8 @@ impl Searcher {
         mut beta: Score,
         do_null: bool,
     ) -> Score {
+        assert!(alpha < beta);
+
         if self.num_nodes & 4096 == 0 {
             self.checkup();
         }
