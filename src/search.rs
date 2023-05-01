@@ -100,7 +100,9 @@ impl Searcher {
             let pv = self.table.extract_pv(&mut self.board, depth);
             // let hash_full = self.table.hash_full();
 
-            self.best_root_move = pv[0];
+            if pv.len() > 0 {
+                self.best_root_move = pv[0];
+            }
             print_search_info(
                 depth,
                 self.sel_depth,
@@ -199,7 +201,7 @@ impl Searcher {
         }
 
         if depth == 0 {
-            let score = self.quiesence(alpha, beta, true, ply);
+            let score = self.quiesence(alpha, beta, true);
             return score;
         }
 
@@ -238,17 +240,6 @@ impl Searcher {
 
         self.eval_history[ply] = eval;
 
-        // Futility pruning: frontier node
-        if depth == 1
-            && !in_check
-            && !is_pv
-            && eval + MG_VALUE[1] < alpha
-            && alpha > -IS_MATE
-            && beta < IS_MATE
-        {
-            return eval;
-        }
-
         /* if !in_check
             && !is_pv
             && depth < 9
@@ -283,23 +274,44 @@ impl Searcher {
             }
         }
 
-        let improving = (ply >= 2 && eval >= self.eval_history[ply - 2]);
+        let improving: bool = (ply >= 2 && eval >= self.eval_history[ply - 2]);
+
+        // Futility pruning: child node
+        if !is_pv
+            && !in_check
+            && depth < 9
+            && eval - 214 * (depth - improving as i32) >= beta
+            && eval < 10_000
+        {
+            return eval;
+        }
+
+        // Futility pruning: frontier node
+        if depth == 1
+            && !in_check
+            && !is_pv
+            && eval + MG_VALUE[2] < alpha
+            && alpha > -IS_MATE
+            && beta < IS_MATE
+        {
+            return eval;
+        }
 
         // Reverse futility pruning
-        if !is_pv
+        /* if !is_pv
             && !in_check
             && depth < 7
             && beta < IS_MATE
             && eval - 67 * depth + 76 * (improving as i32) >= beta
         {
             return eval;
-        }
+        } */
 
         // Razoring
         if !is_pv && !in_check && tt_move == 0 && do_null && depth <= 3 {
             let threshold = alpha - 300 - (depth - 1) * 60;
             if eval < threshold {
-                let score = self.quiesence(alpha, beta, true, ply);
+                let score = self.quiesence(alpha, beta, true);
                 // This might be a bit too bold, but it's worth a try
                 return score;
                 /* if score < threshold {
@@ -335,7 +347,6 @@ impl Searcher {
             }
 
             let gives_check = self.board.gives_check(m);
-            let mut score = 0;
 
             if !is_root && best_score > -IS_MATE && self.board.has_non_pawns(turn) {
                 if is_cap || is_prom || gives_check {
@@ -355,8 +366,9 @@ impl Searcher {
                         continue;
                     }
                 } else {
-                    // Futility pruning
-                    if depth <= 3 && (eval + MG_VALUE[1] <= alpha) {
+                    // Futility pruning: parent node
+                    if depth <= 8 && (eval + 172 + 145 * (depth - 3).max(1) <= alpha) {
+                    // if depth <= 8 && (eval + MG_VALUE[1] <= alpha) {
                         search_quiets = false;
                         continue;
                     }
@@ -392,6 +404,7 @@ impl Searcher {
             }
 
             self.board.make_move(m);
+            let mut score = 0;
 
             // search pv move in a full window, at full depth
             if i == 0 || depth <= 2 || !is_pv {
@@ -448,13 +461,13 @@ impl Searcher {
                     self.board.pos.key,
                     depth,
                     best_move,
-                    beta,
+                    best_score,
                     eval,
                     HashFlag::Beta,
                 );
                 self.table.store(entry, ply);
 
-                return beta;
+                return best_score;
             } else if !is_cap {
                 self.quiets_tried[ply][quiets_tried] = Some(m);
                 quiets_tried += 1;
@@ -466,22 +479,21 @@ impl Searcher {
                 self.board.key(),
                 depth,
                 best_move,
-                alpha,
+                best_score,
                 eval,
                 HashFlag::Alpha,
             );
             if alpha != old_alpha {
-                entry.score = best_score;
                 entry.hash_flag = HashFlag::Exact;
             }
 
             self.table.store(entry, ply);
         }
 
-        alpha
+        best_score
     }
 
-    fn quiesence(&mut self, mut alpha: Score, beta: Score, root: bool, depth: usize) -> Score {
+    fn quiesence(&mut self, mut alpha: Score, beta: Score, root: bool) -> Score {
         if self.num_nodes & 4096 == 0 {
             self.checkup();
         }
@@ -494,32 +506,28 @@ impl Searcher {
             return 0;
         }
 
-        let entry = self.table.probe(self.board.key(), self.board.pos.ply);
+        let mut tt_move = 0;
 
-        if let Some(entry) = entry {
-            if let Some(score) = table_cutoff(entry, depth as i32 - 4, alpha, beta) {
-                return score;
+        if root {
+            let entry = self.table.probe(self.board.key(), 0);
+            if let Some(entry) = entry {
+                if let Some(score) = table_cutoff(entry, 0, alpha, beta) {
+                    return score;
+                }
+
+                tt_move = entry.m;
             }
         }
 
         self.num_nodes += 1;
-        if depth > self.sel_depth {
-            self.sel_depth = depth;
+        if self.board.pos.ply > self.sel_depth {
+            self.sel_depth = self.board.pos.ply;
         }
 
         // Stand pat
         let eval = evaluate(&self.board);
         if eval >= beta {
-            let entry = HashEntry::new(
-                self.board.key(),
-                0,
-                self.table.best_move(self.board.key()).unwrap_or(0),
-                eval,
-                eval,
-                HashFlag::Beta,
-            );
-            self.table.store(entry, self.board.pos.ply);
-            return beta;
+            return eval;
         }
         if eval > alpha {
             alpha = eval;
@@ -535,6 +543,10 @@ impl Searcher {
         let mut best_score = eval;
         let old_alpha = alpha;
 
+        if tt_move != 0 {
+            set_tt_move_score(&mut moves, tt_move);
+        }
+
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
             let m = moves.get(i);
@@ -549,7 +561,7 @@ impl Searcher {
             }
 
             self.board.make_move(m);
-            let score = -self.quiesence(-beta, -alpha, false, depth + 1);
+            let score = -self.quiesence(-beta, -alpha, false);
             self.board.unmake_move(m);
 
             if score > best_score {
@@ -565,23 +577,23 @@ impl Searcher {
             }
         }
 
-        // if root {
-        let entry = HashEntry::new(
-            self.board.key(),
-            depth as i32,
-            self.table.best_move(self.board.key()).unwrap_or(0),
-            best_score,
-            eval,
-            if best_score >= beta {
-                HashFlag::Beta
-            } else if best_score != old_alpha {
-                HashFlag::Exact
-            } else {
-                HashFlag::Alpha
-            },
-        );
-        self.table.store(entry, self.board.pos.ply);
-        // }
+        if root {
+            let entry = HashEntry::new(
+                self.board.key(),
+                0,
+                self.table.best_move(self.board.key()).unwrap_or(0),
+                best_score,
+                eval,
+                if best_score >= beta {
+                    HashFlag::Beta
+                } else if best_score != old_alpha {
+                    HashFlag::Exact
+                } else {
+                    HashFlag::Alpha
+                },
+            );
+            self.table.store(entry, 0);
+        }
 
         best_score
     }
