@@ -413,7 +413,7 @@ pub fn generate_quiet(board: &mut Board, move_list: &mut MoveList) {
         generate_all(board, GenType::EvadingCaptures, move_list);
     } else {
         generate_all(board, GenType::Captures, move_list);
-        // generate_all(board, GenType::QuietChecks, move_list);
+        generate_all(board, GenType::QuietChecks, move_list);
     }
 }
 
