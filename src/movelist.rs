@@ -1,7 +1,7 @@
 use crate::{
     board::Board,
     defs::MAX_MOVES,
-    movegen::{generate_legal, generate_quiet},
+    movegen::{generate_legal, generate_quiet, generate_all},
 };
 
 #[derive(Clone, Copy)]
@@ -21,6 +21,12 @@ impl MoveList {
             count: 0,
             current: 0,
         }
+    }
+
+    pub fn all(board: &mut Board) -> Self {
+        let mut move_list = MoveList::new();
+        generate_all(board, &mut move_list);
+        move_list
     }
 
     pub fn legal(board: &mut Board) -> Self {

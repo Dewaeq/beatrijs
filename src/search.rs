@@ -87,7 +87,7 @@ impl Searcher {
         self.start();
         self.clear_for_search();
 
-        self.root_moves = MoveList::legal(&mut self.board);
+        self.root_moves = MoveList::all(&mut self.board);
         let mut score = -INFINITY;
 
         for depth in 1..=self.info.depth as i32 {
@@ -225,7 +225,7 @@ impl Searcher {
         let mut moves = if is_root {
             self.root_moves
         } else {
-            MoveList::legal(&mut self.board)
+            MoveList::all(&mut self.board)
         };
 
         if moves.is_empty() {
