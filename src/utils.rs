@@ -120,12 +120,12 @@ pub const fn is_draw(board: &Board) -> bool {
 }
 
 pub const fn is_repetition(board: &Board) -> bool {
-    if board.pos.rule_fifty < 2 {
+    if board.pos.rule_fifty < 2 || board.history.count == 0 {
         return false;
     }
 
     let mut i = 1;
-    while i <= board.pos.rule_fifty as usize {
+    while i <= board.pos.rule_fifty as usize && i <= board.history.count {
         let key = board.history.get_key(board.history.count - i);
         if key == board.key() {
             return true;
