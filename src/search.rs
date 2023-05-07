@@ -232,7 +232,7 @@ impl Searcher {
             if self.board.pos.ply > self.sel_depth {
                 self.sel_depth = self.board.pos.ply;
             }
-            
+
             if in_check {
                 return -IMMEDIATE_MATE_SCORE + ply as Score;
             }
@@ -456,7 +456,7 @@ impl Searcher {
         }
 
         if !self.should_stop() {
-            let mut entry = HashEntry::new(
+            let entry = HashEntry::new(
                 self.board.key(),
                 depth,
                 best_move,

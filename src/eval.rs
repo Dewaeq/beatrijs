@@ -64,7 +64,9 @@ pub fn evaluate(board: &Board) -> Score {
 
             if piece.t == PieceType::Bishop {
                 let pawns_on_bishop_color = board.pawns_on_sq_color(piece.c, sq as Square);
-                mg[idx] -= (BitBoard::count(pawns_on_bishop_color) * 3) as Score;
+                let punishment = (BitBoard::count(pawns_on_bishop_color) * 3) as Score;
+                mg[idx] -= punishment;
+                eg[idx] -= punishment;
             }
         }
 
