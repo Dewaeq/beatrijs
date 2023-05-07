@@ -229,6 +229,10 @@ impl Searcher {
         };
 
         if moves.is_empty() {
+            if self.board.pos.ply > self.sel_depth {
+                self.sel_depth = self.board.pos.ply;
+            }
+            
             if in_check {
                 return -IMMEDIATE_MATE_SCORE + ply as Score;
             }
