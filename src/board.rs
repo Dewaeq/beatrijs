@@ -5,7 +5,7 @@ use crate::{
     bitmove::{BitMove, MoveFlag},
     defs::{
         Castling, Piece, PieceType, Player, Score, Square, BLACK_IDX, FEN_START_STRING, MAX_MOVES,
-        MG_VALUE, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX,
+        MG_VALUE, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX, LIGHT_SQUARES, DARK_SQUARES,
     },
     gen::{
         attack::{attacks, bishop_attacks, knight_attacks, pawn_attacks, rook_attacks},
@@ -184,6 +184,15 @@ impl Board {
         match side {
             Player::White => self.pos.castling & Castling::WHITE_ALL != 0,
             Player::Black => self.pos.castling & Castling::BLACK_ALL != 0,
+        }
+    }
+
+    pub const fn pawns_on_sq_color(&self, side: Player, sq: Square) -> u64 {
+        let pawns = self.player_piece_bb(side, PieceType::Pawn);
+        if sq % 2 == 0 {
+            pawns & DARK_SQUARES
+        } else {
+            pawns & LIGHT_SQUARES
         }
     }
 

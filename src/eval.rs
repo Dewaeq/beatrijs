@@ -51,7 +51,6 @@ pub fn evaluate(board: &Board) -> Score {
         mg[idx] += MG_TABLE[piece.as_usize()][sq];
         eg[idx] += EG_TABLE[piece.as_usize()][sq];
         game_phase += GAME_PHASE_INC[piece.t.as_usize()];
-        score += mobility(board, piece, sq as Square, &mut attacked_by);
 
         if piece.t == PieceType::Pawn {
             score += match piece.c {
@@ -60,7 +59,13 @@ pub fn evaluate(board: &Board) -> Score {
             };
             pawn_material[idx] += MG_VALUE[0];
         } else {
+            score += mobility(board, piece, sq as Square, &mut attacked_by);
             piece_material[idx] += MG_VALUE[piece.t.as_usize()];
+
+            if piece.t == PieceType::Bishop {
+                let pawns_on_bishop_color = board.pawns_on_sq_color(piece.c, sq as Square);
+                mg[idx] -= (BitBoard::count(pawns_on_bishop_color) * 3) as Score;
+            }
         }
 
         sq += 1;
@@ -209,10 +214,6 @@ fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
 // Structural evaluation of a piece, from white's perspective
 #[inline(always)]
 fn mobility(board: &Board, piece: Piece, sq: Square, attacked_by: &mut AttackedBy) -> Score {
-    if piece.t == PieceType::Pawn {
-        return 0;
-    }
-
     let occ = board.occ_bb();
     let my_bb = board.player_bb(piece.c);
     let opp_bb = occ & !my_bb;
