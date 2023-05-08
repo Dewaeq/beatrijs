@@ -1,15 +1,15 @@
-use crate::{ defs::MAX_MOVES, position::Position};
+use crate::{ defs::MAX_GAME_LENGTH, position::Position};
 
 #[derive(Copy, Clone)]
 pub struct History {
-    positions: [Position; MAX_MOVES],
+    positions: [Position; MAX_GAME_LENGTH],
     pub count: usize,
 }
 
 impl History {
     pub const fn new() -> Self {
         History {
-            positions: [Position::new(); MAX_MOVES],
+            positions: [Position::new(); MAX_GAME_LENGTH],
             count: 0,
         }
     }
@@ -19,6 +19,8 @@ impl History {
     }
 
     pub fn push(&mut self, pos: Position) {
+        assert!(self.count < MAX_GAME_LENGTH);
+
         unsafe {
             *self.positions.get_unchecked_mut(self.count) = pos;
         }
