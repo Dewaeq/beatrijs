@@ -65,7 +65,7 @@ impl Searcher {
 
     fn should_stop(&mut self) -> bool {
         if !self.stop {
-            self.stop = self.abort.load(Ordering::SeqCst);
+            self.stop = self.abort.load(Ordering::Relaxed);
         }
 
         self.stop
@@ -524,8 +524,15 @@ impl Searcher {
         }
 
         let mut moves = MoveList::quiet(&mut self.board);
+        let mut legals = 0;
         let mut best_score = eval;
         let old_alpha = alpha;
+
+        let futility_base = if self.board.in_check() {
+            -INFINITY
+        } else {
+            eval + 155
+        };
 
         if tt_move != 0 {
             set_tt_move_score(&mut moves, tt_move);
@@ -537,6 +544,33 @@ impl Searcher {
 
             if !is_legal_move(&self.board, m) {
                 continue;
+            }
+
+            let is_prom = BitMove::is_prom(m);
+            let gives_check = self.board.gives_check(m);
+
+            legals += 1;
+
+            // Futility pruning
+            if !gives_check && futility_base > -INFINITY && !is_prom {
+                if legals > 2 {
+                    continue;
+                }
+
+                let dest = BitMove::dest(m);
+                // We can safely do this, as this move isn't a promotion and it doesn't give check,
+                // so it must be a capture
+                let futility_value = futility_base + self.board.piece_type(dest).eg_value();
+
+                if futility_value <= alpha {
+                    best_score = best_score.max(futility_value);
+                    continue;
+                }
+
+                if futility_base <= alpha && !self.board.see_ge(m, 1) {
+                    best_score = best_score.max(futility_base);
+                    continue;
+                }
             }
 
             // This move (likely) won't raise alpha

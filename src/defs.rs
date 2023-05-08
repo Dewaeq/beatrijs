@@ -3,6 +3,7 @@ use crate::bitboard::BitBoard;
 pub const WHITE_IDX: usize = 0;
 pub const BLACK_IDX: usize = 1;
 
+pub const MAX_GAME_LENGTH: usize = 512;
 pub const MAX_MOVES: usize = 256;
 pub const NUM_PIECES: usize = 6;
 pub const NUM_SIDES: usize = 2;
@@ -156,6 +157,13 @@ impl PieceType {
     }
 
     pub const fn mg_value(&self) -> Score {
+        match self {
+            PieceType::None => 0,
+            _ => MG_VALUE[self.as_usize()],
+        }
+    }
+
+    pub const fn eg_value(&self) -> Score {
         match self {
             PieceType::None => 0,
             _ => MG_VALUE[self.as_usize()],
