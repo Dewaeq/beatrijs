@@ -3,7 +3,6 @@ use std::cell::SyncUnsafeCell;
 use crate::{board::Board, defs::Score, movegen::is_legal_move, search::IS_MATE};
 
 pub const TABLE_SIZE_MB: usize = 1024;
-type TT = HashTable;
 
 pub struct HashTable {
     pub buckets: Vec<Bucket>,
@@ -82,23 +81,21 @@ impl HashTable {
         let mut filled = 0;
         let mut total = 0;
 
-        /* let mut index = 0;
+        let mut index = 0;
         while index < self.size && filled < 500 {
-            if self.entries[index].valid() {
-                filled += 1;
-            }
+            filled += self.buckets[index].count_filled();
+
             total += 1;
             index += 1;
         }
 
         index = self.size - 1;
         while filled < 1000 && index > 0 {
-            if self.entries[index].valid() {
-                filled += 1;
-            }
+            filled += self.buckets[index].count_filled();
+
             total += 1;
             index -= 1;
-        } */
+        }
 
         (filled as f64 / total as f64 * 1000f64) as usize
     }
@@ -108,13 +105,13 @@ unsafe impl Sync for TWrapper {}
 unsafe impl Send for TWrapper {}
 
 pub struct TWrapper {
-    pub inner: SyncUnsafeCell<TT>,
+    pub inner: SyncUnsafeCell<HashTable>,
 }
 
 impl TWrapper {
     pub fn new() -> Self {
         TWrapper {
-            inner: SyncUnsafeCell::new(TT::with_size(TABLE_SIZE_MB)),
+            inner: SyncUnsafeCell::new(HashTable::with_size(TABLE_SIZE_MB)),
         }
     }
 
@@ -217,6 +214,21 @@ impl Bucket {
         } else {
             None
         }
+    }
+
+    pub fn count_filled(&self) -> i32 {
+        let mut count = 0;
+
+        if self.one.valid() {
+            count += 1;
+        }
+        if self.two.valid() {
+            count += 1;
+        }
+        if self.three.valid() {
+            count += 1;
+        }
+        count
     }
 }
 

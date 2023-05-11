@@ -99,7 +99,7 @@ impl Searcher {
 
             let elapsed = self.info.started.elapsed().as_secs_f64() * 1000f64;
             let pv = self.table.extract_pv(&mut self.board, depth);
-            // let hash_full = self.table.hash_full();
+            let hash_full = self.table.hash_full();
 
             if pv.len() > 0 {
                 self.best_root_move = pv[0];
@@ -110,7 +110,7 @@ impl Searcher {
                 score,
                 elapsed,
                 self.num_nodes,
-                0,
+                hash_full,
                 &pv,
                 self.board.turn,
             );
