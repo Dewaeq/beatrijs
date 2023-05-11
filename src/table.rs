@@ -3,7 +3,7 @@ use std::cell::SyncUnsafeCell;
 use crate::{board::Board, defs::Score, movegen::is_legal_move, search::IS_MATE};
 
 pub const TABLE_SIZE_MB: usize = 1024;
-type TT = HashTable<HashEntry>;
+type TT = HashTable<Bucket>;
 
 pub trait Table<T>
 where
@@ -28,71 +28,54 @@ pub struct HashTable<T>
 where
     T: Default + Copy,
 {
-    pub entries: Vec<T>,
+    pub buckets: Vec<T>,
     pub size: usize,
 }
 
-impl Table<HashEntry> for HashTable<HashEntry> {
+impl Table<Bucket> for HashTable<Bucket> {
     fn new(num_entries: usize) -> Self {
-        let entries = vec![HashEntry::default(); num_entries];
+        let size = num_entries / 3;
+        let buckets = vec![Bucket::default(); size];
 
         HashTable {
-            entries,
-            size: num_entries,
+            buckets,
+            size,
         }
     }
 
     fn with_size(mb: usize) -> Self {
-        let num_entries = mb * 1024 * 1024 / std::mem::size_of::<HashEntry>();
+        let num_entries = mb * 1024 * 1024 / std::mem::size_of::<Bucket>() * 3;
         Self::new(num_entries)
     }
 
     fn clear(&mut self) {
-        self.entries = vec![HashEntry::default(); self.size];
+        self.buckets = vec![Bucket::default(); self.size];
     }
 
     fn probe(&self, key: u64) -> Option<HashEntry> {
-        let entry = self.get(key);
-
-        if entry.valid() && entry.key == key {
-            Some(entry)
-        } else {
-            None
-        }
+        let bucket = self.get(key);
+        bucket.probe(key)
     }
 
     fn store(&mut self, entry: HashEntry) {
-        let prev = self.get_mut(entry.key);
-        *prev = entry;
-
-        // TODO: add aging to table entries,
-        // the method below is very inefficient, especially in endgames
-        /* if !prev.valid()
-        // prioritize entries that add a move to a
-        // position that previously didnt have a pv move stored
-        || (!prev.has_move() && entry.has_move())
-        || prev.depth < entry.depth {
-            *prev = entry;
-        } */
+        let bucket = self.get_mut(entry.key);
+        bucket.store(entry);
     }
 
-    fn get(&self, key: u64) -> HashEntry {
-        unsafe { *self.entries.get_unchecked(key as usize % self.size) }
+    fn get(&self, key: u64) -> Bucket {
+        unsafe { *self.buckets.get_unchecked(key as usize % self.size) }
     }
 
-    fn get_mut(&mut self, key: u64) -> &mut HashEntry {
-        unsafe { self.entries.get_unchecked_mut(key as usize % self.size) }
+    fn get_mut(&mut self, key: u64) -> &mut Bucket {
+        unsafe { self.buckets.get_unchecked_mut(key as usize % self.size) }
     }
 }
 
 impl HashTable<HashEntry> {
     pub fn best_move(&self, key: u64) -> Option<u16> {
-        let entry = self.get(key);
-        if entry.valid() && entry.key == key && entry.has_move() {
-            Some(entry.m)
-        } else {
-            None
-        }
+        let bucket = self.get(key);
+        bucket.best_move(key)
+        
     }
 
     pub fn extract_pv(&self, board: &Board, depth: u8) -> Vec<u16> {
@@ -210,6 +193,57 @@ impl TWrapper {
     }
 }
 
+#[Derive(Copy, Clone)]
+pub struct Bucket {
+    pub one: HashEntry,
+    pub two: HashEntry,
+    pub three: HashEntry,
+}
+
+impl Default for Bucket {
+    fn default() -> Self {
+        Self {
+            one: HashEntry::default(),
+            two: HashEntry::default(),
+            three: HashEntry::default(),
+        }
+    }
+}
+
+impl Bucket {
+    pub fn store(&mut self, entry: HashEntry) {
+        if self.one.is_better(&entry) {
+            self.one = entry;
+        } else if self.two.is_better(&entry) {
+            self.two = entry;
+        } else if self.three.is_better(&entry) {
+            self.three = entry;
+        }
+    }
+
+    pub fn probe(&self, key: u64) -> Option<HashEntry> {
+        if self.one.key == key {
+            Some(self.one)
+        } else if self.two.key == key {
+            Some(self.two)
+        } else if self.three.key == key {
+            Some(self.three)
+        }
+
+        None
+    }
+
+    pub fn best_move(&self, key: u64) -> Option<u16> {
+        if self.one.key == key && self.one.has_move() {
+            Some(self.one.m)
+        } else if self.two.key == key && self.two.has_move() {
+            Some(self.two.m)
+        } else if self.three.key == key && self.three.has_move() {
+            Some(self.three.m)
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum HashFlag {
     Exact,
@@ -265,5 +299,13 @@ impl HashEntry {
 
     pub const fn has_move(&self) -> bool {
         self.m != 0
+    }
+
+    /// Is the provided entry better than this one
+    /// 
+    /// Useful for checking if this entry should be replaced or not
+    /// TODO: implement aging
+    pub const fn is_better(&self, entry: &HashEntry) -> bool {
+        !self.is_valid() || (self.key == entry.key && self.depth < entry.depth)
     }
 }
