@@ -3,61 +3,36 @@ use std::cell::SyncUnsafeCell;
 use crate::{board::Board, defs::Score, movegen::is_legal_move, search::IS_MATE};
 
 pub const TABLE_SIZE_MB: usize = 1024;
-type TT = HashTable<Bucket>;
+type TT = HashTable;
 
-pub trait Table<T>
-where
-    T: Default + Copy,
-{
-    fn new(num_entries: usize) -> Self;
-
-    fn with_size(mb: usize) -> Self;
-
-    fn clear(&mut self);
-
-    fn probe(&self, key: u64) -> Option<T>;
-
-    fn store(&mut self, entry: T);
-
-    fn get(&self, key: u64) -> T;
-
-    fn get_mut(&mut self, key: u64) -> &mut T;
-}
-
-pub struct HashTable<T>
-where
-    T: Default + Copy,
-{
-    pub buckets: Vec<T>,
+pub struct HashTable {
+    pub buckets: Vec<Bucket>,
     pub size: usize,
 }
 
-impl Table<Bucket> for HashTable<Bucket> {
-    fn new(num_entries: usize) -> Self {
+impl HashTable {
+    pub fn new(num_entries: usize) -> Self {
         let size = num_entries / 3;
         let buckets = vec![Bucket::default(); size];
 
-        HashTable {
-            buckets,
-            size,
-        }
+        HashTable { buckets, size }
     }
 
-    fn with_size(mb: usize) -> Self {
+    pub fn with_size(mb: usize) -> Self {
         let num_entries = mb * 1024 * 1024 / std::mem::size_of::<Bucket>() * 3;
         Self::new(num_entries)
     }
 
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.buckets = vec![Bucket::default(); self.size];
     }
 
-    fn probe(&self, key: u64) -> Option<HashEntry> {
+    pub fn probe(&self, key: u64) -> Option<HashEntry> {
         let bucket = self.get(key);
         bucket.probe(key)
     }
 
-    fn store(&mut self, entry: HashEntry) {
+    pub fn store(&mut self, entry: HashEntry) {
         let bucket = self.get_mut(entry.key);
         bucket.store(entry);
     }
@@ -71,11 +46,10 @@ impl Table<Bucket> for HashTable<Bucket> {
     }
 }
 
-impl HashTable<HashEntry> {
+impl HashTable {
     pub fn best_move(&self, key: u64) -> Option<u16> {
         let bucket = self.get(key);
         bucket.best_move(key)
-        
     }
 
     pub fn extract_pv(&self, board: &Board, depth: u8) -> Vec<u16> {
@@ -108,7 +82,7 @@ impl HashTable<HashEntry> {
         let mut filled = 0;
         let mut total = 0;
 
-        let mut index = 0;
+        /* let mut index = 0;
         while index < self.size && filled < 500 {
             if self.entries[index].valid() {
                 filled += 1;
@@ -124,7 +98,7 @@ impl HashTable<HashEntry> {
             }
             total += 1;
             index -= 1;
-        }
+        } */
 
         (filled as f64 / total as f64 * 1000f64) as usize
     }
@@ -176,7 +150,7 @@ impl TWrapper {
 
     pub fn delete(&self, key: u64) {
         unsafe {
-            *(*self.inner.get()).get_mut(key) = HashEntry::default();
+            *(*self.inner.get()).get_mut(key) = Bucket::default();
         }
     }
 
@@ -193,7 +167,7 @@ impl TWrapper {
     }
 }
 
-#[Derive(Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct Bucket {
     pub one: HashEntry,
     pub two: HashEntry,
@@ -228,9 +202,9 @@ impl Bucket {
             Some(self.two)
         } else if self.three.key == key {
             Some(self.three)
+        } else {
+            None
         }
-
-        None
     }
 
     pub fn best_move(&self, key: u64) -> Option<u16> {
@@ -240,6 +214,8 @@ impl Bucket {
             Some(self.two.m)
         } else if self.three.key == key && self.three.has_move() {
             Some(self.three.m)
+        } else {
+            None
         }
     }
 }
@@ -302,10 +278,10 @@ impl HashEntry {
     }
 
     /// Is the provided entry better than this one
-    /// 
+    ///
     /// Useful for checking if this entry should be replaced or not
     /// TODO: implement aging
     pub const fn is_better(&self, entry: &HashEntry) -> bool {
-        !self.is_valid() || (self.key == entry.key && self.depth < entry.depth)
+        !self.valid() || (self.key == entry.key && self.depth < entry.depth)
     }
 }
