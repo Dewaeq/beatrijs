@@ -43,9 +43,7 @@ impl HashTable {
     fn get_mut(&mut self, key: u64) -> &mut Bucket {
         unsafe { self.buckets.get_unchecked_mut(key as usize % self.size) }
     }
-}
 
-impl HashTable {
     pub fn best_move(&self, key: u64) -> Option<u16> {
         let bucket = self.get(key);
         bucket.best_move(key)
