@@ -218,6 +218,7 @@ pub const CASTLE_QUEEN_FILES: u64 = BitBoard::FILE_A | BitBoard::FILE_B | BitBoa
 pub const CENTER_FILES: u64 =
     BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F;
 pub const CENTER_SQUARES: u64 = (BitBoard::RANK_4 | BitBoard::RANK_5) & CENTER_FILES;
+pub const SMALL_CENTER: u64 = (BitBoard::RANK_4 | BitBoard::RANK_5) & (BitBoard::FILE_D | BitBoard::FILE_E);
 
 pub const DARK_SQUARES: u64 = 0b1010101001010101101010100101010110101010010101011010101001010101;
 pub const LIGHT_SQUARES: u64 = !DARK_SQUARES;

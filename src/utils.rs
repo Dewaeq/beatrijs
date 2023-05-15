@@ -174,10 +174,27 @@ const fn is_material_draw(board: &Board) -> bool {
 
 pub const fn ranks_in_front_of(side: Player, sq: Square) -> u64 {
     let bb = BitBoard::rank_bb(sq);
+    front_span(side, bb)
+}
 
+pub const fn front_span(side: Player, bb: u64) -> u64 {
     match side {
         Player::White => north_one(north_fill(bb)),
-        _ => south_one(south_fill(bb)),
+        Player::Black => south_one(south_fill(bb)),
+    }
+}
+
+pub const fn fill_up(side: Player, bb: u64) -> u64 {
+    match side {
+        Player::White => north_fill(bb),
+        Player::Black => south_fill(bb),
+    }
+}
+
+pub const fn fill_down(side: Player, bb: u64) -> u64 {
+    match side {
+        Player::White => south_fill(bb),
+        Player::Black => north_fill(bb),
     }
 }
 
@@ -197,10 +214,22 @@ pub const fn south_fill(mut bb: u64) -> u64 {
     bb
 }
 
+pub const fn file_fill(bb: u64) -> u64 {
+    north_fill(bb) | south_fill(bb)
+}
+
 pub const fn north_one(bb: u64) -> u64 {
     bb << 8
 }
 
 pub const fn south_one(bb: u64) -> u64 {
     bb >> 8
+}
+
+pub const fn east_one(bb: u64) -> u64 {
+    (bb & !BitBoard::FILE_H) << 1
+}
+
+pub const fn west_one(bb: u64) -> u64 {
+    (bb & !BitBoard::FILE_A) >> 1
 }

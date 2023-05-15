@@ -10,8 +10,8 @@ use crate::{
         pesto::{EG_TABLE, MG_TABLE},
         tables::{CENTER_DISTANCE, DISTANCE, ISOLATED, PASSED, SHIELDING_PAWNS},
     },
-    movegen::pawn_caps,
-    utils::ranks_in_front_of,
+    movegen::{pawn_caps, pawn_push},
+    utils::{ranks_in_front_of, front_span, file_fill, west_one, east_one, fill_up, fill_down},
 };
 
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
@@ -53,10 +53,6 @@ pub fn evaluate(board: &Board) -> Score {
         game_phase += GAME_PHASE_INC[piece.t.as_usize()];
 
         if piece.t == PieceType::Pawn {
-            score += match piece.c {
-                Player::White => pawn_structure(piece.c, sq as Square, w_pawns, b_pawns),
-                Player::Black => pawn_structure(piece.c, sq as Square, b_pawns, w_pawns),
-            };
             pawn_material[idx] += MG_VALUE[0];
         } else {
             score += mobility(board, piece, sq as Square, &mut attacked_by);
@@ -97,22 +93,19 @@ pub fn evaluate(board: &Board) -> Score {
     mg[1] += (BitBoard::count(b_pawns & CENTER_SQUARES) * 4) as Score;
 
     // pawn attacks
-    let w_pawn_caps = pawn_caps(w_pawns, Player::White) & board.player_bb(Player::Black);
-    let b_pawn_caps = pawn_caps(b_pawns, Player::Black) & board.player_bb(Player::White);
+    let w_pawn_attacks = pawn_caps(w_pawns, Player::White);
+    let b_pawn_attacks = pawn_caps(b_pawns, Player::Black);
 
-    attacked_by.w_pawns = w_pawn_caps;
-    attacked_by.white |= w_pawn_caps;
-    attacked_by.b_pawns = b_pawn_caps;
-    attacked_by.black |= b_pawn_caps;
+    attacked_by.w_pawns = w_pawn_attacks;
+    attacked_by.white |= w_pawn_attacks;
+    attacked_by.b_pawns = b_pawn_attacks;
+    attacked_by.black |= b_pawn_attacks;
 
-    mg[0] += (BitBoard::count(w_pawn_caps) * 3) as Score;
-    mg[1] += (BitBoard::count(b_pawn_caps) * 3) as Score;
+    score += eval_pawns(board, Player::White, w_pawns, b_pawns, w_pawn_attacks, b_pawn_attacks);
+    score -= eval_pawns(board, Player::Black, b_pawns, w_pawns, b_pawn_attacks, w_pawn_attacks);
 
-    // pawns defended by pawns
-    let w_defenders = pawn_caps(w_pawns, Player::Black) & w_pawns;
-    let b_defenders = pawn_caps(b_pawns, Player::White) & b_pawns;
-    score += (BitBoard::count(w_defenders) * 4) as Score;
-    score -= (BitBoard::count(b_defenders) * 4) as Score;
+    score += eval_knights(board, Player::White, w_pawn_attacks, b_pawns);
+    score -= eval_knights(board, Player::Black, b_pawn_attacks, w_pawns);
 
     // attacks on king
     let w_king_sq = board.king_square(Player::White);
@@ -249,35 +242,6 @@ fn mobility(board: &Board, piece: Piece, sq: Square, attacked_by: &mut AttackedB
 }
 
 #[inline(always)]
-const fn pawn_structure(side: Player, sq: Square, pawns: u64, opp_pawns: u64) -> Score {
-    let mut score = 0;
-
-    let file = sq % 8;
-    // isolated pawn, as there are no pawns besides it
-    if pawns & ISOLATED[file as usize] == 0 {
-        score -= 8;
-    }
-    // doubled pawn
-    if BitBoard::more_than_one(pawns & BitBoard::file_bb(sq)) {
-        score -= 12;
-    }
-
-    // passed pawn
-    if PASSED[side.as_usize()][sq as usize] & opp_pawns == 0 {
-        let rel_rank = match side {
-            Player::White => (sq / 8) as usize,
-            Player::Black => (7 - sq / 8) as usize,
-        };
-        score += PASSED_PAWN_SCORE[rel_rank];
-    }
-
-    match side {
-        Player::White => score,
-        _ => -score,
-    }
-}
-
-#[inline(always)]
 fn king_pawn_shield(
     board: &Board,
     w_pawns: u64,
@@ -367,6 +331,71 @@ const fn eval_space(
         BitBoard::count(board.piece_bb(PieceType::Knight) | board.piece_bb(PieceType::Bishop));
 
     (bonus * weight * weight / 16) as Score
+}
+
+fn eval_knights(board: &Board, side: Player, my_pawn_attacks: u64, opp_pawns: u64) -> Score {
+    let mut score = 0;
+
+    let knights = board.player_piece_bb(side, PieceType::Knight);
+    let mut supported = knights & my_pawn_attacks;
+
+    while supported != 0 {
+        let sq = BitBoard::pop_lsb(&mut supported);
+        // Check if this is an outpost knight, i.e. it can't be attacked by a pawn on the neighbouring files
+        if PASSED[side.as_usize()][sq as usize] & opp_pawns & !BitBoard::file_bb(sq) == 0 {
+            score += 25;
+        }
+    }
+
+    score
+}
+
+fn eval_pawns(board: &Board, side: Player, my_pawns: u64, opp_pawns: u64, my_pawn_attacks: u64, opp_pawn_attacks: u64) -> Score {
+    let mut score = 0;
+
+    let mut supported = my_pawns & my_pawn_attacks;
+    while supported != 0 {
+        let sq = BitBoard::pop_lsb(&mut supported);
+        score += 5;
+    }
+
+    // Doubled and isolated pawns
+    let my_front_span = front_span(side, my_pawns);
+    let num_doubled = BitBoard::count(my_pawns & my_front_span) as Score;
+    let num_isolated = BitBoard::count(file_fill(my_pawns) & !west_one(my_pawns) & !east_one(my_pawns)) as Score;
+
+    score += num_doubled * -11;
+    score += num_isolated * -8;
+
+    // Backward pawns, see https://www.chessprogramming.org/Backward_Pawns_(Bitboards)#Telestop_Weakness
+    let my_attack_spans = fill_up(side, my_pawn_attacks);
+    let stops = !my_attack_spans & opp_pawn_attacks;
+    let my_backward_area = fill_down(side, stops);
+    let num_backward = BitBoard::count(my_backward_area & my_pawns) as Score;
+
+    score += num_backward * -6;
+
+    // Passed pawns
+    let mut opp_front_spans = front_span(side.opp(), opp_pawns);
+    opp_front_spans |= west_one(opp_front_spans) | east_one(opp_front_spans);
+    let mut passers = my_pawns & !opp_front_spans;
+    let behind_passers = fill_down(side, passers);
+    let num_my_rooks_behind_passers = BitBoard::count(board.player_piece_bb(side, PieceType::Rook) & behind_passers) as Score;
+    let num_opp_rooks_behind_passers = BitBoard::count(board.player_piece_bb(side.opp(), PieceType::Rook) & behind_passers) as Score;
+
+    score += num_my_rooks_behind_passers * 7;
+    score += num_opp_rooks_behind_passers * -13;
+
+    while passers != 0 {
+        let sq = BitBoard::pop_lsb(&mut passers);
+        let rel_rank = match side {
+            Player::White => (sq / 8) as usize,
+            Player::Black => (7 - sq / 8) as usize,
+        };
+        score += PASSED_PAWN_SCORE[rel_rank];
+    }
+
+    score
 }
 
 struct AttackedBy {
