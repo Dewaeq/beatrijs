@@ -176,10 +176,6 @@ impl Searcher {
             return 0;
         }
 
-        if is_draw(&self.board) {
-            return 0;
-        }
-
         let ply = self.board.pos.ply;
         if ply >= MAX_SEARCH_DEPTH {
             return evaluate(&self.board);
@@ -196,6 +192,10 @@ impl Searcher {
 
             if alpha >= beta {
                 return alpha;
+            }
+
+            if is_draw(&self.board) {
+                return 0;
             }
         }
 
@@ -217,6 +217,10 @@ impl Searcher {
 
             if let Some(score) = table_cutoff(entry, depth, alpha, beta) {
                 return score;
+            }
+
+            if !is_pv && will_fail_low(entry, depth, alpha) {
+                return alpha;
             }
         }
 
@@ -258,9 +262,10 @@ impl Searcher {
         */
 
         // Null move pruning
-        if do_null && !in_check && depth >= 4 && self.board.has_big_piece(self.board.turn) {
+        if do_null && !in_check && depth >= 2 && self.board.has_big_piece(self.board.turn) {
             self.board.make_null_move();
-            let score = -self.negamax(depth - 4, -beta, -beta + 1, false);
+            let r = 4 + depth / 6;
+            let score = -self.negamax((depth - r).max(0), -beta, -beta + 1, false);
             self.board.unmake_null_move();
 
             if score >= beta {
@@ -708,6 +713,14 @@ const fn table_cutoff(entry: HashEntry, depth: i32, alpha: Score, beta: Score) -
             }
         }
     }
+}
+
+/// If the entry from one depth lower failed low and, even with an added margin, it
+/// still can't beat the current alpha, it will likely fail low again, so return early
+fn will_fail_low(entry: HashEntry, depth: i32, alpha: Score) -> bool {
+    entry.depth as i32 >= depth - 1
+        && entry.hash_flag == HashFlag::Alpha
+        && entry.score + MG_VALUE[0] <= alpha
 }
 
 fn lmr_reduction(
