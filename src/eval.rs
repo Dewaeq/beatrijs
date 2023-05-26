@@ -3,7 +3,7 @@ use crate::{
     board::Board,
     defs::{
         Piece, PieceType, Player, Score, Square, CASTLE_KING_FILES, CASTLE_QUEEN_FILES,
-        CENTER_SQUARES, EG_VALUE, MG_VALUE, PASSED_PAWN_SCORE,
+        CENTER_SQUARES, DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE, SMALL_CENTER,
     },
     gen::{
         attack::{attacks, king_attacks},
@@ -11,7 +11,7 @@ use crate::{
         tables::{CENTER_DISTANCE, DISTANCE, ISOLATED, PASSED, SHIELDING_PAWNS},
     },
     movegen::{pawn_caps, pawn_push},
-    utils::{ranks_in_front_of, front_span, file_fill, west_one, east_one, fill_up, fill_down},
+    utils::{east_one, file_fill, fill_down, fill_up, front_span, ranks_in_front_of, west_one},
 };
 
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
@@ -57,13 +57,6 @@ pub fn evaluate(board: &Board) -> Score {
         } else {
             score += mobility(board, piece, sq as Square, &mut attacked_by);
             piece_material[idx] += MG_VALUE[piece.t.as_usize()];
-
-            if piece.t == PieceType::Bishop {
-                let pawns_on_bishop_color = board.pawns_on_sq_color(piece.c, sq as Square);
-                let punishment = (BitBoard::count(pawns_on_bishop_color) * 3) as Score;
-                mg[idx] -= punishment;
-                eg[idx] -= punishment;
-            }
         }
 
         sq += 1;
@@ -75,22 +68,11 @@ pub fn evaluate(board: &Board) -> Score {
     let w_bishops = board.player_piece_bb(Player::White, PieceType::Bishop);
     let b_bishops = board.player_piece_bb(Player::Black, PieceType::Bishop);
 
-    if BitBoard::more_than_one(w_bishops) {
-        score += BISHOP_PAIR_BONUS;
-    }
-    if BitBoard::more_than_one(b_bishops) {
-        score -= BISHOP_PAIR_BONUS;
-    }
-
     // undeveloped pieces penalty
     let w_knights = board.player_piece_bb(Player::White, PieceType::Knight);
     let b_knights = board.player_piece_bb(Player::Black, PieceType::Knight);
     mg[0] -= (BitBoard::count((w_knights | w_bishops) & BitBoard::RANK_1) * 6) as Score;
     mg[1] -= (BitBoard::count((b_knights | b_bishops) & BitBoard::RANK_8) * 6) as Score;
-
-    // pawns controlling center of the board
-    mg[0] += (BitBoard::count(w_pawns & CENTER_SQUARES) * 4) as Score;
-    mg[1] += (BitBoard::count(b_pawns & CENTER_SQUARES) * 4) as Score;
 
     // pawn attacks
     let w_pawn_attacks = pawn_caps(w_pawns, Player::White);
@@ -101,11 +83,28 @@ pub fn evaluate(board: &Board) -> Score {
     attacked_by.b_pawns = b_pawn_attacks;
     attacked_by.black |= b_pawn_attacks;
 
-    score += eval_pawns(board, Player::White, w_pawns, b_pawns, w_pawn_attacks, b_pawn_attacks);
-    score -= eval_pawns(board, Player::Black, b_pawns, w_pawns, b_pawn_attacks, w_pawn_attacks);
+    score += eval_pawns(
+        board,
+        Player::White,
+        w_pawns,
+        b_pawns,
+        w_pawn_attacks,
+        b_pawn_attacks,
+    );
+    score -= eval_pawns(
+        board,
+        Player::Black,
+        b_pawns,
+        w_pawns,
+        b_pawn_attacks,
+        w_pawn_attacks,
+    );
 
     score += eval_knights(board, Player::White, w_pawn_attacks, b_pawns);
     score -= eval_knights(board, Player::Black, b_pawn_attacks, w_pawns);
+
+    score += eval_bishops(board, Player::White, w_pawns);
+    score -= eval_bishops(board, Player::Black, b_pawns);
 
     // attacks on king
     let w_king_sq = board.king_square(Player::White);
@@ -350,19 +349,60 @@ fn eval_knights(board: &Board, side: Player, my_pawn_attacks: u64, opp_pawns: u6
     score
 }
 
-fn eval_pawns(board: &Board, side: Player, my_pawns: u64, opp_pawns: u64, my_pawn_attacks: u64, opp_pawn_attacks: u64) -> Score {
+fn eval_bishops(board: &Board, side: Player, my_pawns: u64) -> Score {
     let mut score = 0;
 
+    let mut bishops = board.player_piece_bb(side, PieceType::Bishop);
+    if BitBoard::more_than_one(bishops) {
+        score += BISHOP_PAIR_BONUS;
+    }
+
+    if bishops & DARK_SQUARES != 0 {
+        score -= BitBoard::count(my_pawns & DARK_SQUARES) as Score;
+    }
+    if bishops & LIGHT_SQUARES != 0 {
+        score -= BitBoard::count(my_pawns & LIGHT_SQUARES) as Score;
+    }
+
+    score
+}
+
+fn eval_pawns(
+    board: &Board,
+    side: Player,
+    my_pawns: u64,
+    opp_pawns: u64,
+    my_pawn_attacks: u64,
+    opp_pawn_attacks: u64,
+) -> Score {
+    let mut score = 0;
+    let occ = board.occ_bb();
+
+    // Defended pawns
     let mut supported = my_pawns & my_pawn_attacks;
     while supported != 0 {
         let sq = BitBoard::pop_lsb(&mut supported);
         score += 5;
     }
 
+    // Pawns controlling centre of the board
+    let num_pawns_behind_center = BitBoard::count(my_pawns & pawn_caps(SMALL_CENTER, side.opp())) as Score;
+    score += num_pawns_behind_center * -20;
+
+    // Pawn mobility
+    let attacks = pawn_caps(my_pawns & !side.rank_7(), side);
+    let pushes = pawn_push(my_pawns, side) & !occ;
+    let double_pushes = pawn_push(pushes & side.rank_3(), side);
+
+    score += (BitBoard::count(attacks) * 7) as Score;
+    score += (BitBoard::count(pushes) * 4) as Score;
+    score += (BitBoard::count(double_pushes) * 3) as Score;
+
     // Doubled and isolated pawns
     let my_front_span = front_span(side, my_pawns);
     let num_doubled = BitBoard::count(my_pawns & my_front_span) as Score;
-    let num_isolated = BitBoard::count(file_fill(my_pawns) & !west_one(my_pawns) & !east_one(my_pawns)) as Score;
+    let num_isolated =
+        BitBoard::count(file_fill(my_pawns) & !west_one(my_pawns) & !east_one(my_pawns)) as Score;
 
     score += num_doubled * -11;
     score += num_isolated * -8;
@@ -380,8 +420,11 @@ fn eval_pawns(board: &Board, side: Player, my_pawns: u64, opp_pawns: u64, my_paw
     opp_front_spans |= west_one(opp_front_spans) | east_one(opp_front_spans);
     let mut passers = my_pawns & !opp_front_spans;
     let behind_passers = fill_down(side, passers);
-    let num_my_rooks_behind_passers = BitBoard::count(board.player_piece_bb(side, PieceType::Rook) & behind_passers) as Score;
-    let num_opp_rooks_behind_passers = BitBoard::count(board.player_piece_bb(side.opp(), PieceType::Rook) & behind_passers) as Score;
+    let num_my_rooks_behind_passers =
+        BitBoard::count(board.player_piece_bb(side, PieceType::Rook) & behind_passers) as Score;
+    let num_opp_rooks_behind_passers =
+        BitBoard::count(board.player_piece_bb(side.opp(), PieceType::Rook) & behind_passers)
+            as Score;
 
     score += num_my_rooks_behind_passers * 7;
     score += num_opp_rooks_behind_passers * -13;
