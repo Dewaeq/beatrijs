@@ -64,11 +64,9 @@ pub fn evaluate(board: &Board) -> Score {
 
     mopup_eval(board, &mut eg);
 
-    // Bishop pair bonus
+    // undeveloped pieces penalty
     let w_bishops = board.player_piece_bb(Player::White, PieceType::Bishop);
     let b_bishops = board.player_piece_bb(Player::Black, PieceType::Bishop);
-
-    // undeveloped pieces penalty
     let w_knights = board.player_piece_bb(Player::White, PieceType::Knight);
     let b_knights = board.player_piece_bb(Player::Black, PieceType::Knight);
     mg[0] -= (BitBoard::count((w_knights | w_bishops) & BitBoard::RANK_1) * 6) as Score;
