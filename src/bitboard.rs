@@ -69,9 +69,8 @@ impl BitBoard {
     /// Empty bitboards remain empty
     pub fn pop_lsb(bb: &mut u64) -> Square {
         let lsb = BitBoard::bit_scan_forward(*bb);
-        if lsb < 64 {
-            BitBoard::pop_bit(bb, lsb)
-        }
+        *bb &= *bb - 1;
+
         lsb
     }
 
