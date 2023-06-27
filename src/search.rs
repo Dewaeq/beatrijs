@@ -215,12 +215,14 @@ impl Searcher {
         if let Some(entry) = entry {
             tt_move = entry.m;
 
-            if let Some(score) = table_cutoff(entry, depth, alpha, beta) {
-                return score;
-            }
+            if !is_pv || entry.hash_flag == HashFlag::Exact {
+                if let Some(score) = table_cutoff(entry, depth, alpha, beta) {
+                    return score;
+                }
 
-            if !is_pv && will_fail_low(entry, depth, alpha) {
-                return alpha;
+                if will_fail_low(entry, depth, alpha) {
+                    return alpha;
+                }
             }
         }
 
