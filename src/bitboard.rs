@@ -100,7 +100,12 @@ impl BitBoard {
             return 64;
         }
 
-        unsafe { *INDEX_64.get_unchecked((((bb ^ (bb - 1)) * DEBRUIJN_64) >> 58) as usize) }
+        let index = ((bb ^ (bb - 1)) * DEBRUIJN_64) >> 58;
+        // This isn't necessary, because 'index' is 6 bits, so it can't exceed 63,
+        // but this assert aids the compiler (I think)
+        assert!(index < 64);
+
+        INDEX_64[index as usize]
     }
 
     /// Get the index of the most significant bit.
@@ -118,7 +123,12 @@ impl BitBoard {
         bb |= bb >> 16;
         bb |= bb >> 32;
 
-        unsafe { *INDEX_64.get_unchecked(((bb * DEBRUIJN_64) >> 58) as usize) }
+        let index = (bb * DEBRUIJN_64) >> 58;
+        // This isn't necessary, because 'index' is 6 bits, so it can't exceed 63,
+        // but this assert aids the compiler (I think)
+        assert!(index < 64);
+
+        INDEX_64[index as usize]
     }
 
     pub const fn count(mut bb: u64) -> u32 {

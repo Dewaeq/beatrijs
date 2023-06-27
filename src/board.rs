@@ -4,8 +4,9 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
-        Castling, Piece, PieceType, Player, Score, Square, BLACK_IDX, FEN_START_STRING, MAX_MOVES,
-        MG_VALUE, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX, LIGHT_SQUARES, DARK_SQUARES,
+        Castling, Piece, PieceType, Player, Score, Square, BLACK_IDX, DARK_SQUARES,
+        FEN_START_STRING, LIGHT_SQUARES, MAX_MOVES, MG_VALUE, NUM_PIECES, NUM_SIDES, NUM_SQUARES,
+        WHITE_IDX,
     },
     gen::{
         attack::{attacks, bishop_attacks, knight_attacks, pawn_attacks, rook_attacks},
@@ -38,16 +39,18 @@ impl Board {
     }
 
     pub const fn piece(&self, square: Square) -> Piece {
-        unsafe { *self.pieces.get_unchecked(square as usize) }
+        assert!(square < 64);
+        self.pieces[square as usize]
     }
 
     /// Get the [`PieceType`] of the piece on the provided square
     pub const fn piece_type(&self, square: Square) -> PieceType {
-        unsafe { self.pieces.get_unchecked(square as usize).t }
+        assert!(square < 64);
+        self.pieces[square as usize].t
     }
 
     pub const fn occ_bb(&self) -> u64 {
-        unsafe { *self.side_bb.get_unchecked(0) | *self.side_bb.get_unchecked(1) }
+        self.side_bb[0] | self.side_bb[1]
     }
 
     pub const fn cur_player_bb(&self) -> u64 {
@@ -57,14 +60,14 @@ impl Board {
     pub const fn player_bb(&self, side: Player) -> u64 {
         unsafe {
             match side {
-                Player::White => *self.side_bb.get_unchecked(WHITE_IDX),
-                _ => *self.side_bb.get_unchecked(BLACK_IDX),
+                Player::White => self.side_bb[WHITE_IDX],
+                _ => self.side_bb[BLACK_IDX],
             }
         }
     }
 
     pub const fn piece_bb(&self, piece: PieceType) -> u64 {
-        unsafe { *self.piece_bb.get_unchecked(piece.as_usize()) }
+        self.piece_bb[piece.as_usize()]
     }
 
     /// Get a piece-like bitboard.
@@ -210,7 +213,7 @@ impl Board {
     }
 
     pub const fn blockers(&self, side: Player) -> u64 {
-        unsafe { *self.pos.king_blockers.get_unchecked(side.as_usize()) }
+        self.pos.king_blockers[side.as_usize()]
     }
 
     pub fn slider_blockers(&self, us_bb: u64, opp_bb: u64, sq: Square) -> (u64, u64) {
@@ -284,7 +287,7 @@ impl Board {
     }
 
     const fn check_squares(&self, piece: PieceType) -> u64 {
-        unsafe { *self.pos.check_squares.get_unchecked(piece.as_usize()) }
+        self.pos.check_squares[piece.as_usize()]
     }
 
     /// Removes castling permissions for the given side
@@ -503,7 +506,7 @@ impl Board {
         };
 
         let mut score = captured.mg_value();
-        
+
         if BitMove::is_prom(m) {
             score += BitMove::prom_type(BitMove::flag(m)).mg_value() - piece.mg_value();
         }

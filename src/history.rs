@@ -1,4 +1,4 @@
-use crate::{ defs::MAX_GAME_LENGTH, position::Position};
+use crate::{defs::MAX_GAME_LENGTH, position::Position};
 
 #[derive(Copy, Clone)]
 pub struct History {
@@ -39,6 +39,6 @@ impl History {
     }
 
     pub const fn get_key(&self, index: usize) -> u64 {
-        unsafe { self.positions.get_unchecked(index).key }
+        self.positions[index].key
     }
 }
