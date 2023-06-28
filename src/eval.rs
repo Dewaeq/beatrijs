@@ -70,6 +70,9 @@ pub fn evaluate(board: &Board) -> Score {
 
     let mut mg_material = [0; 2];
     let mut eg_material = [0; 2];
+    let mut piece_material = [0; 2];
+    let mut pawn_material = [0; 2];
+
     let mut sq = 0;
     for piece in board.pieces {
         if piece.is_none() {
@@ -81,6 +84,13 @@ pub fn evaluate(board: &Board) -> Score {
         let pc_idx = piece.as_usize();
         mg_material[idx] += MG_TABLE[pc_idx][sq];
         eg_material[idx] += EG_TABLE[pc_idx][sq];
+
+        if piece.t != PieceType::Pawn {
+            piece_material[idx] += piece.t.mg_value();
+        } else {
+            pawn_material[idx] += piece.t.mg_value();
+        }
+
         eval.phase += GAME_PHASE_INC[piece.t.as_usize()];
 
         sq += 1;
@@ -100,44 +110,10 @@ pub fn evaluate(board: &Board) -> Score {
         total_score -= 10;
     }
 
-    if board.num_pieces(WHITE_BISHOP) > 1 {
-        eval.adjust_material[0] += BISHOP_PAIR_BONUS;
-    }
-    if board.num_pieces(BLACK_BISHOP) > 1 {
-        eval.adjust_material[1] += BISHOP_PAIR_BONUS;
-    }
-    if board.num_pieces(WHITE_KNIGHT) > 1 {
-        eval.adjust_material[0] += KNIGHT_PAIR_PENALTY;
-    }
-    if board.num_pieces(BLACK_KNIGHT) > 1 {
-        eval.adjust_material[1] += KNIGHT_PAIR_PENALTY;
-    }
-    if board.num_pieces(WHITE_ROOK) > 1 {
-        eval.adjust_material[0] += ROOK_PAIR_PENALTY;
-    }
-    if board.num_pieces(BLACK_ROOK) > 1 {
-        eval.adjust_material[1] += ROOK_PAIR_PENALTY;
-    }
-
-    eval.adjust_material[0] += KNIGHT_PAWN_ADJUSTMENT[board.num_pieces(WHITE_PAWN)]
-        * (board.num_pieces(WHITE_KNIGHT) as Score);
-    eval.adjust_material[1] += KNIGHT_PAWN_ADJUSTMENT[board.num_pieces(BLACK_PAWN)]
-        * (board.num_pieces(BLACK_KNIGHT) as Score);
-    eval.adjust_material[0] += ROOK_PAWN_ADJUSTMENT[board.num_pieces(WHITE_PAWN)]
-        * (board.num_pieces(WHITE_ROOK) as Score);
-    eval.adjust_material[0] += ROOK_PAWN_ADJUSTMENT[board.num_pieces(BLACK_PAWN)]
-        * (board.num_pieces(BLACK_ROOK) as Score);
-
+    adjust_material(board, &mut eval);
     total_score += pawn_score(board);
-    // Score is from white's perspective
-    /* let mut score = 0;
-    let mut mg = [0; 2];
-    let mut eg = [0; 2];
-    let mut piece_material = [0; 2];
-    let mut pawn_material = [0; 2];
-    let mut game_phase = 0;
-    let mut attacked_by = AttackedBy::new();
 
+    /*
     let w_pawns = board.player_piece_bb(Player::White, PieceType::Pawn);
     let b_pawns = board.player_piece_bb(Player::Black, PieceType::Pawn);
 
@@ -182,23 +158,6 @@ pub fn evaluate(board: &Board) -> Score {
     attacked_by.b_pawns = b_pawn_attacks;
     attacked_by.black |= b_pawn_attacks;
 
-    score += eval_pawns(
-        board,
-        Player::White,
-        w_pawns,
-        b_pawns,
-        w_pawn_attacks,
-        b_pawn_attacks,
-    );
-    score -= eval_pawns(
-        board,
-        Player::Black,
-        b_pawns,
-        w_pawns,
-        b_pawn_attacks,
-        w_pawn_attacks,
-    );
-
     score += eval_knights(board, Player::White, w_pawn_attacks, b_pawns);
     score -= eval_knights(board, Player::Black, b_pawn_attacks, w_pawns);
 
@@ -218,25 +177,17 @@ pub fn evaluate(board: &Board) -> Score {
     score += (BitBoard::count(attacked_by.white & king_attacks(b_king_sq)) * 9) as Score;
     score += (BitBoard::count(attacked_by.white & b_king_bb) * 16) as Score;
 
-    // pawn shield for king safety
-    king_pawn_shield(
-        board, w_pawns, b_pawns, &mut mg, w_king_sq, b_king_sq, w_king_bb, b_king_bb,
-    );
-
     // Control of space on the player's side of the board
     let total_non_pawn = piece_material[0] + piece_material[1];
     score += eval_space(&board, Player::White, w_pawns, &attacked_by, total_non_pawn);
     score -= eval_space(&board, Player::Black, b_pawns, &attacked_by, total_non_pawn);
+    */
+    let mg_weight = eval.phase;
+    let eg_weight = 24 - eval.phase;
 
-    // tapered eval
-    let mg_score = mg[0] - mg[1];
-    let eg_score = eg[0] - eg[1];
-    let mg_phase = game_phase.min(24);
-    let eg_phase = 24 - mg_phase;
+    total_score += (mg_score * mg_weight + eg_score * eg_weight) / 24;
 
-    score += (mg_score * mg_phase + eg_score * eg_phase) / 24;
-
-    let (stronger, weaker) = if score > 0 {
+    let (stronger, weaker) = if total_score > 0 {
         (Player::White.as_usize(), Player::Black.as_usize())
     } else {
         (Player::Black.as_usize(), Player::White.as_usize())
@@ -259,7 +210,7 @@ pub fn evaluate(board: &Board) -> Score {
             && (piece_material[weaker] == PieceType::Bishop.mg_value()
                 || piece_material[weaker] == PieceType::Knight.mg_value())
         {
-            score /= 2;
+            total_score /= 2;
         }
 
         if (piece_material[stronger] == PieceType::Rook.mg_value() + PieceType::Bishop.mg_value()
@@ -267,17 +218,15 @@ pub fn evaluate(board: &Board) -> Score {
                 == PieceType::Rook.mg_value() + PieceType::Knight.mg_value())
             && piece_material[weaker] == PieceType::Rook.mg_value()
         {
-            score /= 2;
+            total_score /= 2;
         }
     }
 
     if board.turn == Player::White {
-        score
+        total_score
     } else {
-        -score
-    } */
-
-    0
+        -total_score
+    }
 }
 
 fn pawn_score(board: &Board) -> Score {
@@ -285,6 +234,36 @@ fn pawn_score(board: &Board) -> Score {
     let b_score = 0;
 
     w_score - b_score
+}
+
+fn adjust_material(board: &Board, eval: &mut Evaluation) {
+    if board.num_pieces(WHITE_BISHOP) > 1 {
+        eval.adjust_material[0] += BISHOP_PAIR_BONUS;
+    }
+    if board.num_pieces(BLACK_BISHOP) > 1 {
+        eval.adjust_material[1] += BISHOP_PAIR_BONUS;
+    }
+    if board.num_pieces(WHITE_KNIGHT) > 1 {
+        eval.adjust_material[0] += KNIGHT_PAIR_PENALTY;
+    }
+    if board.num_pieces(BLACK_KNIGHT) > 1 {
+        eval.adjust_material[1] += KNIGHT_PAIR_PENALTY;
+    }
+    if board.num_pieces(WHITE_ROOK) > 1 {
+        eval.adjust_material[0] += ROOK_PAIR_PENALTY;
+    }
+    if board.num_pieces(BLACK_ROOK) > 1 {
+        eval.adjust_material[1] += ROOK_PAIR_PENALTY;
+    }
+
+    eval.adjust_material[0] += KNIGHT_PAWN_ADJUSTMENT[board.num_pieces(WHITE_PAWN)]
+        * (board.num_pieces(WHITE_KNIGHT) as Score);
+    eval.adjust_material[1] += KNIGHT_PAWN_ADJUSTMENT[board.num_pieces(BLACK_PAWN)]
+        * (board.num_pieces(BLACK_KNIGHT) as Score);
+    eval.adjust_material[0] += ROOK_PAWN_ADJUSTMENT[board.num_pieces(WHITE_PAWN)]
+        * (board.num_pieces(WHITE_ROOK) as Score);
+    eval.adjust_material[0] += ROOK_PAWN_ADJUSTMENT[board.num_pieces(BLACK_PAWN)]
+        * (board.num_pieces(BLACK_ROOK) as Score);
 }
 
 #[inline(always)]
