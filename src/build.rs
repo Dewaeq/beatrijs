@@ -2,9 +2,19 @@ use fastrand::Rng;
 use std::{env, fs::File, io::Write, path::Path};
 
 fn main() -> std::io::Result<()> {
+    write_randoms()?;
+    write_logarithms()
+}
+
+fn create_output_file(name: &str) -> File {
     let out_dir = env::var_os("OUT_DIR").unwrap();
-    let dest_path = Path::new(&out_dir).join("zobrist.rs");
-    let mut f = File::create(dest_path).unwrap();
+    let dest_path = Path::new(&out_dir).join(name);
+
+    File::create(dest_path).unwrap()
+}
+
+fn write_randoms() -> std::io::Result<()> {
+    let mut f = create_output_file("zobrist.rs");
 
     let rng = Rng::new();
     rng.seed(16358476);
@@ -30,4 +40,15 @@ fn main() -> std::io::Result<()> {
     writeln!(f, "const SIDE: u64 = {:?};", rng.u64(..))?;
     writeln!(f, "const CASTLE: [u64; 16] = {:?};", castle)?;
     writeln!(f, "const EP: [u64; 8] = {:?};", ep)
+}
+
+fn write_logarithms() -> std::io::Result<()> {
+    let mut f = create_output_file("logarithms.rs");
+
+    let mut table = [0f32; 64];
+    for i in 1..64 {
+        table[i] = (i as f32).ln();
+    }
+
+    writeln!(f, "const LN: [f32; 64] = {:?};", table)
 }

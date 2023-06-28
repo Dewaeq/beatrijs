@@ -1,6 +1,7 @@
 use crate::bitmove::MoveFlag;
 use crate::defs::{PieceType, Score, Square, INFINITY, MG_VALUE};
 use crate::eval::evaluate;
+use crate::gen::tables::LMR;
 use crate::movegen::is_legal_move;
 use crate::search_info::SearchInfo;
 use crate::table::{HashEntry, HashFlag, TWrapper};
@@ -735,13 +736,7 @@ fn lmr_reduction(
     in_check: bool,
     history_score: i32,
 ) -> i32 {
-    let depth_ln = (depth as f32).ln();
-    let index_ln = (index as f32).ln();
-    let mut reduction = (0.8422840719846748 * index_ln * depth_ln
-        - 0.4 * index_ln
-        - 0.22572624883839026 * depth_ln
-        + 1.2)
-        .max(0f32);
+    let mut reduction = LMR[depth as usize][index];
 
     if is_tactical {
         reduction /= 2f32;
