@@ -112,20 +112,14 @@ impl Piece {
     }
 }
 
-pub const PIECES: [Piece; 12] = [
-    Piece::new(PieceType::Pawn, Player::White),
-    Piece::new(PieceType::Knight, Player::White),
-    Piece::new(PieceType::Bishop, Player::White),
-    Piece::new(PieceType::Rook, Player::White),
-    Piece::new(PieceType::Queen, Player::White),
-    Piece::new(PieceType::King, Player::White),
-    Piece::new(PieceType::Pawn, Player::Black),
-    Piece::new(PieceType::Knight, Player::Black),
-    Piece::new(PieceType::Bishop, Player::Black),
-    Piece::new(PieceType::Rook, Player::Black),
-    Piece::new(PieceType::Queen, Player::Black),
-    Piece::new(PieceType::King, Player::Black),
-];
+pub const WHITE_PAWN: Piece = Piece::new(PieceType::Pawn, Player::White);
+pub const BLACK_PAWN: Piece = Piece::new(PieceType::Pawn, Player::Black);
+pub const WHITE_KNIGHT: Piece = Piece::new(PieceType::Knight, Player::White);
+pub const BLACK_KNIGHT: Piece = Piece::new(PieceType::Knight, Player::Black);
+pub const WHITE_BISHOP: Piece = Piece::new(PieceType::Bishop, Player::White);
+pub const BLACK_BISHOP: Piece = Piece::new(PieceType::Bishop, Player::Black);
+pub const WHITE_ROOK: Piece = Piece::new(PieceType::Rook, Player::White);
+pub const BLACK_ROOK: Piece = Piece::new(PieceType::Rook, Player::Black);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PieceType {
@@ -166,7 +160,7 @@ impl PieceType {
     pub const fn eg_value(&self) -> Score {
         match self {
             PieceType::None => 0,
-            _ => MG_VALUE[self.as_usize()],
+            _ => EG_VALUE[self.as_usize()],
         }
     }
 }
@@ -218,7 +212,8 @@ pub const CASTLE_QUEEN_FILES: u64 = BitBoard::FILE_A | BitBoard::FILE_B | BitBoa
 pub const CENTER_FILES: u64 =
     BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F;
 pub const CENTER_SQUARES: u64 = (BitBoard::RANK_4 | BitBoard::RANK_5) & CENTER_FILES;
-pub const SMALL_CENTER: u64 = (BitBoard::RANK_4 | BitBoard::RANK_5) & (BitBoard::FILE_D | BitBoard::FILE_E);
+pub const SMALL_CENTER: u64 =
+    (BitBoard::RANK_4 | BitBoard::RANK_5) & (BitBoard::FILE_D | BitBoard::FILE_E);
 
 pub const DARK_SQUARES: u64 = 0b1010101001010101101010100101010110101010010101011010101001010101;
 pub const LIGHT_SQUARES: u64 = !DARK_SQUARES;

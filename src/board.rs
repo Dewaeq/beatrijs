@@ -212,6 +212,10 @@ impl Board {
             || self.player_piece_bb(side, PieceType::Queen) != 0
     }
 
+    pub const fn num_pieces(&self, piece: Piece) -> usize {
+        BitBoard::count(self.player_piece_bb(piece.c, piece.t)) as usize
+    }
+
     pub const fn blockers(&self, side: Player) -> u64 {
         self.pos.king_blockers[side.as_usize()]
     }

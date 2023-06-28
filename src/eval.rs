@@ -2,8 +2,10 @@ use crate::{
     bitboard::BitBoard,
     board::Board,
     defs::{
-        Piece, PieceType, Player, Score, Square, CASTLE_KING_FILES, CASTLE_QUEEN_FILES,
-        CENTER_SQUARES, DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE, SMALL_CENTER,
+        Piece, PieceType, Player, Score, Square, BLACK_BISHOP, BLACK_KNIGHT, BLACK_PAWN,
+        BLACK_ROOK, CASTLE_KING_FILES, CASTLE_QUEEN_FILES, CENTER_SQUARES, DARK_SQUARES, EG_VALUE,
+        LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE, SMALL_CENTER, WHITE_BISHOP, WHITE_KNIGHT,
+        WHITE_PAWN, WHITE_ROOK,
     },
     gen::{
         attack::{attacks, king_attacks},
@@ -15,7 +17,11 @@ use crate::{
 };
 
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
-const BISHOP_PAIR_BONUS: Score = 7;
+const BISHOP_PAIR_BONUS: Score = 23;
+const KNIGHT_PAIR_PENALTY: Score = -8;
+const ROOK_PAIR_PENALTY: Score = -22;
+const KNIGHT_PAWN_ADJUSTMENT: [Score; 9] = [-20, -16, -12, -8, -4, 0, 4, 8, 12];
+const ROOK_PAWN_ADJUSTMENT: [Score; 9] = [15, 12, 9, 6, 3, 0, -3, -6, -9];
 
 const SHIELD_MISSING: [i32; 4] = [-2, -23, -38, -55];
 const SHIELD_MISSING_ON_OPEN_FILE: [i32; 4] = [-8, -10, -37, -66];
@@ -27,9 +33,104 @@ const SAFE_MASK: [u64; 2] = [
         & (BitBoard::RANK_5 | BitBoard::RANK_6 | BitBoard::RANK_7),
 ];
 
+pub struct Evaluation {
+    phase: i32,
+    mg_mob: [Score; 2],
+    eg_mob: [Score; 2],
+    mg_tropism: [Score; 2],
+    eg_tropism: [Score; 2],
+    att_count: [Score; 2],
+    att_weight: [Score; 2],
+    king_shield: [Score; 2],
+    adjust_material: [Score; 2],
+    blockages: [Score; 2],
+    positional_themes: [Score; 2],
+}
+
+impl Evaluation {
+    const fn new() -> Self {
+        Evaluation {
+            phase: 0,
+            mg_mob: [0; 2],
+            eg_mob: [0; 2],
+            mg_tropism: [0; 2],
+            eg_tropism: [0; 2],
+            att_count: [0; 2],
+            att_weight: [0; 2],
+            king_shield: [0; 2],
+            adjust_material: [0; 2],
+            blockages: [0; 2],
+            positional_themes: [0; 2],
+        }
+    }
+}
+
 pub fn evaluate(board: &Board) -> Score {
+    let mut eval = Evaluation::new();
+
+    let mut mg_material = [0; 2];
+    let mut eg_material = [0; 2];
+    let mut sq = 0;
+    for piece in board.pieces {
+        if piece.is_none() {
+            sq += 1;
+            continue;
+        }
+
+        let idx = piece.c.as_usize();
+        let pc_idx = piece.as_usize();
+        mg_material[idx] += MG_TABLE[pc_idx][sq];
+        eg_material[idx] += EG_TABLE[pc_idx][sq];
+        eval.phase += GAME_PHASE_INC[piece.t.as_usize()];
+
+        sq += 1;
+    }
+
+    let mut total_score = 0;
+    let mut mg_score = mg_material[0] - mg_material[1];
+    let mut eg_score = eg_material[0] - eg_material[1];
+
+    king_pawn_shield(board, &mut eval);
+    mg_score += (eval.king_shield[0] - eval.king_shield[1]);
+
+    // Tempo bonus
+    if board.turn == Player::White {
+        total_score += 10;
+    } else {
+        total_score -= 10;
+    }
+
+    if board.num_pieces(WHITE_BISHOP) > 1 {
+        eval.adjust_material[0] += BISHOP_PAIR_BONUS;
+    }
+    if board.num_pieces(BLACK_BISHOP) > 1 {
+        eval.adjust_material[1] += BISHOP_PAIR_BONUS;
+    }
+    if board.num_pieces(WHITE_KNIGHT) > 1 {
+        eval.adjust_material[0] += KNIGHT_PAIR_PENALTY;
+    }
+    if board.num_pieces(BLACK_KNIGHT) > 1 {
+        eval.adjust_material[1] += KNIGHT_PAIR_PENALTY;
+    }
+    if board.num_pieces(WHITE_ROOK) > 1 {
+        eval.adjust_material[0] += ROOK_PAIR_PENALTY;
+    }
+    if board.num_pieces(BLACK_ROOK) > 1 {
+        eval.adjust_material[1] += ROOK_PAIR_PENALTY;
+    }
+
+    eval.adjust_material[0] += KNIGHT_PAWN_ADJUSTMENT[board.num_pieces(WHITE_PAWN)]
+        * (board.num_pieces(WHITE_KNIGHT) as Score);
+    eval.adjust_material[1] += KNIGHT_PAWN_ADJUSTMENT[board.num_pieces(BLACK_PAWN)]
+        * (board.num_pieces(BLACK_KNIGHT) as Score);
+    eval.adjust_material[0] += ROOK_PAWN_ADJUSTMENT[board.num_pieces(WHITE_PAWN)]
+        * (board.num_pieces(WHITE_ROOK) as Score);
+    eval.adjust_material[0] += ROOK_PAWN_ADJUSTMENT[board.num_pieces(BLACK_PAWN)]
+        * (board.num_pieces(BLACK_ROOK) as Score);
+
+    total_score += pawn_score(board);
     // Score is from white's perspective
-    let mut score = 0;
+    /* let mut score = 0;
     let mut mg = [0; 2];
     let mut eg = [0; 2];
     let mut piece_material = [0; 2];
@@ -174,7 +275,16 @@ pub fn evaluate(board: &Board) -> Score {
         score
     } else {
         -score
-    }
+    } */
+
+    0
+}
+
+fn pawn_score(board: &Board) -> Score {
+    let w_score = eval_pawns(board, Player::White, 0, 0, 0, 0);
+    let b_score = 0;
+
+    w_score - b_score
 }
 
 #[inline(always)]
@@ -239,35 +349,32 @@ fn mobility(board: &Board, piece: Piece, sq: Square, attacked_by: &mut AttackedB
 }
 
 #[inline(always)]
-fn king_pawn_shield(
-    board: &Board,
-    w_pawns: u64,
-    b_pawns: u64,
-    mg: &mut [Score; 2],
-    w_king_sq: Square,
-    b_king_sq: Square,
-    w_king_bb: u64,
-    b_king_bb: u64,
-) {
+fn king_pawn_shield(board: &Board, eval: &mut Evaluation) {
+    let w_pawns = board.player_piece_bb(Player::White, PieceType::Pawn);
+    let b_pawns = board.player_piece_bb(Player::Black, PieceType::Pawn);
+
+    let w_king_sq = board.king_square(Player::White);
+    let b_king_sq = board.king_square(Player::Black);
+
     // punish king on open or semi-open file
     if (w_pawns | b_pawns) & BitBoard::file_bb(w_king_sq) == 0 {
-        mg[0] -= 13;
+        eval.king_shield[0] -= 13;
     } else if w_pawns & BitBoard::file_bb(w_king_sq) == 0 {
-        mg[0] -= 5;
+        eval.king_shield[0] -= 5;
     }
     if (w_pawns | b_pawns) & BitBoard::file_bb(b_king_sq) == 0 {
-        mg[1] -= 13;
+        eval.king_shield[1] -= 13;
     } else if b_pawns & BitBoard::file_bb(b_king_sq) == 0 {
-        mg[1] -= 5;
+        eval.king_shield[1] -= 5;
     }
 
     let w_pawn_shield = SHIELDING_PAWNS[0][w_king_sq as usize];
     let w_king_front_span = ranks_in_front_of(Player::White, w_king_sq);
-    mg[0] += missing_shield_pawns(w_pawn_shield, w_pawns, b_pawns, w_king_front_span);
+    eval.king_shield[0] += missing_shield_pawns(w_pawn_shield, w_pawns, b_pawns, w_king_front_span);
 
     let b_pawn_shield = SHIELDING_PAWNS[1][b_king_sq as usize];
     let b_king_front_span = ranks_in_front_of(Player::Black, b_king_sq);
-    mg[1] += missing_shield_pawns(b_pawn_shield, b_pawns, w_pawns, b_king_front_span);
+    eval.king_shield[1] += missing_shield_pawns(b_pawn_shield, b_pawns, w_pawns, b_king_front_span);
 }
 
 /// # Arguments
@@ -384,7 +491,8 @@ fn eval_pawns(
     }
 
     // Pawns controlling centre of the board
-    let num_pawns_behind_center = BitBoard::count(my_pawns & pawn_caps(SMALL_CENTER, side.opp())) as Score;
+    let num_pawns_behind_center =
+        BitBoard::count(my_pawns & pawn_caps(SMALL_CENTER, side.opp())) as Score;
     score += num_pawns_behind_center * -20;
 
     // Pawn mobility
