@@ -736,7 +736,7 @@ fn lmr_reduction(
     in_check: bool,
     history_score: i32,
 ) -> i32 {
-    let mut reduction = LMR[depth as usize][index];
+    let mut reduction = LMR[depth.max(31) as usize][index.max(63)];
 
     if is_tactical {
         reduction /= 2f32;
