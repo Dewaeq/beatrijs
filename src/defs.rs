@@ -120,6 +120,8 @@ pub const WHITE_BISHOP: Piece = Piece::new(PieceType::Bishop, Player::White);
 pub const BLACK_BISHOP: Piece = Piece::new(PieceType::Bishop, Player::Black);
 pub const WHITE_ROOK: Piece = Piece::new(PieceType::Rook, Player::White);
 pub const BLACK_ROOK: Piece = Piece::new(PieceType::Rook, Player::Black);
+pub const WHITE_QUEEN: Piece = Piece::new(PieceType::Queen, Player::White);
+pub const BLACK_QUEEN: Piece = Piece::new(PieceType::Queen, Player::Black);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PieceType {

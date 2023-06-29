@@ -1,8 +1,10 @@
 use crate::{
     bitboard::BitBoard,
     defs::{Score, Square, NUM_SIDES, NUM_SQUARES},
-    utils::{b_max, coord_from_square},
+    utils::{b_max, coord_from_square, east_one, north_one, south_one, west_one},
 };
+
+use super::attack::KING_ATK;
 
 /// Manhattan distance:
 ///
@@ -18,6 +20,9 @@ pub const SHIELDING_PAWNS: [[u64; NUM_SQUARES]; NUM_SIDES] =
     [gen_white_shielding(), gen_black_shielding()];
 
 pub const LMR: [[f32; 64]; 32] = gen_lmr();
+
+pub const KING_ZONE: [[u64; NUM_SQUARES]; NUM_SIDES] =
+    [gen_white_king_zone(), gen_black_king_zone()];
 
 const fn gen_distance() -> [[Score; NUM_SQUARES]; NUM_SQUARES] {
     let mut table = [[0; NUM_SQUARES]; NUM_SQUARES];
@@ -193,6 +198,46 @@ const fn gen_lmr() -> [[f32; 64]; 32] {
             move_count += 1;
         }
         depth += 1;
+    }
+
+    table
+}
+
+const fn gen_white_king_zone() -> [u64; NUM_SQUARES] {
+    let mut table = [0; NUM_SQUARES];
+
+    let mut sq = 0;
+    while sq < 64 {
+        let mut bb = KING_ATK[sq as usize];
+        let (_, rank) = coord_from_square(sq);
+
+        // Also include squares in front of king ring
+        if rank < 6 {
+            bb |= north_one(bb);
+        }
+
+        table[sq as usize] = bb & !BitBoard::from_sq(sq);
+        sq += 1;
+    }
+
+    table
+}
+
+const fn gen_black_king_zone() -> [u64; NUM_SQUARES] {
+    let mut table = [0; NUM_SQUARES];
+
+    let mut sq = 0;
+    while sq < 64 {
+        let mut bb = KING_ATK[sq as usize];
+        let (_, rank) = coord_from_square(sq);
+
+        // Also include squares in front of king ring
+        if rank > 1 {
+            bb |= south_one(bb);
+        }
+
+        table[sq as usize] = bb & !BitBoard::from_sq(sq);
+        sq += 1;
     }
 
     table
