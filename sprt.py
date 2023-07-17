@@ -6,6 +6,7 @@ import argparse
 
 parser = argparse.ArgumentParser(prog="Beatrijs SPRT test suite")
 parser.add_argument("--hash", type=int, help="Table size in mb")
+parser.add_argument("--threads", type=int, default=6, help="number of threads cutechess-cli can use")
 
 args = parser.parse_args()
 
@@ -32,7 +33,7 @@ cutechess-cli \
 bookdepth=4 proto=uci {f"option.Hash={args.hash}" if args.hash else ""} \
 -games 2 -rounds 2500 -repeat 2 -maxmoves 200 \
 -sprt elo0=0 elo1=10 alpha=0.05 beta=0.05 \
--concurrency 6 \
+-concurrency {args.threads} \
 -ratinginterval 10 \
 -recover \
 -pgnout 'tmp/sprt.pgn'
