@@ -27,7 +27,7 @@ os.system("""
 cutechess-cli \
 -engine cmd=tmp/beatrijs-new name=new \
 -engine cmd=tmp/beatrijs-master name=master \
--each restart=on tc=inf/10+0.1 book='/home/dewaeq/Downloads/baronbook30/baron30.bin' bookdepth=4 proto=uci \
+-each restart=on tc=inf/10+0.1 book='/home/dewaeq/Downloads/baronbook30/baron30.bin' bookdepth=4 proto=uci option.hash=256 \
 -games 2 -rounds 2500 -repeat 2 -maxmoves 200 \
 -sprt elo0=0 elo1=10 alpha=0.05 beta=0.05 \
 -concurrency 6 \

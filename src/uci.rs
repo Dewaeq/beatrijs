@@ -9,12 +9,13 @@ use crate::{bitmove::BitMove, board::Board, input::Game, search_info::SearchInfo
 impl Game {
     pub fn uci(&mut self) {
         self.clear();
-        self.id();
-        self.uci_ok()
+        println!("id name beatrijs author Dewaeq");
+        println!("option name Hash type spin default 128 min 1");
+        println!("uciok");
     }
 
     pub fn is_ready(&self) {
-        self.ready_ok();
+        println!("readyok");
     }
 
     pub fn set_option(&mut self, commands: Vec<&str>) {
@@ -112,18 +113,6 @@ impl Game {
 
 /// Engine to Gui
 impl Game {
-    pub fn id(&self) {
-        println!("id name beatrijs author Dewaeq");
-    }
-
-    pub fn uci_ok(&self) {
-        println!("uciok");
-    }
-
-    pub fn ready_ok(&self) {
-        println!("readyok");
-    }
-
     pub fn best_move(&self) {
         let best_move = self.table.best_move(self.board.key());
         println!("bestmove {}", BitMove::pretty_move(best_move.unwrap_or(0)));
