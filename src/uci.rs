@@ -10,7 +10,7 @@ impl Game {
     pub fn uci(&mut self) {
         self.clear();
         println!("id name beatrijs author Dewaeq");
-        println!("option name Hash type spin default 128 min 1");
+        println!("option name Hash type spin default 128 min 1 max 16384");
         println!("uciok");
     }
 
@@ -22,7 +22,7 @@ impl Game {
         let mut index = 1;
         while index < commands.len() {
             let option = commands[index];
-            match option {
+            match option.to_lowercase().as_str() {
                 "hash" => {
                     let size = commands[index + 2]
                         .parse()
@@ -64,7 +64,7 @@ impl Game {
 
         for mut i in 0..commands.len() {
             let command = commands[i];
-            match command {
+            match command.to_lowercase().as_str() {
                 "infinite" => {
                     info.depth = MAX_SEARCH_DEPTH;
                     info.time_set = false;
