@@ -73,23 +73,28 @@ impl Game {
                     info.depth = commands[i + 1].parse::<usize>().unwrap();
                     i += 1;
                 }
+                "movetime" => {
+                    info.move_time = commands[i + 1].parse::<usize>().ok();
+                    info.time_set = true;
+                    i += 1;
+                }
                 "wtime" => {
-                    info.w_time = commands[i + 1].parse::<usize>().unwrap();
+                    info.w_time = commands[i + 1].parse::<usize>().ok();
                     info.time_set = true;
                     i += 1;
                 }
                 "btime" => {
-                    info.b_time = commands[i + 1].parse::<usize>().unwrap();
+                    info.b_time = commands[i + 1].parse::<usize>().ok();
                     info.time_set = true;
                     i += 1;
                 }
                 "winc" => {
-                    info.w_inc = commands[i + 1].parse::<usize>().unwrap();
+                    info.w_inc = commands[i + 1].parse::<usize>().ok();
                     info.time_set = true;
                     i += 1;
                 }
                 "binc" => {
-                    info.b_inc = commands[i + 1].parse::<usize>().unwrap();
+                    info.b_inc = commands[i + 1].parse::<usize>().ok();
                     info.time_set = true;
                     i += 1;
                 }
