@@ -1,3 +1,5 @@
+use crate::table::TWrapper;
+use std::sync::Arc;
 use std::{process::exit, sync::atomic::Ordering, thread::JoinHandle, time::Instant};
 
 use crate::search::MAX_SEARCH_DEPTH;
@@ -7,16 +9,30 @@ use crate::{bitmove::BitMove, board::Board, input::Game, search_info::SearchInfo
 impl Game {
     pub fn uci(&mut self) {
         self.clear();
-        self.id();
-        self.uci_ok()
+        println!("id name beatrijs author Dewaeq");
+        println!("option name Hash type spin default 128 min 1 max 16384");
+        println!("uciok");
     }
 
     pub fn is_ready(&self) {
-        self.ready_ok();
+        println!("readyok");
     }
 
-    pub fn set_option(&mut self) {
-        todo!()
+    pub fn set_option(&mut self, commands: Vec<&str>) {
+        let mut index = 1;
+        while index < commands.len() {
+            let option = commands[index];
+            match option.to_lowercase().as_str() {
+                "hash" => {
+                    let size = commands[index + 2]
+                        .parse()
+                        .expect("Please provide a valid table size");
+                    self.table = Arc::new(TWrapper::with_size(size));
+                    return;
+                }
+                _ => index += 1,
+            }
+        }
     }
 
     pub fn uci_new_game(&mut self) {
@@ -48,7 +64,7 @@ impl Game {
 
         for mut i in 0..commands.len() {
             let command = commands[i];
-            match command {
+            match command.to_lowercase().as_str() {
                 "infinite" => {
                     info.depth = MAX_SEARCH_DEPTH;
                     info.time_set = false;
@@ -97,18 +113,6 @@ impl Game {
 
 /// Engine to Gui
 impl Game {
-    pub fn id(&self) {
-        println!("id name beatrijs author Dewaeq");
-    }
-
-    pub fn uci_ok(&self) {
-        println!("uciok");
-    }
-
-    pub fn ready_ok(&self) {
-        println!("readyok");
-    }
-
     pub fn best_move(&self) {
         let best_move = self.table.best_move(self.board.key());
         println!("bestmove {}", BitMove::pretty_move(best_move.unwrap_or(0)));
