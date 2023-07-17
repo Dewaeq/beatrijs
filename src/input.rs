@@ -5,7 +5,7 @@ use std::{io, thread};
 use crate::defs::PieceType;
 use crate::eval::evaluate;
 use crate::search_info::SearchInfo;
-use crate::table::TWrapper;
+use crate::table::{TWrapper, TABLE_SIZE_MB};
 use crate::utils::is_repetition;
 use crate::{
     bitmove::BitMove, board::Board, movelist::MoveList, perft::perft, search::Searcher,
@@ -26,7 +26,7 @@ impl Game {
             board: Board::start_pos(),
             abort_search: Arc::new(AtomicBool::new(false)),
             search_thread: None,
-            table: Arc::new(TWrapper::new()),
+            table: Arc::new(TWrapper::with_size(TABLE_SIZE_MB)),
         }
     }
 
@@ -70,6 +70,8 @@ impl Game {
             self.stop();
         } else if base_command == "quit" {
             self.quit();
+        } else if base_command == "setoption" {
+            self.set_option(commands);
         }
         // Custom commands
         else if base_command == "d" {
@@ -89,6 +91,8 @@ impl Game {
             self.print_moves();
         } else if base_command == "rep" {
             println!("{}", is_repetition(&self.board));
+        } else if base_command == "stat" {
+            self.print_stats();
         }
     }
 
@@ -145,6 +149,15 @@ impl Game {
         }
 
         println!();
+    }
+
+    fn print_stats(&self) {
+        let hash_full = self.table.hash_full();
+        let table_size = self.table.size_mb();
+
+        println!("\n=================================\n");
+        println!("Hash full: {}", hash_full);
+        println!("Table size (mb): {}", table_size);
     }
 
     fn str_to_move(&mut self, move_str: &str) -> Option<u16> {

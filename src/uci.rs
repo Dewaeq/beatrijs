@@ -1,3 +1,5 @@
+use crate::table::TWrapper;
+use std::sync::Arc;
 use std::{process::exit, sync::atomic::Ordering, thread::JoinHandle, time::Instant};
 
 use crate::search::MAX_SEARCH_DEPTH;
@@ -15,8 +17,21 @@ impl Game {
         self.ready_ok();
     }
 
-    pub fn set_option(&mut self) {
-        todo!()
+    pub fn set_option(&mut self, commands: Vec<&str>) {
+        let mut index = 1;
+        while index < commands.len() {
+            let option = commands[index];
+            match option {
+                "hash" => {
+                    let size = commands[index + 2]
+                        .parse()
+                        .expect("Please provide a valid table size");
+                    self.table = Arc::new(TWrapper::with_size(size));
+                    return;
+                }
+                _ => index += 1,
+            }
+        }
     }
 
     pub fn uci_new_game(&mut self) {

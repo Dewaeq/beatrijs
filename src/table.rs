@@ -2,7 +2,7 @@ use std::cell::SyncUnsafeCell;
 
 use crate::{board::Board, defs::Score, movegen::is_legal_move, search::IS_MATE};
 
-pub const TABLE_SIZE_MB: usize = 1024;
+pub const TABLE_SIZE_MB: usize = 128;
 type TT = HashTable<HashEntry>;
 
 pub trait Table<T>
@@ -161,6 +161,12 @@ impl TWrapper {
         }
     }
 
+    pub fn with_size(mb: usize) -> Self {
+        TWrapper {
+            inner: SyncUnsafeCell::new(TT::with_size(mb)),
+        }
+    }
+
     pub fn clear(&self) {
         unsafe { (*self.inner.get()).clear() }
     }
@@ -207,6 +213,10 @@ impl TWrapper {
 
     pub fn hash_full(&self) -> usize {
         unsafe { (*self.inner.get()).hash_full() }
+    }
+
+    pub fn size_mb(&self) -> usize {
+        unsafe { (*self.inner.get()).size * std::mem::size_of::<HashEntry>() / (1024 * 1024) }
     }
 }
 
