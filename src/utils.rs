@@ -1,7 +1,7 @@
 use crate::bitmove::BitMove;
 use crate::board::Board;
 use crate::defs::{PieceType, Player, Score};
-use crate::search::{IMMEDIATE_MATE_SCORE, IS_MATE};
+use crate::search::{IS_MATE, MATE};
 use crate::{bitboard::BitBoard, defs::Square};
 
 pub fn square_from_string(str: &str) -> Square {
@@ -64,7 +64,7 @@ pub const fn b_max(a: Square, b: Square) -> Square {
 }
 
 /// # Arguments
-/// 
+///
 /// * `elapsed` - Elapsed time from the start of the search, in milliseconds
 pub fn print_search_info(
     depth: i32,
@@ -76,12 +76,12 @@ pub fn print_search_info(
     pv: &[u16],
     turn: Player,
 ) {
-    let score_str = if score.abs() == IMMEDIATE_MATE_SCORE {
+    let score_str = if score.abs() == MATE {
         format!("mate",)
     } else if score > IS_MATE {
-        format!("mate {}", (IMMEDIATE_MATE_SCORE - score + 1) / 2 as Score)
+        format!("mate {}", (MATE - score + 1) / 2 as Score)
     } else if score < -IS_MATE {
-        format!("mate {}", -(score + IMMEDIATE_MATE_SCORE) / 2 as Score)
+        format!("mate {}", -(score + MATE) / 2 as Score)
     } else {
         format!("cp {score}")
     };

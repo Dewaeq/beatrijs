@@ -14,8 +14,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 pub const MAX_SEARCH_DEPTH: usize = 100;
-pub const IMMEDIATE_MATE_SCORE: Score = 31_000;
-pub const IS_MATE: Score = IMMEDIATE_MATE_SCORE - 1000;
+pub const MATE: Score = 31_000;
+pub const IS_MATE: Score = MATE - 1000;
 
 const DELTA_PRUNING: Score = 100;
 const STATIC_NULL_MOVE_DEPTH: i32 = 5;
@@ -124,13 +124,15 @@ impl Searcher {
         println!("bestmove {}", BitMove::pretty_move(best_move));
     }
 
-    fn aspiration_search(&mut self, depth: i32, eval: Score) -> Score {
+    fn aspiration_search(&mut self, search_depth: i32, score: Score) -> Score {
         let mut alpha = -INFINITY;
         let mut beta = INFINITY;
+        let mut delta = 12;
+        let mut depth = search_depth;
 
         if depth > 4 {
-            alpha = eval - 16;
-            beta = eval + 16;
+            alpha = (-INFINITY).max(score - delta);
+            beta = INFINITY.min(score + delta);
         }
 
         let mut research = 0;
@@ -139,24 +141,20 @@ impl Searcher {
                 return 0;
             }
 
-            if alpha < -3500 {
-                alpha = -INFINITY;
-            }
+            let best_score = self.negamax(depth.max(1), alpha, beta, false);
 
-            if beta > 3500 {
-                beta = INFINITY;
-            }
-
-            let best_eval = self.negamax(depth, alpha, beta, false);
-            research += 1;
-
-            if best_eval <= alpha {
-                alpha = (-INFINITY).max(alpha - research * research * 23);
-            } else if best_eval >= beta {
-                beta = INFINITY.min(beta + research * research * 23);
+            if (best_score <= alpha) {
+                beta = (alpha + beta) / 2;
+                alpha = (-INFINITY).max(alpha - delta);
+                depth = search_depth;
+            } else if best_score >= beta {
+                beta = INFINITY.min(beta + delta);
+                depth -= (best_score.abs() <= IS_MATE) as Score;
             } else {
-                return best_eval;
+                return best_score;
             }
+
+            delta += delta / 2;
         }
     }
 
@@ -188,8 +186,8 @@ impl Searcher {
 
         // Mate distance pruning
         if !is_root {
-            alpha = Score::max(-IMMEDIATE_MATE_SCORE + ply as Score, alpha);
-            beta = Score::min(IMMEDIATE_MATE_SCORE - 1 - ply as Score, beta);
+            alpha = Score::max(-MATE + ply as Score, alpha);
+            beta = Score::min(MATE - 1 - ply as Score, beta);
 
             if alpha >= beta {
                 return alpha;
@@ -241,7 +239,7 @@ impl Searcher {
             }
 
             if in_check {
-                return -IMMEDIATE_MATE_SCORE + ply as Score;
+                return -MATE + ply as Score;
             }
             return 0;
         }
@@ -457,7 +455,7 @@ impl Searcher {
 
         if legals == 0 {
             if in_check {
-                best_score = -IMMEDIATE_MATE_SCORE + self.board.pos.ply as Score;
+                best_score = -MATE + self.board.pos.ply as Score;
             } else {
                 best_score = 0;
             }
