@@ -4,7 +4,7 @@ use crate::eval::evaluate;
 use crate::gen::tables::LMR;
 use crate::movegen::is_legal_move;
 use crate::search_info::SearchInfo;
-use crate::table::{HashEntry, HashFlag, TWrapper};
+use crate::table::{Bound, HashEntry, TWrapper};
 use crate::utils::{is_draw, is_repetition, print_search_info};
 use crate::{
     bitmove::BitMove, board::Board, defs::Player, movelist::MoveList, order::pick_next_move,
@@ -202,19 +202,19 @@ impl Searcher {
             depth += 1;
         }
 
-        if depth == 0 {
+        if depth <= 0 {
             let score = self.quiesence(alpha, beta, true);
             return score;
         }
 
-        let entry = self.table.probe(self.board.key(), ply);
+        let (tt_hit, entry) = self.table.probe(self.board.key(), ply);
         let mut tt_move = 0;
         let is_root = self.board.pos.ply == 0;
 
-        if let Some(entry) = entry {
+        if tt_hit {
             tt_move = entry.m;
 
-            if !is_pv || entry.hash_flag == HashFlag::Exact {
+            if !is_pv || entry.bound == Bound::Exact {
                 if let Some(score) = table_cutoff(entry, depth, alpha, beta) {
                     return score;
                 }
@@ -244,13 +244,15 @@ impl Searcher {
             return 0;
         }
 
-        let eval = if entry.is_some() {
-            entry.unwrap().static_eval
+        let static_eval = if in_check {
+            -INFINITY
+        } else if tt_hit {
+            entry.static_eval
         } else {
             evaluate(&self.board)
         };
 
-        self.eval_history[ply] = eval;
+        self.eval_history[ply] = static_eval;
 
         // Static null move pruning (= reverse futility pruning)
         /* if depth <= STATIC_NULL_MOVE_DEPTH
@@ -262,44 +264,56 @@ impl Searcher {
         }
         */
 
-        // Null move pruning
-        if do_null && !in_check && depth >= 2 && self.board.has_big_piece(self.board.turn) {
+        // Null move pruning:
+        // We have such a good position, that, even with a free move for our opponent,
+        // we'll still be able to beat beta
+        if do_null
+            && !is_pv
+            && !in_check
+            && depth >= 2
+            && static_eval >= beta
+            && (!tt_hit || entry.bound == Bound::Lower || entry.score >= beta)
+            && self.board.has_non_pawns(self.board.turn)
+        {
             self.board.make_null_move();
-            let r = 4 + depth / 6;
+            let r = 4 + depth / 6 + ((static_eval - beta) / 200).min(3);
             let score = -self.negamax((depth - r).max(0), -beta, -beta + 1, false);
             self.board.unmake_null_move();
 
             if score >= beta {
+                if score > IS_MATE {
+                    return beta;
+                }
                 return score;
             }
         }
 
-        let improving: bool = (ply >= 2 && eval >= self.eval_history[ply - 2]);
+        let improving: bool = (ply >= 2 && static_eval >= self.eval_history[ply - 2]);
 
         // Reverse futility pruning
         if !is_pv
             && !in_check
             && depth < 9
-            && eval - 214 * (depth - improving as i32) >= beta
-            && eval < 10_000
+            && static_eval - 214 * (depth - improving as i32) >= beta
+            && static_eval < 10_000
         {
-            return eval;
+            return static_eval;
         }
 
         // Futility pruning: frontier node
         if depth == 1
             && !in_check
             && !is_pv
-            && eval + MG_VALUE[2] < alpha
+            && static_eval + MG_VALUE[2] < alpha
             && alpha > -IS_MATE
             && beta < IS_MATE
         {
-            return eval;
+            return static_eval;
         }
 
         // Razoring
         if !is_pv && !in_check && tt_move == 0 && do_null && depth <= 3 {
-            if eval + 300 + (depth - 1) * 60 < alpha {
+            if static_eval + 300 + (depth - 1) * 60 < alpha {
                 return self.quiesence(alpha, beta, true);
             }
         }
@@ -359,7 +373,8 @@ impl Searcher {
                     }
                 } else {
                     // Futility pruning: parent node
-                    if !in_check && depth <= 8 && (eval + MG_VALUE[1] + 30 * depth <= alpha) {
+                    if !in_check && depth <= 8 && (static_eval + MG_VALUE[1] + 30 * depth <= alpha)
+                    {
                         search_quiets = false;
                         continue;
                     }
@@ -467,13 +482,13 @@ impl Searcher {
                 depth,
                 best_move,
                 best_score,
-                eval,
+                static_eval,
                 if best_score >= beta {
-                    HashFlag::Beta
+                    Bound::Lower
                 } else if alpha != old_alpha {
-                    HashFlag::Exact
+                    Bound::Exact
                 } else {
-                    HashFlag::Alpha
+                    Bound::Upper
                 },
             );
 
@@ -499,8 +514,8 @@ impl Searcher {
         let mut tt_move = 0;
 
         if root {
-            let entry = self.table.probe(self.board.key(), 0);
-            if let Some(entry) = entry {
+            let (tt_hit, entry) = self.table.probe(self.board.key(), 0);
+            if tt_hit {
                 if let Some(score) = table_cutoff(entry, 0, alpha, beta) {
                     return score;
                 }
@@ -621,11 +636,11 @@ impl Searcher {
                 best_score,
                 eval,
                 if best_score >= beta {
-                    HashFlag::Beta
+                    Bound::Lower
                 } else if alpha != old_alpha {
-                    HashFlag::Exact
+                    Bound::Exact
                 } else {
-                    HashFlag::Alpha
+                    Bound::Upper
                 },
             );
             self.table.store(entry, 0);
@@ -697,16 +712,16 @@ const fn table_cutoff(entry: HashEntry, depth: i32, alpha: Score, beta: Score) -
         return None;
     }
 
-    match entry.hash_flag {
-        HashFlag::Exact => Some(entry.score),
-        HashFlag::Alpha => {
+    match entry.bound {
+        Bound::Exact => Some(entry.score),
+        Bound::Upper => {
             if alpha >= entry.score {
                 Some(alpha)
             } else {
                 None
             }
         }
-        HashFlag::Beta => {
+        Bound::Lower => {
             if beta <= entry.score {
                 Some(beta)
             } else {
@@ -720,7 +735,7 @@ const fn table_cutoff(entry: HashEntry, depth: i32, alpha: Score, beta: Score) -
 /// still can't beat the current alpha, it will likely fail low again, so return early
 fn will_fail_low(entry: HashEntry, depth: i32, alpha: Score) -> bool {
     entry.depth as i32 >= depth - 1
-        && entry.hash_flag == HashFlag::Alpha
+        && entry.bound == Bound::Upper
         && entry.score + MG_VALUE[0] <= alpha
 }
 

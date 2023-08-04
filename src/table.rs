@@ -171,18 +171,20 @@ impl TWrapper {
         unsafe { (*self.inner.get()).clear() }
     }
 
-    pub fn probe(&self, key: u64, ply_from_root: usize) -> Option<HashEntry> {
-        let mut entry = unsafe { (*self.inner.get()).probe(key) };
+    pub fn probe(&self, key: u64, ply_from_root: usize) -> (bool, HashEntry) {
+        let mut entry = unsafe { (*self.inner.get()).get(key) };
 
-        if let Some(ref mut entry) = entry {
+        if entry.key == key {
             if entry.score > IS_MATE {
                 entry.score -= ply_from_root as Score;
             } else if entry.score < -IS_MATE {
                 entry.score += ply_from_root as Score;
             }
+
+            return (true, entry);
         }
 
-        entry
+        (false, entry)
     }
 
     pub fn store(&self, mut entry: HashEntry, ply_from_root: usize) {
@@ -221,10 +223,10 @@ impl TWrapper {
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum HashFlag {
+pub enum Bound {
     Exact,
-    Alpha,
-    Beta,
+    Upper,
+    Lower,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -234,7 +236,7 @@ pub struct HashEntry {
     pub m: u16,
     pub score: Score,
     pub static_eval: Score,
-    pub hash_flag: HashFlag,
+    pub bound: Bound,
 }
 
 impl Default for HashEntry {
@@ -245,7 +247,7 @@ impl Default for HashEntry {
             m: 0,
             score: 0,
             static_eval: 0,
-            hash_flag: HashFlag::Exact,
+            bound: Bound::Exact,
         }
     }
 }
@@ -257,7 +259,7 @@ impl HashEntry {
         m: u16,
         score: Score,
         static_eval: Score,
-        hash_flag: HashFlag,
+        hash_flag: Bound,
     ) -> Self {
         HashEntry {
             key,
@@ -265,7 +267,7 @@ impl HashEntry {
             m,
             score,
             static_eval,
-            hash_flag,
+            bound: hash_flag,
         }
     }
 
