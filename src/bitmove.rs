@@ -54,7 +54,12 @@ impl BitMove {
         BitMove::is_cap(bitmove) || BitMove::is_prom(bitmove)
     }
 
-    pub fn prom_type(flag: u8) -> PieceType {
+    /// No capture, promotion, en passant or castle
+    pub const fn is_normal(bitmove: u16) -> bool {
+        bitmove & 0b1110 == 0
+    }
+
+    pub const fn prom_type(flag: u8) -> PieceType {
         // Remove capture bit
         match flag & 0b1011 {
             MoveFlag::PROMOTE_KNIGHT => PieceType::Knight,
@@ -131,10 +136,12 @@ pub struct MoveFlag;
 impl MoveFlag {
     pub const QUIET: u8 = 0;
     pub const DOUBLE_PAWN_PUSH: u8 = 1;
+    pub const CASTLE: u8 = 2;
     pub const CASTLE_KING: u8 = 2;
     pub const CASTLE_QUEEN: u8 = 3;
     pub const CAPTURE: u8 = 4;
     pub const EN_PASSANT: u8 = 5;
+    pub const PROMOTE: u8 = 8;
     pub const PROMOTE_KNIGHT: u8 = 8;
     pub const PROMOTE_BISHOP: u8 = 9;
     pub const PROMOTE_ROOK: u8 = 10;

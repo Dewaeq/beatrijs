@@ -4,8 +4,8 @@ use std::{io, thread};
 
 use crate::defs::PieceType;
 use crate::eval::evaluate;
-use crate::search::SearchInfo;
-use crate::table::TWrapper;
+use crate::search_info::SearchInfo;
+use crate::table::{TWrapper, TABLE_SIZE_MB};
 use crate::utils::is_repetition;
 use crate::{
     bitmove::BitMove, board::Board, movelist::MoveList, perft::perft, search::Searcher,
@@ -26,20 +26,13 @@ impl Game {
             board: Board::start_pos(),
             abort_search: Arc::new(AtomicBool::new(false)),
             search_thread: None,
-            table: Arc::new(TWrapper::new()),
+            table: Arc::new(TWrapper::with_size(TABLE_SIZE_MB)),
         }
     }
 
     pub fn clear(&mut self) {
         self.table.clear();
         self.stop();
-        // self.board = Board::start_pos();
-    }
-
-    fn create_searcher(&mut self, info: SearchInfo) -> Searcher {
-        let abort = self.abort_search.clone();
-        let table = self.table.clone();
-        Searcher::new(self.board, abort, table, info)
     }
 
     pub fn main_loop() {
@@ -77,6 +70,8 @@ impl Game {
             self.stop();
         } else if base_command == "quit" {
             self.quit();
+        } else if base_command == "setoption" {
+            self.set_option(commands);
         }
         // Custom commands
         else if base_command == "d" {
@@ -96,13 +91,21 @@ impl Game {
             self.print_moves();
         } else if base_command == "rep" {
             println!("{}", is_repetition(&self.board));
+        } else if base_command == "stat" {
+            self.print_stats();
         }
     }
 
     pub fn start_search(&mut self, info: SearchInfo) {
-        let mut searcher = self.create_searcher(info);
+        // We can't just move the whole searcher to a new thread,
+        // because moving that much data causes a stack overflow in debug builds
+        let abort = self.abort_search.clone();
+        let table = self.table.clone();
+        let info = info.clone();
+        let board = self.board.clone();
+
         let handle = thread::spawn(move || {
-            searcher.iterate();
+            Searcher::new(board, abort, table, info).iterate();
         });
 
         self.search_thread = Some(handle);
@@ -148,6 +151,15 @@ impl Game {
         println!();
     }
 
+    fn print_stats(&self) {
+        let hash_full = self.table.hash_full();
+        let table_size = self.table.size_mb();
+
+        println!("\n=================================\n");
+        println!("Hash full: {}", hash_full);
+        println!("Table size (mb): {}", table_size);
+    }
+
     fn str_to_move(&mut self, move_str: &str) -> Option<u16> {
         assert!(move_str.len() == 4 || move_str.len() == 5);
 
@@ -161,7 +173,11 @@ impl Game {
             _ => PieceType::None,
         };
 
+        let temp_ply = self.board.pos.ply;
+        self.board.pos.ply = 0;
         let mut moves = MoveList::legal(&mut self.board);
+        self.board.pos.ply = temp_ply;
+
         moves.find(|&x| {
             BitMove::src(x) == src
                 && BitMove::dest(x) == dest

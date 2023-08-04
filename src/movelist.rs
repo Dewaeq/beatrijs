@@ -1,7 +1,7 @@
 use crate::{
     board::Board,
     defs::MAX_MOVES,
-    movegen::{generate_legal, generate_quiet},
+    movegen::{generate_all, generate_legal, generate_quiet},
 };
 
 #[derive(Clone, Copy)]
@@ -21,6 +21,12 @@ impl MoveList {
             count: 0,
             current: 0,
         }
+    }
+
+    pub fn all(board: &mut Board) -> Self {
+        let mut move_list = MoveList::new();
+        generate_all(board, &mut move_list);
+        move_list
     }
 
     pub fn legal(board: &mut Board) -> Self {
@@ -44,20 +50,18 @@ impl MoveList {
     }
 
     pub const fn get_all(&self, index: usize) -> (u16, i32) {
-        unsafe {
-            (
-                *self.moves.get_unchecked(index),
-                *self.scores.get_unchecked(index),
-            )
-        }
+        assert!(index < MAX_MOVES);
+        (self.moves[index], self.scores[index])
     }
 
     pub const fn get(&self, index: usize) -> u16 {
-        unsafe { *self.moves.get_unchecked(index) }
+        assert!(index < MAX_MOVES);
+        self.moves[index]
     }
 
     pub const fn get_score(&self, index: usize) -> i32 {
-        unsafe { *self.scores.get_unchecked(index) }
+        assert!(index < MAX_MOVES);
+        self.scores[index]
     }
 
     pub fn set_score(&mut self, index: usize, score: i32) {

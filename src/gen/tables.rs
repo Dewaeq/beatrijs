@@ -14,6 +14,11 @@ pub const ISOLATED: [u64; 8] = gen_isolated();
 
 pub const PASSED: [[u64; NUM_SQUARES]; NUM_SIDES] = [gen_white_passed(), gen_black_passed()];
 
+pub const SHIELDING_PAWNS: [[u64; NUM_SQUARES]; NUM_SIDES] =
+    [gen_white_shielding(), gen_black_shielding()];
+
+pub const LMR: [[f32; 64]; 32] = gen_lmr();
+
 const fn gen_distance() -> [[Score; NUM_SQUARES]; NUM_SQUARES] {
     let mut table = [[0; NUM_SQUARES]; NUM_SQUARES];
 
@@ -83,6 +88,111 @@ const fn gen_black_passed() -> [u64; NUM_SQUARES] {
         }
 
         sq += 1;
+    }
+
+    table
+}
+
+const fn gen_white_shielding() -> [u64; NUM_SQUARES] {
+    let mut table = [0; NUM_SQUARES];
+    let mut sq = 0;
+
+    while sq < 56 {
+        let (file, rank) = coord_from_square(sq);
+        let mut shield = BitBoard::file_bb(sq);
+
+        if file == 0 {
+            shield |= BitBoard::FILE_C;
+        } else if file == 7 {
+            shield |= BitBoard::FILE_F;
+        }
+
+        if file != 0 {
+            shield |= BitBoard::file_bb(file - 1);
+        }
+        if file != 7 {
+            shield |= BitBoard::file_bb(file + 1);
+        }
+
+        let mut next = sq + 24;
+        while next < 64 {
+            shield &= !BitBoard::rank_bb(next);
+            next += 8;
+        }
+
+        let mut prev = sq;
+        while prev >= 0 {
+            shield &= !BitBoard::rank_bb(prev);
+            prev -= 8;
+        }
+
+        table[sq as usize] = shield;
+        sq += 1;
+    }
+
+    table
+}
+
+const fn gen_black_shielding() -> [u64; NUM_SQUARES] {
+    let mut table = [0; NUM_SQUARES];
+    let mut sq = 63;
+
+    while sq > 7 {
+        let (file, rank) = coord_from_square(sq);
+        let mut shield = BitBoard::file_bb(sq);
+
+        if file == 0 {
+            shield |= BitBoard::FILE_C;
+        } else if file == 7 {
+            shield |= BitBoard::FILE_F;
+        }
+
+        if file != 0 {
+            shield |= BitBoard::file_bb(file - 1);
+        }
+        if file != 7 {
+            shield |= BitBoard::file_bb(file + 1);
+        }
+
+        let mut next = sq - 24;
+        while next >= 0 {
+            shield &= !BitBoard::rank_bb(next);
+            next -= 8;
+        }
+
+        let mut prev = sq;
+        while prev < 64 {
+            shield &= !BitBoard::rank_bb(prev);
+            prev += 8;
+        }
+
+        table[sq as usize] = shield;
+
+        sq -= 1;
+    }
+
+    table
+}
+
+include!(concat!(env!("OUT_DIR"), "/logarithms.rs"));
+const fn gen_lmr() -> [[f32; 64]; 32] {
+    let mut table = [[0f32; 64]; 32];
+
+    let mut depth = 3;
+    while depth < 32 {
+        let mut move_count = 0;
+        while move_count < 64 {
+            let d_ln = LN[depth];
+            let m_ln = LN[move_count];
+
+            let reduction =
+                (0.8422840719846748 * m_ln * d_ln - 0.4 * m_ln - 0.22572624883839026 * d_ln + 1.2);
+            if reduction >= 0f32 {
+                table[depth][move_count] = reduction;
+            }
+            move_count += 1;
+        }
+        depth += 1;
     }
 
     table

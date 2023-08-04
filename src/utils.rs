@@ -63,38 +63,38 @@ pub const fn b_max(a: Square, b: Square) -> Square {
     }
 }
 
+/// # Arguments
+/// 
+/// * `elapsed` - Elapsed time from the start of the search, in milliseconds
 pub fn print_search_info(
     depth: i32,
+    sel_depth: usize,
     score: Score,
-    total_time: u64,
-    search_time: f64,
+    elapsed: f64,
     num_nodes: u64,
+    hash_full: usize,
     pv: &[u16],
     turn: Player,
 ) {
     let score_str = if score.abs() == IMMEDIATE_MATE_SCORE {
         format!("mate",)
     } else if score > IS_MATE {
-        format!(
-            "mate {}",
-            (IMMEDIATE_MATE_SCORE - score + 1) / 2 as Score
-        )
+        format!("mate {}", (IMMEDIATE_MATE_SCORE - score + 1) / 2 as Score)
     } else if score < -IS_MATE {
-        format!(
-            "mate {}",
-            (score + IMMEDIATE_MATE_SCORE) / 2 as Score
-        )
+        format!("mate {}", -(score + IMMEDIATE_MATE_SCORE) / 2 as Score)
     } else {
         format!("cp {score}")
     };
 
     print!(
-        "info depth {} score {} nodes {} time {} nps {} ",
+        "info depth {} seldepth {} score {} nodes {} time {} nps {} hashfull {} ",
         depth,
+        sel_depth,
         score_str,
         num_nodes,
-        total_time,
-        (num_nodes as f64 / search_time) as u64
+        elapsed as u64,
+        (num_nodes as f64 / elapsed * 1000f64) as u64,
+        hash_full,
     );
     print_pv(&pv);
 }
@@ -120,12 +120,12 @@ pub const fn is_draw(board: &Board) -> bool {
 }
 
 pub const fn is_repetition(board: &Board) -> bool {
-    if board.pos.rule_fifty < 2 {
+    if board.pos.rule_fifty < 2 || board.history.count == 0 {
         return false;
     }
 
     let mut i = 1;
-    while i <= board.pos.rule_fifty as usize {
+    while i <= board.pos.rule_fifty as usize && i <= board.history.count {
         let key = board.history.get_key(board.history.count - i);
         if key == board.key() {
             return true;
@@ -170,4 +170,66 @@ const fn is_material_draw(board: &Board) -> bool {
     }
 
     return false;
+}
+
+pub const fn ranks_in_front_of(side: Player, sq: Square) -> u64 {
+    let bb = BitBoard::rank_bb(sq);
+    front_span(side, bb)
+}
+
+pub const fn front_span(side: Player, bb: u64) -> u64 {
+    match side {
+        Player::White => north_one(north_fill(bb)),
+        Player::Black => south_one(south_fill(bb)),
+    }
+}
+
+pub const fn fill_up(side: Player, bb: u64) -> u64 {
+    match side {
+        Player::White => north_fill(bb),
+        Player::Black => south_fill(bb),
+    }
+}
+
+pub const fn fill_down(side: Player, bb: u64) -> u64 {
+    match side {
+        Player::White => south_fill(bb),
+        Player::Black => north_fill(bb),
+    }
+}
+
+pub const fn north_fill(mut bb: u64) -> u64 {
+    bb |= bb << 8;
+    bb |= bb << 16;
+    bb |= bb << 32;
+
+    bb
+}
+
+pub const fn south_fill(mut bb: u64) -> u64 {
+    bb |= bb >> 8;
+    bb |= bb >> 16;
+    bb |= bb >> 32;
+
+    bb
+}
+
+pub const fn file_fill(bb: u64) -> u64 {
+    north_fill(bb) | south_fill(bb)
+}
+
+pub const fn north_one(bb: u64) -> u64 {
+    bb << 8
+}
+
+pub const fn south_one(bb: u64) -> u64 {
+    bb >> 8
+}
+
+pub const fn east_one(bb: u64) -> u64 {
+    (bb & !BitBoard::FILE_H) << 1
+}
+
+pub const fn west_one(bb: u64) -> u64 {
+    (bb & !BitBoard::FILE_A) >> 1
 }

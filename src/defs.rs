@@ -3,12 +3,11 @@ use crate::bitboard::BitBoard;
 pub const WHITE_IDX: usize = 0;
 pub const BLACK_IDX: usize = 1;
 
+pub const MAX_GAME_LENGTH: usize = 512;
 pub const MAX_MOVES: usize = 256;
 pub const NUM_PIECES: usize = 6;
 pub const NUM_SIDES: usize = 2;
 pub const NUM_SQUARES: usize = 64;
-
-pub const MAX_DEPTH: u8 = 255;
 
 pub type Square = i8;
 pub type Score = i32;
@@ -152,6 +151,24 @@ impl PieceType {
             PieceType::None => 6,
         }
     }
+
+    pub const fn is_none(&self) -> bool {
+        matches!(self, PieceType::None)
+    }
+
+    pub const fn mg_value(&self) -> Score {
+        match self {
+            PieceType::None => 0,
+            _ => MG_VALUE[self.as_usize()],
+        }
+    }
+
+    pub const fn eg_value(&self) -> Score {
+        match self {
+            PieceType::None => 0,
+            _ => MG_VALUE[self.as_usize()],
+        }
+    }
 }
 
 /// Rook directions are 0-3
@@ -198,4 +215,10 @@ pub const PASSED_PAWN_SCORE: [Score; 8] = [0, 5, 10, 20, 35, 60, 100, 200];
 pub const CASTLE_KING_FILES: u64 = BitBoard::FILE_F | BitBoard::FILE_G | BitBoard::FILE_H;
 pub const CASTLE_QUEEN_FILES: u64 = BitBoard::FILE_A | BitBoard::FILE_B | BitBoard::FILE_C;
 
-pub const CENTER_FILES: u64 = BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F;
+pub const CENTER_FILES: u64 =
+    BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F;
+pub const CENTER_SQUARES: u64 = (BitBoard::RANK_4 | BitBoard::RANK_5) & CENTER_FILES;
+pub const SMALL_CENTER: u64 = (BitBoard::RANK_4 | BitBoard::RANK_5) & (BitBoard::FILE_D | BitBoard::FILE_E);
+
+pub const DARK_SQUARES: u64 = 0b1010101001010101101010100101010110101010010101011010101001010101;
+pub const LIGHT_SQUARES: u64 = !DARK_SQUARES;

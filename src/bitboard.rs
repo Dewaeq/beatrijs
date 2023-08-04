@@ -23,6 +23,8 @@ impl BitBoard {
     pub const RANK_1: u64 = 0x00000000000000FF;
     pub const RANK_2: u64 = BitBoard::RANK_1 << 8;
     pub const RANK_3: u64 = BitBoard::RANK_1 << 16;
+    pub const RANK_4: u64 = BitBoard::RANK_1 << 24;
+    pub const RANK_5: u64 = BitBoard::RANK_1 << 32;
     pub const RANK_6: u64 = BitBoard::RANK_1 << 40;
     pub const RANK_7: u64 = BitBoard::RANK_1 << 48;
     pub const RANK_8: u64 = BitBoard::RANK_1 << 56;
@@ -67,9 +69,8 @@ impl BitBoard {
     /// Empty bitboards remain empty
     pub fn pop_lsb(bb: &mut u64) -> Square {
         let lsb = BitBoard::bit_scan_forward(*bb);
-        if lsb < 64 {
-            BitBoard::pop_bit(bb, lsb)
-        }
+        *bb &= *bb - 1;
+
         lsb
     }
 
@@ -99,7 +100,12 @@ impl BitBoard {
             return 64;
         }
 
-        unsafe { *INDEX_64.get_unchecked((((bb ^ (bb - 1)) * DEBRUIJN_64) >> 58) as usize) }
+        let index = ((bb ^ (bb - 1)) * DEBRUIJN_64) >> 58;
+        // This isn't necessary, because 'index' is 6 bits, so it can't exceed 63,
+        // but this assert aids the compiler (I think)
+        assert!(index < 64);
+
+        INDEX_64[index as usize]
     }
 
     /// Get the index of the most significant bit.
@@ -117,7 +123,12 @@ impl BitBoard {
         bb |= bb >> 16;
         bb |= bb >> 32;
 
-        unsafe { *INDEX_64.get_unchecked(((bb * DEBRUIJN_64) >> 58) as usize) }
+        let index = (bb * DEBRUIJN_64) >> 58;
+        // This isn't necessary, because 'index' is 6 bits, so it can't exceed 63,
+        // but this assert aids the compiler (I think)
+        assert!(index < 64);
+
+        INDEX_64[index as usize]
     }
 
     pub const fn count(mut bb: u64) -> u32 {

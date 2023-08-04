@@ -91,8 +91,8 @@ fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board) {
 }
 
 fn add_capture_move(m: u16, move_list: &mut MoveList, board: &Board) {
-    let move_piece = board.piece(BitMove::src(m));
-    let cap_piece = board.piece(BitMove::dest(m));
+    let move_piece = board.piece_type(BitMove::src(m));
+    let cap_piece = board.piece_type(BitMove::dest(m));
 
     assert!(move_piece != PieceType::None);
     assert!(cap_piece != PieceType::None);
@@ -133,7 +133,7 @@ fn make_promotions(
 }
 
 #[inline]
-const fn pawn_push(pawns: u64, player: Player) -> u64 {
+pub const fn pawn_push(pawns: u64, player: Player) -> u64 {
     match player {
         Player::White => pawns << 8,
         Player::Black => pawns >> 8,
@@ -166,7 +166,7 @@ const fn pawn_cap_west(pawns: u64, player: Player) -> u64 {
 
 #[inline]
 pub const fn pawn_caps(pawns: u64, player: Player) -> u64 {
-    pawn_cap_east(pawns, player) | pawn_cap_east(pawns, player)
+    pawn_cap_west(pawns, player) | pawn_cap_east(pawns, player)
 }
 
 fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mut MoveList) {
@@ -312,7 +312,7 @@ fn gen_piece_moves(
     }
 }
 
-fn generate_all(board: &Board, gen_type: GenType, move_list: &mut MoveList) {
+fn generate_all_moves(board: &Board, gen_type: GenType, move_list: &mut MoveList) {
     let king_sq = board.cur_king_square();
     let checker_sq = BitBoard::bit_scan_forward(board.pos.checkers_bb);
     let checks = gen_type == GenType::QuietChecks;
@@ -399,15 +399,18 @@ fn generate_all(board: &Board, gen_type: GenType, move_list: &mut MoveList) {
     }
 }
 
+pub fn generate_all(board: &mut Board, move_list: &mut MoveList) {
+    if board.in_check() {
+        generate_all_moves(board, GenType::Evasions, move_list);
+    } else {
+        generate_all_moves(board, GenType::NonEvasions, move_list);
+    }
+}
+
 /// Wrapper around [`generate_all`]
 pub fn generate_legal(board: &mut Board, move_list: &mut MoveList) {
     let mut pseudo = MoveList::new();
-
-    if board.in_check() {
-        generate_all(board, GenType::Evasions, &mut pseudo);
-    } else {
-        generate_all(board, GenType::NonEvasions, &mut pseudo);
-    }
+    generate_all(board, &mut pseudo);
 
     let mut i = 0;
     while i < pseudo.size() {
@@ -415,27 +418,17 @@ pub fn generate_legal(board: &mut Board, move_list: &mut MoveList) {
         if is_legal_move(board, m) {
             move_list.push(m, score);
         }
+
         i += 1;
     }
 }
 
 pub fn generate_quiet(board: &mut Board, move_list: &mut MoveList) {
-    let mut pseudo = MoveList::new();
-
     if board.in_check() {
-        generate_all(board, GenType::EvadingCaptures, &mut pseudo);
+        generate_all_moves(board, GenType::EvadingCaptures, move_list);
     } else {
-        generate_all(board, GenType::Captures, &mut pseudo);
-        generate_all(board, GenType::QuietChecks, &mut pseudo);
-    }
-
-    let mut i = 0;
-    while i < pseudo.size() {
-        let (m, score) = pseudo.get_all(i);
-        if is_legal_move(board, m) {
-            move_list.push(m, score);
-        }
-        i += 1;
+        generate_all_moves(board, GenType::Captures, move_list);
+        generate_all_moves(board, GenType::QuietChecks, move_list);
     }
 }
 

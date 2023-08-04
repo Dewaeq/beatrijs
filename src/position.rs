@@ -20,10 +20,10 @@ pub struct Position {
     pub key: u64,
     /// Bitboard of all the pieces giving check
     pub checkers_bb: u64,
-    /// Per player, bitboard of all the pieces blocking check on that player's king
+    /// Per player, bitboard of all the pieces (both colors) blocking check on that player's king
     pub king_blockers: [u64; 2],
-    // Per player, bitboard of all the pieces pinned the opponent's king
-    // pub pinners_bb: [u64; 2],
+    // Per player, bitboard of all the pieces pinning the opponent's king
+    pub pinners: [u64; 2],
     /// Per piece type, bitboard containing all the squares on which a piece of that
     /// type gives check to the opponent
     pub check_squares: [u64; NUM_PIECES],
@@ -42,6 +42,7 @@ impl Position {
             ep_square: 64,
             checkers_bb: 0,
             king_blockers: [0; NUM_SIDES],
+            pinners: [0; 2],
             check_squares: [0; NUM_PIECES],
             captured_piece: PieceType::None,
             last_move: None,
