@@ -254,6 +254,12 @@ impl Searcher {
 
         self.eval_history[ply] = static_eval;
 
+        // Internal Iterative Reduction (IRR):
+        // A modern approach to internal iterative deepening
+        if depth >= 6 && !tt_hit {
+            depth -= 1;
+        }
+
         // Static null move pruning (= reverse futility pruning)
         /* if depth <= STATIC_NULL_MOVE_DEPTH
             && !is_pv
