@@ -202,7 +202,7 @@ impl Searcher {
             depth += 1;
         }
 
-        if depth <= 0 {
+        if depth <= 0 && !in_check {
             let score = self.quiesence(alpha, beta, true);
             return score;
         }
