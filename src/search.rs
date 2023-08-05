@@ -194,7 +194,7 @@ impl Searcher {
             }
 
             if is_draw(&self.board) {
-                return 0;
+                return 8 - (self.num_nodes & 7) as Score;
             }
         }
 
@@ -514,7 +514,7 @@ impl Searcher {
         }
 
         if is_draw(&self.board) {
-            return 0;
+            return 8 - (self.num_nodes & 7) as Score;
         }
 
         let mut tt_move = 0;

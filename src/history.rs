@@ -1,3 +1,5 @@
+use std::slice::Iter;
+
 use crate::{defs::MAX_GAME_LENGTH, position::Position};
 
 #[derive(Copy, Clone)]
@@ -40,5 +42,9 @@ impl History {
 
     pub const fn get_key(&self, index: usize) -> u64 {
         self.positions[index].key
+    }
+
+    pub fn iter(&self) -> Iter<'_, Position> {
+        self.positions.iter()
     }
 }

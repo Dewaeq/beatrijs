@@ -116,25 +116,30 @@ pub const fn mirror(sq: Square) -> Square {
 }
 
 pub const fn is_draw(board: &Board) -> bool {
-    board.pos.rule_fifty >= 100 || is_repetition(board) || is_material_draw(board)
+    board.pos.half_move_count >= 100 || is_repetition(board) || is_material_draw(board)
 }
 
 pub const fn is_repetition(board: &Board) -> bool {
-    if board.pos.rule_fifty < 2 || board.history.count == 0 {
-        return false;
-    }
-
-    let mut i = 1;
-    while i <= board.pos.rule_fifty as usize && i <= board.history.count {
-        let key = board.history.get_key(board.history.count - i);
-        if key == board.key() {
+    let mut i = board.history.count as i32 - 2;
+    while i >= 0 && i >= board.history.count as i32 - board.pos.half_move_count as i32 {
+        if board.history.get_key(i as usize) == board.key() {
             return true;
         }
 
-        i += 1;
+        i -= 2;
     }
 
-    false
+    return false;
+
+    /*board
+    .history
+    .iter()
+    .take(board.history.count)
+    .rev()
+    .take(board.pos.half_move_count as usize)
+    .skip(1)
+    .step_by(2)
+    .any(|pos| pos.key == board.key())*/
 }
 
 const fn is_material_draw(board: &Board) -> bool {
@@ -161,10 +166,12 @@ const fn is_material_draw(board: &Board) -> bool {
     }
 
     let num_knights = BitBoard::count(board.piece_bb(PieceType::Knight));
-    let num_bishops = BitBoard::count(board.piece_bb(PieceType::Bishop));
+    let bishops = board.piece_bb(PieceType::Bishop);
 
+    // KvN, KvNN and KvB are draws
     if (only_white_king || only_black_king)
-        && ((num_knights < 2 && num_bishops == 0) || (num_knights == 0 && num_bishops < 2))
+        && ((num_knights <= 2 && bishops == 0)
+            || (num_knights == 0 && !BitBoard::more_than_one(bishops)))
     {
         return true;
     }

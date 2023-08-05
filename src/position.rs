@@ -10,7 +10,7 @@ pub struct Position {
     /// bit 3 is black castle king side
     pub castling: u8,
     /// 50 move rule counter
-    pub rule_fifty: u8,
+    pub half_move_count: u8,
     /// Ply at this position, starting from zero
     pub ply: usize,
     /// Square behind the pawn, 64 if none
@@ -36,7 +36,7 @@ impl Position {
     pub const fn new() -> Self {
         Position {
             castling: Castling::NONE,
-            rule_fifty: 0,
+            half_move_count: 0,
             ply: 0,
             key: 0,
             ep_square: 64,

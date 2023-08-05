@@ -382,9 +382,9 @@ impl Board {
         }
 
         if piece == PieceType::Pawn || is_cap {
-            self.pos.rule_fifty = 0;
+            self.pos.half_move_count = 0;
         } else {
-            self.pos.rule_fifty += 1;
+            self.pos.half_move_count += 1;
         }
 
         self.pos.key ^= Zobrist::side();
@@ -793,7 +793,7 @@ impl Board {
             board.set_ep(square_from_string(ep_str));
         }
 
-        board.pos.rule_fifty = half_move_str.parse::<u8>().unwrap();
+        board.pos.half_move_count = half_move_str.parse::<u8>().unwrap();
         board.pos.ply = full_move_str.parse::<usize>().unwrap();
 
         let mut file = 0;
