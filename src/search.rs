@@ -252,6 +252,10 @@ impl Searcher {
             evaluate(&self.board)
         };
 
+        if !tt_hit && !in_check {
+            self.table.store_eval(self.board.key(), static_eval);
+        }
+
         self.eval_history[ply] = static_eval;
 
         // Internal Iterative Reduction (IRR):
@@ -519,15 +523,13 @@ impl Searcher {
 
         let mut tt_move = 0;
 
-        if root {
-            let (tt_hit, entry) = self.table.probe(self.board.key(), 0);
-            if tt_hit {
-                if let Some(score) = table_cutoff(entry, 0, alpha, beta) {
-                    return score;
-                }
-
-                tt_move = entry.m;
+        let (tt_hit, entry) = self.table.probe(self.board.key(), self.board.pos.ply);
+        if tt_hit {
+            if let Some(score) = table_cutoff(entry, 0, alpha, beta) {
+                return score;
             }
+
+            tt_move = entry.m;
         }
 
         self.num_nodes += 1;
@@ -535,8 +537,21 @@ impl Searcher {
             self.sel_depth = self.board.pos.ply;
         }
 
+        let in_check = self.board.in_check();
+
         // Stand pat
-        let eval = evaluate(&self.board);
+        let eval = if in_check {
+            -INFINITY
+        } else if tt_hit {
+            entry.static_eval
+        } else {
+            evaluate(&self.board)
+        };
+
+        if !tt_hit && !in_check {
+            self.table.store_eval(self.board.key(), eval);
+        }
+
         if eval >= beta {
             return eval;
         }
@@ -553,6 +568,7 @@ impl Searcher {
         let mut moves = MoveList::quiet(&mut self.board);
         let mut legals = 0;
         let mut best_score = eval;
+        let mut best_move = 0;
         let old_alpha = alpha;
 
         let futility_base = if self.board.in_check() {
@@ -623,22 +639,23 @@ impl Searcher {
 
             if score > best_score {
                 best_score = score;
-            }
+                best_move = m;
 
-            if score > alpha {
-                alpha = score;
-            }
+                if score > alpha {
+                    alpha = score;
+                }
 
-            if score >= beta {
-                break;
+                if score >= beta {
+                    break;
+                }
             }
         }
 
-        if root {
+        if !self.should_stop() {
             let entry = HashEntry::new(
                 self.board.key(),
                 0,
-                self.table.best_move(self.board.key()).unwrap_or(0),
+                best_move,
                 best_score,
                 eval,
                 if best_score >= beta {
@@ -649,7 +666,8 @@ impl Searcher {
                     Bound::Upper
                 },
             );
-            self.table.store(entry, 0);
+
+            self.table.store(entry, self.board.pos.ply);
         }
 
         best_score
@@ -719,6 +737,7 @@ const fn table_cutoff(entry: HashEntry, depth: i32, alpha: Score, beta: Score) -
     }
 
     match entry.bound {
+        Bound::None => None,
         Bound::Exact => Some(entry.score),
         Bound::Upper => {
             if alpha >= entry.score {

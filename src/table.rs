@@ -1,6 +1,11 @@
 use std::cell::SyncUnsafeCell;
 
-use crate::{board::Board, defs::Score, movegen::is_legal_move, search::IS_MATE};
+use crate::{
+    board::Board,
+    defs::{Score, INFINITY},
+    movegen::is_legal_move,
+    search::IS_MATE,
+};
 
 pub const TABLE_SIZE_MB: usize = 128;
 type TT = HashTable<HashEntry>;
@@ -199,6 +204,13 @@ impl TWrapper {
         }
     }
 
+    pub fn store_eval(&self, key: u64, eval: Score) {
+        unsafe {
+            *(*self.inner.get()).get_mut(key) =
+                HashEntry::new(key, 0, 0, -INFINITY, eval, Bound::None);
+        }
+    }
+
     pub fn delete(&self, key: u64) {
         unsafe {
             *(*self.inner.get()).get_mut(key) = HashEntry::default();
@@ -227,6 +239,7 @@ pub enum Bound {
     Exact,
     Upper,
     Lower,
+    None,
 }
 
 #[derive(Copy, Clone, Debug)]
