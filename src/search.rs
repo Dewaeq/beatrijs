@@ -1,5 +1,5 @@
 use crate::bitmove::MoveFlag;
-use crate::defs::{PieceType, Score, Square, INFINITY, MG_VALUE};
+use crate::defs::{PieceType, Score, Square, MG_VALUE};
 use crate::eval::evaluate;
 use crate::gen::tables::LMR;
 use crate::movegen::is_legal_move;
@@ -13,6 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+pub const INFINITY: Score = 32_000;
 pub const MAX_SEARCH_DEPTH: usize = 100;
 pub const MATE: Score = 31_000;
 pub const IS_MATE: Score = MATE - 1000;
@@ -540,15 +541,11 @@ impl Searcher {
         let in_check = self.board.in_check();
 
         // Stand pat
-        let eval = if in_check {
-            -INFINITY
-        } else if tt_hit {
+        let eval = if tt_hit && entry.static_eval != -INFINITY {
             entry.static_eval
         } else {
             evaluate(&self.board)
         };
-
-        //let eval = evaluate(&self.board);
 
         if !tt_hit && !in_check {
             self.table.store_eval(self.board.key(), eval);
@@ -669,7 +666,7 @@ impl Searcher {
                 },
             );
 
-            self.table.store(entry, 0);
+            self.table.store(entry, self.board.pos.ply);
         }
 
         best_score

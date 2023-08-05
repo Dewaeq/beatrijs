@@ -2,9 +2,9 @@ use std::cell::SyncUnsafeCell;
 
 use crate::{
     board::Board,
-    defs::{Score, INFINITY},
+    defs::Score,
     movegen::is_legal_move,
-    search::IS_MATE,
+    search::{INFINITY, IS_MATE},
 };
 
 pub const TABLE_SIZE_MB: usize = 128;
