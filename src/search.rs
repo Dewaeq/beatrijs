@@ -548,6 +548,8 @@ impl Searcher {
             evaluate(&self.board)
         };
 
+        //let eval = evaluate(&self.board);
+
         if !tt_hit && !in_check {
             self.table.store_eval(self.board.key(), eval);
         }
@@ -640,14 +642,14 @@ impl Searcher {
             if score > best_score {
                 best_score = score;
                 best_move = m;
+            }
 
-                if score > alpha {
-                    alpha = score;
-                }
+            if score > alpha {
+                alpha = score;
+            }
 
-                if score >= beta {
-                    break;
-                }
+            if score >= beta {
+                break;
             }
         }
 
@@ -667,7 +669,7 @@ impl Searcher {
                 },
             );
 
-            self.table.store(entry, self.board.pos.ply);
+            self.table.store(entry, 0);
         }
 
         best_score

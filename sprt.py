@@ -29,7 +29,7 @@ os.system(f"""
 cutechess-cli \
 -engine cmd=tmp/beatrijs-new name=new \
 -engine cmd=tmp/beatrijs-master name=master \
--each restart=on tc=inf/10+0.1 book='/home/dewaeq/Downloads/baronbook30/baron30.bin' \
+-each restart=on tc=inf/8+0.08 book='/home/dewaeq/Downloads/baronbook30/baron30.bin' \
 bookdepth=4 proto=uci {f"option.Hash={args.hash}" if args.hash else ""} \
 -games 2 -rounds 2500 -repeat 2 -maxmoves 200 \
 -sprt elo0=0 elo1=10 alpha=0.05 beta=0.05 \
