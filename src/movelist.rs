@@ -2,6 +2,7 @@ use crate::{
     board::Board,
     defs::MAX_MOVES,
     movegen::{generate_all, generate_legal, generate_quiet},
+    search::{HistoryTable, Searcher},
 };
 
 #[derive(Clone, Copy)]
@@ -23,21 +24,21 @@ impl MoveList {
         }
     }
 
-    pub fn all(board: &mut Board) -> Self {
+    pub fn all(board: &mut Board, history_table: &HistoryTable) -> Self {
         let mut move_list = MoveList::new();
-        generate_all(board, &mut move_list);
+        generate_all(board, history_table, &mut move_list);
         move_list
     }
 
-    pub fn legal(board: &mut Board) -> Self {
+    pub fn legal(board: &mut Board, history_table: &HistoryTable) -> Self {
         let mut move_list = MoveList::new();
-        generate_legal(board, &mut move_list);
+        generate_legal(board, history_table, &mut move_list);
         move_list
     }
 
-    pub fn quiet(board: &mut Board) -> Self {
+    pub fn quiet(board: &mut Board, history_table: &HistoryTable) -> Self {
         let mut move_list = MoveList::new();
-        generate_quiet(board, &mut move_list);
+        generate_quiet(board, history_table, &mut move_list);
         move_list
     }
 

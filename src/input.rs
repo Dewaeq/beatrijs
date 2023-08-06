@@ -4,6 +4,7 @@ use std::{io, thread};
 
 use crate::defs::PieceType;
 use crate::eval::evaluate;
+use crate::search::HistoryTable;
 use crate::search_info::SearchInfo;
 use crate::table::{TWrapper, TABLE_SIZE_MB};
 use crate::utils::is_repetition;
@@ -141,7 +142,7 @@ impl Game {
     }
 
     fn print_moves(&mut self) {
-        let moves = MoveList::legal(&mut self.board);
+        let moves = MoveList::legal(&mut self.board, &[[[0; 64]; 64]; 2]);
         print!("{}: ", moves.size());
 
         for m in moves {
@@ -175,7 +176,7 @@ impl Game {
 
         let temp_ply = self.board.pos.ply;
         self.board.pos.ply = 0;
-        let mut moves = MoveList::legal(&mut self.board);
+        let mut moves = MoveList::legal(&mut self.board, &[[[0; 64]; 64]; 2]);
         self.board.pos.ply = temp_ply;
 
         moves.find(|&x| {

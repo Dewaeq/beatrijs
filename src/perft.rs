@@ -1,4 +1,4 @@
-use crate::{bitmove::BitMove, board::Board, movelist::MoveList};
+use crate::{bitmove::BitMove, board::Board, movelist::MoveList, search::HistoryTable};
 use std::time::Instant;
 
 #[derive(Debug)]
@@ -25,8 +25,10 @@ pub fn perft_all(board: &mut Board, depth: u8) -> PerftResult {
         check_mates: 0,
     };
 
+    let fake_history = &[[[0; 64]; 64]; 2];
+
     let start = Instant::now();
-    inner_perft_all(board, depth, &mut perft);
+    inner_perft_all(board, &fake_history, depth, &mut perft);
     let end = start.elapsed();
 
     perft.time = end.as_secs_f64() * 1000f64;
@@ -35,14 +37,16 @@ pub fn perft_all(board: &mut Board, depth: u8) -> PerftResult {
 }
 
 pub fn perft(board: &mut Board, depth: u8, print_info: bool) -> u64 {
+    let fake_history = &[[[0; 64]; 64]; 2];
+
     let start = Instant::now();
-    let nodes = inner_perft(print_info, board, depth);
+    let nodes = inner_perft(print_info, board, &fake_history, depth);
     let end = start.elapsed();
 
     if print_info {
         println!("\n=================================\n");
         println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
-        println!("Num moves      :   {}", MoveList::legal(board).size());
+        //println!("Num moves      :   {}", MoveList::legal(board).size());
         println!("Num nodes      :   {nodes}");
         println!(
             "Nodes/s        :   {}",
@@ -50,12 +54,16 @@ pub fn perft(board: &mut Board, depth: u8, print_info: bool) -> u64 {
         );
     }
 
-
     nodes
 }
 
-fn inner_perft_all(board: &mut Board, depth: u8, perft: &mut PerftResult) {
-    let moves = MoveList::legal(board);
+fn inner_perft_all(
+    board: &mut Board,
+    fake_history: &HistoryTable,
+    depth: u8,
+    perft: &mut PerftResult,
+) {
+    let moves = MoveList::legal(board, fake_history);
 
     if depth == 0 {
         perft.nodes += 1;
@@ -83,15 +91,15 @@ fn inner_perft_all(board: &mut Board, depth: u8, perft: &mut PerftResult) {
             }
 
             board.make_move(m);
-            inner_perft_all(board, depth - 1, perft);
+            inner_perft_all(board, fake_history, depth - 1, perft);
             board.unmake_move(m);
         }
     }
 }
 
 /// Only counts the number of leaf nodes
-fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
-    let moves = MoveList::legal(board);
+fn inner_perft(root: bool, board: &mut Board, fake_history: &HistoryTable, depth: u8) -> u64 {
+    let moves = MoveList::legal(board, fake_history);
     let mut count = 0;
 
     if depth == 0 {
@@ -102,11 +110,11 @@ fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
         board.make_move(m);
 
         let add = if depth == 2 {
-            MoveList::legal(board).size() as u64
+            MoveList::legal(board, fake_history).size() as u64
         } else {
-            inner_perft(false, board, depth - 1)
+            inner_perft(false, board, fake_history, depth - 1)
         };
-        
+
         board.unmake_move(m);
 
         count += add;

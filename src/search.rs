@@ -18,6 +18,8 @@ pub const MAX_SEARCH_DEPTH: usize = 100;
 pub const MATE: Score = 31_000;
 pub const IS_MATE: Score = MATE - 1000;
 
+pub type HistoryTable = [[[Score; 64]; 64]; 2];
+
 const DELTA_PRUNING: Score = 100;
 const STATIC_NULL_MOVE_DEPTH: i32 = 5;
 const STATIC_NULL_MOVE_MARGIN: Score = 120;
@@ -32,7 +34,7 @@ pub struct Searcher {
     info: SearchInfo,
     best_root_move: u16,
     root_moves: MoveList,
-    history_score: [[[Score; 64]; 64]; 2],
+    history_score: HistoryTable,
     quiets_tried: [[Option<u16>; 128]; MAX_SEARCH_DEPTH],
     eval_history: [Score; 128],
 }
@@ -89,7 +91,7 @@ impl Searcher {
         self.start();
         self.clear_for_search();
 
-        self.root_moves = MoveList::all(&mut self.board);
+        self.root_moves = MoveList::all(&mut self.board, &self.history_score);
         let mut score = -INFINITY;
 
         for depth in 1..=self.info.depth as i32 {
@@ -231,7 +233,7 @@ impl Searcher {
         let mut moves = if is_root {
             self.root_moves
         } else {
-            MoveList::all(&mut self.board)
+            MoveList::all(&mut self.board, &self.history_score)
         };
 
         if moves.is_empty() {
@@ -564,7 +566,7 @@ impl Searcher {
             return eval;
         }
 
-        let mut moves = MoveList::quiet(&mut self.board);
+        let mut moves = MoveList::quiet(&mut self.board, &self.history_score);
         let mut legals = 0;
         let mut best_score = eval;
         let mut best_move = 0;

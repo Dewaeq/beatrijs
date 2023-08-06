@@ -11,6 +11,7 @@ use crate::{
         eval::MVV_LVA,
     },
     movelist::MoveList,
+    search::HistoryTable,
     utils::adjacent_files,
 };
 
@@ -43,6 +44,7 @@ pub const fn is_square_attacked(
 /// Only supports sliding and knight moves
 fn make_moves(
     board: &Board,
+    history_table: &HistoryTable,
     src: Square,
     mut moves_bb: u64,
     opp_bb: u64,
@@ -57,12 +59,24 @@ fn make_moves(
                 board,
             );
         } else {
-            add_quiet_move(BitMove::from_squares(src, dest), move_list, board);
+            add_quiet_move(
+                BitMove::from_squares(src, dest),
+                move_list,
+                board,
+                history_table,
+            );
         }
     }
 }
 
-fn make_pawn_move(board: &Board, src: Square, dest: Square, flag: u8, move_list: &mut MoveList) {
+fn make_pawn_move(
+    board: &Board,
+    history_table: &HistoryTable,
+    src: Square,
+    dest: Square,
+    flag: u8,
+    move_list: &mut MoveList,
+) {
     let m = BitMove::from_flag(src, dest, flag);
 
     if flag == MoveFlag::EN_PASSANT {
@@ -70,22 +84,25 @@ fn make_pawn_move(board: &Board, src: Square, dest: Square, flag: u8, move_list:
     } else if flag & MoveFlag::CAPTURE != 0 {
         add_capture_move(m, move_list, board);
     } else {
-        add_quiet_move(m, move_list, board)
+        add_quiet_move(m, move_list, board, history_table)
     }
 }
 
-fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board) {
+fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board, history_table: &HistoryTable) {
     assert!(!BitMove::is_cap(m));
 
     let mut score = 0;
     let ply = board.pos.ply;
-    if board.killers[0][ply] == m {
-        score = KILLER_1_BONUS;
+
+    let score = if board.killers[0][ply] == m {
+        KILLER_1_BONUS
     } else if board.killers[1][ply] == m {
-        score = KILLER_2_BONUS;
-    } else if BitMove::is_castle(m) {
-        score = CASTLE_BONUS;
-    }
+        KILLER_2_BONUS
+    } else {
+        let src = BitMove::src(m) as usize;
+        let dest = BitMove::dest(m) as usize;
+        history_table[board.turn.as_usize()][src][dest]
+    };
 
     move_list.push(m, score);
 }
@@ -107,6 +124,7 @@ fn add_ep_move(m: u16, move_list: &mut MoveList) {
 
 fn make_promotions(
     board: &Board,
+    history_table: &HistoryTable,
     src: Square,
     dest: Square,
     gen_type: &GenType,
@@ -120,15 +138,43 @@ fn make_promotions(
         || gen_type == &GenType::Evasions
         || gen_type == &GenType::NonEvasions
     {
-        make_pawn_move(board, src, dest, MoveFlag::PROMOTE_QUEEN | flag, move_list);
+        make_pawn_move(
+            board,
+            history_table,
+            src,
+            dest,
+            MoveFlag::PROMOTE_QUEEN | flag,
+            move_list,
+        );
     }
     if gen_type == &GenType::Quiets
         || gen_type == &GenType::Evasions
         || gen_type == &GenType::NonEvasions
     {
-        make_pawn_move(board, src, dest, MoveFlag::PROMOTE_KNIGHT | flag, move_list);
-        make_pawn_move(board, src, dest, MoveFlag::PROMOTE_BISHOP | flag, move_list);
-        make_pawn_move(board, src, dest, MoveFlag::PROMOTE_ROOK | flag, move_list);
+        make_pawn_move(
+            board,
+            history_table,
+            src,
+            dest,
+            MoveFlag::PROMOTE_KNIGHT | flag,
+            move_list,
+        );
+        make_pawn_move(
+            board,
+            history_table,
+            src,
+            dest,
+            MoveFlag::PROMOTE_BISHOP | flag,
+            move_list,
+        );
+        make_pawn_move(
+            board,
+            history_table,
+            src,
+            dest,
+            MoveFlag::PROMOTE_ROOK | flag,
+            move_list,
+        );
     }
 }
 
@@ -169,7 +215,13 @@ pub const fn pawn_caps(pawns: u64, player: Player) -> u64 {
     pawn_cap_west(pawns, player) | pawn_cap_east(pawns, player)
 }
 
-fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mut MoveList) {
+fn gen_pawn_moves(
+    board: &Board,
+    history_table: &HistoryTable,
+    target: u64,
+    gen_type: &GenType,
+    move_list: &mut MoveList,
+) {
     let opp = board.turn.opp();
     let opp_bb = board.player_bb(opp);
     let occ = board.occ_bb();
@@ -205,13 +257,13 @@ fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mu
             let dest = BitBoard::pop_lsb(&mut m1);
             let src = dest - pawn_dir;
             let flag = MoveFlag::QUIET;
-            make_pawn_move(board, src, dest, flag, move_list);
+            make_pawn_move(board, history_table, src, dest, flag, move_list);
         }
         while m2 != 0 {
             let dest = BitBoard::pop_lsb(&mut m2);
             let src = dest - pawn_dir - pawn_dir;
             let flag = MoveFlag::DOUBLE_PAWN_PUSH;
-            make_pawn_move(board, src, dest, flag, move_list);
+            make_pawn_move(board, history_table, src, dest, flag, move_list);
         }
     }
 
@@ -230,12 +282,26 @@ fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mu
         while m1 != 0 {
             let dest = BitBoard::pop_lsb(&mut m1);
             let flag = MoveFlag::CAPTURE;
-            make_pawn_move(board, dest - pawn_dir - 1, dest, flag, move_list);
+            make_pawn_move(
+                board,
+                history_table,
+                dest - pawn_dir - 1,
+                dest,
+                flag,
+                move_list,
+            );
         }
         while m2 != 0 {
             let dest = BitBoard::pop_lsb(&mut m2);
             let flag = MoveFlag::CAPTURE;
-            make_pawn_move(board, dest - pawn_dir + 1, dest, flag, move_list);
+            make_pawn_move(
+                board,
+                history_table,
+                dest - pawn_dir + 1,
+                dest,
+                flag,
+                move_list,
+            );
         }
 
         if board.can_ep() {
@@ -247,7 +313,14 @@ fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mu
             while m3 != 0 {
                 let src = BitBoard::pop_lsb(&mut m3);
                 let flag = MoveFlag::EN_PASSANT;
-                make_pawn_move(board, src, board.pos.ep_square, flag, move_list);
+                make_pawn_move(
+                    board,
+                    history_table,
+                    src,
+                    board.pos.ep_square,
+                    flag,
+                    move_list,
+                );
             }
         }
     }
@@ -270,18 +343,18 @@ fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mu
         while m1 != 0 {
             let dest = BitBoard::pop_lsb(&mut m1);
             let src = dest - pawn_dir;
-            make_promotions(board, src, dest, gen_type, false, move_list);
+            make_promotions(board, history_table, src, dest, gen_type, false, move_list);
         }
 
         while m2 != 0 {
             let dest = BitBoard::pop_lsb(&mut m2);
             let src = dest - pawn_dir - 1;
-            make_promotions(board, src, dest, gen_type, true, move_list);
+            make_promotions(board, history_table, src, dest, gen_type, true, move_list);
         }
         while m3 != 0 {
             let dest = BitBoard::pop_lsb(&mut m3);
             let src = dest - pawn_dir + 1;
-            make_promotions(board, src, dest, gen_type, true, move_list);
+            make_promotions(board, history_table, src, dest, gen_type, true, move_list);
         }
     }
 }
@@ -289,6 +362,7 @@ fn gen_pawn_moves(board: &Board, target: u64, gen_type: &GenType, move_list: &mu
 // Generate sliding and knight moves
 fn gen_piece_moves(
     board: &Board,
+    history_table: &HistoryTable,
     piece: PieceType,
     target: u64,
     checks: bool,
@@ -308,11 +382,23 @@ fn gen_piece_moves(
             }
         }
 
-        make_moves(board, sq, bb, board.player_bb(board.turn.opp()), move_list);
+        make_moves(
+            board,
+            history_table,
+            sq,
+            bb,
+            board.player_bb(board.turn.opp()),
+            move_list,
+        );
     }
 }
 
-fn generate_all_moves(board: &Board, gen_type: GenType, move_list: &mut MoveList) {
+fn generate_all_moves(
+    board: &Board,
+    history_table: &HistoryTable,
+    gen_type: GenType,
+    move_list: &mut MoveList,
+) {
     let king_sq = board.cur_king_square();
     let checker_sq = BitBoard::bit_scan_forward(board.pos.checkers_bb);
     let checks = gen_type == GenType::QuietChecks;
@@ -333,11 +419,39 @@ fn generate_all_moves(board: &Board, gen_type: GenType, move_list: &mut MoveList
             GenType::Quiets | GenType::QuietChecks => !board.occ_bb(),
         };
 
-        gen_pawn_moves(board, target_bb, &gen_type, move_list);
-        gen_piece_moves(board, PieceType::Knight, target_bb, checks, move_list);
-        gen_piece_moves(board, PieceType::Bishop, target_bb, checks, move_list);
-        gen_piece_moves(board, PieceType::Rook, target_bb, checks, move_list);
-        gen_piece_moves(board, PieceType::Queen, target_bb, checks, move_list);
+        gen_pawn_moves(board, history_table, target_bb, &gen_type, move_list);
+        gen_piece_moves(
+            board,
+            history_table,
+            PieceType::Knight,
+            target_bb,
+            checks,
+            move_list,
+        );
+        gen_piece_moves(
+            board,
+            history_table,
+            PieceType::Bishop,
+            target_bb,
+            checks,
+            move_list,
+        );
+        gen_piece_moves(
+            board,
+            history_table,
+            PieceType::Rook,
+            target_bb,
+            checks,
+            move_list,
+        );
+        gen_piece_moves(
+            board,
+            history_table,
+            PieceType::Queen,
+            target_bb,
+            checks,
+            move_list,
+        );
     }
 
     if !checks || BitBoard::contains(board.blockers(board.turn.opp()), king_sq) {
@@ -364,7 +478,12 @@ fn generate_all_moves(board: &Board, gen_type: GenType, move_list: &mut MoveList
                     board,
                 );
             } else {
-                add_quiet_move(BitMove::from_squares(king_sq, dest), move_list, board);
+                add_quiet_move(
+                    BitMove::from_squares(king_sq, dest),
+                    move_list,
+                    board,
+                    history_table,
+                );
             }
         }
 
@@ -382,6 +501,7 @@ fn generate_all_moves(board: &Board, gen_type: GenType, move_list: &mut MoveList
                     BitMove::from_flag(king_sq, king_sq + 2, MoveFlag::CASTLE_KING),
                     move_list,
                     board,
+                    history_table,
                 );
             }
             if board.can_castle_queen(board.turn)
@@ -393,24 +513,25 @@ fn generate_all_moves(board: &Board, gen_type: GenType, move_list: &mut MoveList
                     BitMove::from_flag(king_sq, king_sq - 2, MoveFlag::CASTLE_QUEEN),
                     move_list,
                     board,
+                    history_table,
                 );
             }
         }
     }
 }
 
-pub fn generate_all(board: &mut Board, move_list: &mut MoveList) {
+pub fn generate_all(board: &mut Board, history_table: &HistoryTable, move_list: &mut MoveList) {
     if board.in_check() {
-        generate_all_moves(board, GenType::Evasions, move_list);
+        generate_all_moves(board, history_table, GenType::Evasions, move_list);
     } else {
-        generate_all_moves(board, GenType::NonEvasions, move_list);
+        generate_all_moves(board, history_table, GenType::NonEvasions, move_list);
     }
 }
 
 /// Wrapper around [`generate_all`]
-pub fn generate_legal(board: &mut Board, move_list: &mut MoveList) {
+pub fn generate_legal(board: &mut Board, history_table: &HistoryTable, move_list: &mut MoveList) {
     let mut pseudo = MoveList::new();
-    generate_all(board, &mut pseudo);
+    generate_all(board, history_table, &mut pseudo);
 
     let mut i = 0;
     while i < pseudo.size() {
@@ -423,12 +544,12 @@ pub fn generate_legal(board: &mut Board, move_list: &mut MoveList) {
     }
 }
 
-pub fn generate_quiet(board: &mut Board, move_list: &mut MoveList) {
+pub fn generate_quiet(board: &mut Board, history_table: &HistoryTable, move_list: &mut MoveList) {
     if board.in_check() {
-        generate_all_moves(board, GenType::EvadingCaptures, move_list);
+        generate_all_moves(board, history_table, GenType::EvadingCaptures, move_list);
     } else {
-        generate_all_moves(board, GenType::Captures, move_list);
-        generate_all_moves(board, GenType::QuietChecks, move_list);
+        generate_all_moves(board, history_table, GenType::Captures, move_list);
+        generate_all_moves(board, history_table, GenType::QuietChecks, move_list);
     }
 }
 
