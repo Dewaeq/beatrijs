@@ -204,7 +204,7 @@ impl Searcher {
         }
 
         if depth <= 0 && !in_check {
-            let score = self.quiesence(alpha, beta, true);
+            let score = self.quiescence(alpha, beta);
             return score;
         }
 
@@ -325,7 +325,7 @@ impl Searcher {
         // Razoring
         if !is_pv && !in_check && tt_move == 0 && do_null && depth <= 3 {
             if static_eval + 300 + (depth - 1) * 60 < alpha {
-                return self.quiesence(alpha, beta, true);
+                return self.quiescence(alpha, beta);
             }
         }
 
@@ -509,7 +509,7 @@ impl Searcher {
         best_score
     }
 
-    fn quiesence(&mut self, mut alpha: Score, beta: Score, root: bool) -> Score {
+    fn quiescence(&mut self, mut alpha: Score, beta: Score) -> Score {
         if self.num_nodes & 4096 == 0 {
             self.checkup();
         }
@@ -633,7 +633,7 @@ impl Searcher {
             }
 
             self.board.make_move(m);
-            let score = -self.quiesence(-beta, -alpha, false);
+            let score = -self.quiescence(-beta, -alpha);
             self.board.unmake_move(m);
 
             if score > best_score {
