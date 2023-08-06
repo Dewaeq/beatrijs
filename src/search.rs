@@ -259,12 +259,6 @@ impl Searcher {
 
         self.eval_history[ply] = static_eval;
 
-        // Internal Iterative Reduction (IRR):
-        // A modern approach to internal iterative deepening
-        if depth >= 6 && !tt_hit {
-            depth -= 1;
-        }
-
         // Static null move pruning (= reverse futility pruning)
         /* if depth <= STATIC_NULL_MOVE_DEPTH
             && !is_pv
@@ -299,7 +293,7 @@ impl Searcher {
             }
         }
 
-        let improving: bool = (ply >= 2 && static_eval >= self.eval_history[ply - 2]);
+        let improving = (!in_check && ply >= 2 && static_eval >= self.eval_history[ply - 2]);
 
         // Reverse futility pruning
         if !is_pv
@@ -315,7 +309,7 @@ impl Searcher {
         if depth == 1
             && !in_check
             && !is_pv
-            && static_eval + MG_VALUE[2] < alpha
+            && static_eval + MG_VALUE[3] < alpha
             && alpha > -IS_MATE
             && beta < IS_MATE
         {
@@ -341,6 +335,12 @@ impl Searcher {
         }
 
         let turn = self.board.turn;
+
+        // Internal Iterative Reduction (IRR):
+        // A modern approach to internal iterative deepening
+        if depth >= 4 && (!tt_hit || tt_move == 0) {
+            depth -= 1;
+        }
 
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
