@@ -344,6 +344,9 @@ impl Searcher {
             depth -= 1;
         }
 
+        self.board.killers[0][ply + 1] = 0;
+        self.board.killers[1][ply + 1] = 0;
+
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
             let (m, move_score) = moves.get_all(i);
