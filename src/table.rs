@@ -211,12 +211,6 @@ impl TWrapper {
         }
     }
 
-    pub fn delete(&self, key: u64) {
-        unsafe {
-            *(*self.inner.get()).get_mut(key) = HashEntry::default();
-        }
-    }
-
     pub fn best_move(&self, key: u64) -> Option<u16> {
         unsafe { (*self.inner.get()).best_move(key) }
     }

@@ -4,9 +4,8 @@ use std::{io, thread};
 
 use crate::defs::PieceType;
 use crate::eval::evaluate;
-use crate::search::HistoryTable;
 use crate::search_info::SearchInfo;
-use crate::table::{TWrapper, TABLE_SIZE_MB};
+use crate::table::TWrapper;
 use crate::utils::is_repetition;
 use crate::{
     bitmove::BitMove, board::Board, movelist::MoveList, perft::perft, search::Searcher,
@@ -27,7 +26,7 @@ impl Game {
             board: Board::start_pos(),
             abort_search: Arc::new(AtomicBool::new(false)),
             search_thread: None,
-            table: Arc::new(TWrapper::with_size(TABLE_SIZE_MB)),
+            table: Arc::new(TWrapper::new()),
         }
     }
 
@@ -82,7 +81,7 @@ impl Game {
         } else if base_command == "test" {
             self.parse_test(commands);
         } else if base_command == "static" {
-            self.parse_static(commands);
+            self.parse_static();
         } else if base_command == "take" {
             self.board.unmake_last_move();
             println!("{:?}", self.board);
@@ -128,7 +127,7 @@ impl Game {
         }
     }
 
-    fn parse_static(&self, commands: Vec<&str>) {
+    fn parse_static(&self) {
         let eval = evaluate(&self.board);
         println!("{} cp", eval);
     }

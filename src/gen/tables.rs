@@ -98,7 +98,7 @@ const fn gen_white_shielding() -> [u64; NUM_SQUARES] {
     let mut sq = 0;
 
     while sq < 56 {
-        let (file, rank) = coord_from_square(sq);
+        let (file, _) = coord_from_square(sq);
         let mut shield = BitBoard::file_bb(sq);
 
         if file == 0 {
@@ -138,7 +138,7 @@ const fn gen_black_shielding() -> [u64; NUM_SQUARES] {
     let mut sq = 63;
 
     while sq > 7 {
-        let (file, rank) = coord_from_square(sq);
+        let (file, _) = coord_from_square(sq);
         let mut shield = BitBoard::file_bb(sq);
 
         if file == 0 {
@@ -186,7 +186,7 @@ const fn gen_lmr() -> [[f32; 64]; 32] {
             let m_ln = LN[move_count];
 
             let reduction =
-                (0.8422840719846748 * m_ln * d_ln - 0.4 * m_ln - 0.22572624883839026 * d_ln + 1.2);
+                0.8422840719846748 * m_ln * d_ln - 0.4 * m_ln - 0.22572624883839026 * d_ln + 1.2;
             if reduction >= 0f32 {
                 table[depth][move_count] = reduction;
             }

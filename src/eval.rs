@@ -2,13 +2,12 @@ use crate::{
     bitboard::BitBoard,
     board::Board,
     defs::{
-        Piece, PieceType, Player, Score, Square, CASTLE_KING_FILES, CASTLE_QUEEN_FILES,
-        CENTER_SQUARES, DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE, SMALL_CENTER,
+        Piece, PieceType, Player, Score, Square, DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE, SMALL_CENTER,
     },
     gen::{
         attack::{attacks, king_attacks},
         pesto::{EG_TABLE, MG_TABLE},
-        tables::{CENTER_DISTANCE, DISTANCE, ISOLATED, PASSED, SHIELDING_PAWNS},
+        tables::{CENTER_DISTANCE, DISTANCE, PASSED, SHIELDING_PAWNS},
     },
     movegen::{pawn_caps, pawn_push},
     utils::{east_one, file_fill, fill_down, fill_up, front_span, ranks_in_front_of, west_one},
@@ -350,7 +349,7 @@ fn eval_knights(board: &Board, side: Player, my_pawn_attacks: u64, opp_pawns: u6
 fn eval_bishops(board: &Board, side: Player, my_pawns: u64) -> Score {
     let mut score = 0;
 
-    let mut bishops = board.player_piece_bb(side, PieceType::Bishop);
+    let bishops = board.player_piece_bb(side, PieceType::Bishop);
     if BitBoard::more_than_one(bishops) {
         score += BISHOP_PAIR_BONUS;
     }
@@ -377,11 +376,8 @@ fn eval_pawns(
     let occ = board.occ_bb();
 
     // Defended pawns
-    let mut supported = my_pawns & my_pawn_attacks;
-    while supported != 0 {
-        let sq = BitBoard::pop_lsb(&mut supported);
-        score += 5;
-    }
+    let supported = my_pawns & my_pawn_attacks;
+    score += BitBoard::count(supported) as Score * 5;
 
     // Pawns controlling centre of the board
     let num_pawns_behind_center = BitBoard::count(my_pawns & pawn_caps(SMALL_CENTER, side.opp())) as Score;

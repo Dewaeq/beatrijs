@@ -32,12 +32,6 @@ impl Default for SearchInfo {
 }
 
 impl SearchInfo {
-    pub fn with_depth(depth: usize) -> Self {
-        let mut info = SearchInfo::default();
-        info.depth = depth;
-        info
-    }
-
     pub fn my_time(&self, side: Player) -> Option<usize> {
         match side {
             Player::White => self.w_time,

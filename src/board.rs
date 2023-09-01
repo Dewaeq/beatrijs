@@ -1,19 +1,16 @@
-use std::cmp;
-
 use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
-        Castling, Piece, PieceType, Player, Score, Square, BLACK_IDX, DARK_SQUARES,
-        FEN_START_STRING, LIGHT_SQUARES, MAX_MOVES, MG_VALUE, NUM_PIECES, NUM_SIDES, NUM_SQUARES,
-        WHITE_IDX,
+        Castling, Piece, PieceType, Player, Score, Square, BLACK_IDX, FEN_START_STRING, NUM_PIECES,
+        NUM_SIDES, NUM_SQUARES, WHITE_IDX,
     },
     gen::{
         attack::{attacks, bishop_attacks, knight_attacks, pawn_attacks, rook_attacks},
         between::between,
     },
     history::History,
-    movegen::{attackers_to, smallest_attacker},
+    movegen::attackers_to,
     position::Position,
     search::MAX_SEARCH_DEPTH,
     utils::{square_from_string, square_to_string},
@@ -58,11 +55,9 @@ impl Board {
     }
 
     pub const fn player_bb(&self, side: Player) -> u64 {
-        unsafe {
-            match side {
-                Player::White => self.side_bb[WHITE_IDX],
-                _ => self.side_bb[BLACK_IDX],
-            }
+        match side {
+            Player::White => self.side_bb[WHITE_IDX],
+            _ => self.side_bb[BLACK_IDX],
         }
     }
 
@@ -190,22 +185,15 @@ impl Board {
         }
     }
 
-    pub const fn pawns_on_sq_color(&self, side: Player, sq: Square) -> u64 {
-        let pawns = self.player_piece_bb(side, PieceType::Pawn);
-        if sq % 2 == 0 {
-            pawns & DARK_SQUARES
-        } else {
-            pawns & LIGHT_SQUARES
-        }
-    }
-
     pub const fn has_non_pawns(&self, side: Player) -> bool {
-        self.player_piece_bb(side, PieceType::Knight) != 0
-            || self.player_piece_bb(side, PieceType::Bishop) != 0
-            || self.player_piece_bb(side, PieceType::Rook) != 0
-            || self.player_piece_bb(side, PieceType::Queen) != 0
+        let mine = self.player_piece_bb(side, PieceType::Pawn);
+        let kings = self.piece_bb(PieceType::King);
+        let pawns = self.piece_bb(PieceType::Pawn);
+
+        mine & !(pawns | kings) != 0
     }
 
+    #[allow(unused)]
     pub const fn has_big_piece(&self, side: Player) -> bool {
         self.player_piece_bb(side, PieceType::Bishop) != 0
             || self.player_piece_bb(side, PieceType::Rook) != 0
@@ -470,50 +458,6 @@ impl Board {
         self.killers = [[0; MAX_SEARCH_DEPTH]; 2];
     }
 
-    pub fn see_capture(&self, m: u16) -> Score {
-        if !BitMove::is_cap(m) {
-            return 0;
-        }
-
-        let captured = self.piece_type(BitMove::dest(m));
-        let mut new_board: Board = *self;
-        new_board.make_move(m);
-
-        MG_VALUE[captured.as_usize()] - new_board.see(BitMove::dest(m))
-    }
-
-    fn see(&mut self, dest: Square) -> Score {
-        let captured = self.piece_type(dest);
-        let (attacker, src) = smallest_attacker(self, dest, self.turn);
-
-        if attacker != PieceType::None {
-            self.move_piece_cheap(src, dest, attacker, captured);
-            cmp::max(0, MG_VALUE[captured.as_usize()] - self.see(dest))
-        } else {
-            0
-        }
-    }
-
-    pub fn see_approximate(&self, m: u16) -> Score {
-        let src = BitMove::src(m);
-        let dest = BitMove::dest(m);
-
-        let piece = self.piece_type(src);
-        let captured = if BitMove::is_ep(m) {
-            PieceType::Pawn
-        } else {
-            self.piece_type(dest)
-        };
-
-        let mut score = captured.mg_value();
-
-        if BitMove::is_prom(m) {
-            score += BitMove::prom_type(BitMove::flag(m)).mg_value() - piece.mg_value();
-        }
-
-        score - piece.mg_value()
-    }
-
     pub fn see_ge(&self, m: u16, threshold: Score) -> bool {
         if !BitMove::is_cap(m) || BitMove::is_ep(m) {
             return threshold <= 0;
@@ -629,19 +573,6 @@ impl Board {
         piece
     }
 
-    fn move_piece_cheap(
-        &mut self,
-        src: Square,
-        dest: Square,
-        piece: PieceType,
-        captured: PieceType,
-    ) {
-        self.remove_piece(self.turn, piece, src);
-        self.remove_piece(self.turn.opp(), captured, dest);
-        self.add_piece(self.turn, piece, dest);
-        self.turn = self.turn.opp();
-    }
-
     pub fn set_castling_from_move(&mut self, m: u16) {
         let src = BitMove::src(m);
         let dest = BitMove::dest(m);
@@ -709,11 +640,12 @@ impl Board {
         }
     }
 
+    #[allow(unused)]
     pub fn debug(&mut self) {
         println!("{self:?}");
 
         let mut b = self.clone();
-        while !b.history.empty() {
+        while b.history.count != 0 {
             let m = b.pos.last_move.unwrap();
             println!("{}", BitMove::pretty_move(m));
             if m == 0 {

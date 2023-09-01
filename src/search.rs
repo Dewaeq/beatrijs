@@ -1,17 +1,15 @@
-use crate::bitmove::MoveFlag;
-use crate::defs::{PieceType, Score, Square, MG_VALUE};
+use crate::defs::{PieceType, Score, MG_VALUE};
 use crate::eval::evaluate;
 use crate::gen::tables::LMR;
 use crate::movegen::is_legal_move;
 use crate::search_info::SearchInfo;
 use crate::table::{Bound, HashEntry, TWrapper};
-use crate::utils::{is_draw, is_repetition, print_search_info};
+use crate::utils::{is_draw, print_search_info};
 use crate::{
-    bitmove::BitMove, board::Board, defs::Player, movelist::MoveList, order::pick_next_move,
+    bitmove::BitMove, board::Board, movelist::MoveList, order::pick_next_move,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 pub const INFINITY: Score = 32_000;
 pub const MAX_SEARCH_DEPTH: usize = 100;
@@ -19,10 +17,6 @@ pub const MATE: Score = 31_000;
 pub const IS_MATE: Score = MATE - 1000;
 
 pub type HistoryTable = [[[Score; 64]; 64]; 2];
-
-const DELTA_PRUNING: Score = 100;
-const STATIC_NULL_MOVE_DEPTH: i32 = 5;
-const STATIC_NULL_MOVE_MARGIN: Score = 120;
 
 pub struct Searcher {
     pub num_nodes: u64,
@@ -116,7 +110,6 @@ impl Searcher {
                 self.num_nodes,
                 0,
                 &pv,
-                self.board.turn,
             );
         }
 
@@ -138,7 +131,6 @@ impl Searcher {
             beta = INFINITY.min(score + delta);
         }
 
-        let mut research = 0;
         loop {
             if self.should_stop() {
                 return 0;
@@ -146,7 +138,7 @@ impl Searcher {
 
             let best_score = self.negamax(depth.max(1), alpha, beta, false);
 
-            if (best_score <= alpha) {
+            if best_score <= alpha {
                 beta = (alpha + beta) / 2;
                 alpha = (-INFINITY).max(alpha - delta);
                 depth = search_depth;
@@ -295,7 +287,7 @@ impl Searcher {
             }
         }
 
-        let improving = (!in_check && ply >= 2 && static_eval >= self.eval_history[ply - 2]);
+        let improving = !in_check && ply >= 2 && static_eval >= self.eval_history[ply - 2];
 
         // Reverse futility pruning
         if !is_pv
@@ -423,7 +415,7 @@ impl Searcher {
             }
 
             self.board.make_move(m);
-            let mut score = 0;
+            let mut score;
 
             // search pv move in a full window, at full depth
             if legals == 0 || depth <= 2 || !is_pv {
@@ -561,22 +553,15 @@ impl Searcher {
         }
 
         // delta pruning
-        let diff = alpha - eval - DELTA_PRUNING;
+        let diff = alpha - eval - 100;
         if diff > 0 && diff > max_gain(&self.board) {
             return eval;
         }
 
         let mut moves = MoveList::quiet(&mut self.board, &self.history_score);
-        let mut legals = 0;
         let mut best_score = eval;
         let mut best_move = 0;
         let old_alpha = alpha;
-
-        let futility_base = if self.board.in_check() {
-            -INFINITY
-        } else {
-            eval + 155
-        };
 
         if tt_move != 0 {
             set_tt_move_score(&mut moves, tt_move);
@@ -587,50 +572,6 @@ impl Searcher {
             let m = moves.get(i);
 
             if !is_legal_move(&self.board, m) {
-                continue;
-            }
-
-            let is_prom = BitMove::is_prom(m);
-            let gives_check = self.board.gives_check(m);
-
-            legals += 1;
-
-            // Futility pruning
-            if !gives_check && futility_base > -INFINITY && !is_prom {
-                if legals > 2 {
-                    continue;
-                }
-
-                let dest = BitMove::dest(m);
-                // We can safely do this, as this move isn't a promotion and it doesn't give check,
-                // so it must be a capture
-                let futility_value = futility_base + self.board.piece_type(dest).eg_value();
-
-                if futility_value <= alpha {
-                    best_score = best_score.max(futility_value);
-                    continue;
-                }
-
-                if futility_base <= alpha && !self.board.see_ge(m, 1) {
-                    best_score = best_score.max(futility_base);
-                    continue;
-                }
-            }
-
-            // This move (likely) won't raise alpha
-            if !passes_delta(&self.board, m, eval, alpha) {
-                continue;
-            }
-
-            // if eval + SEE exceeds beta, return early, as the opponent should've
-            // had a better option earlier
-            let see = self.board.see_approximate(m);
-            if see + eval > beta {
-                best_score = see;
-                break;
-            }
-
-            if !self.board.see_ge(m, 0) {
                 continue;
             }
 
@@ -697,27 +638,6 @@ const fn max_gain(board: &Board) -> Score {
     }
 
     score
-}
-
-#[inline(always)]
-/// Is this move eligible to increase alpha?
-const fn passes_delta(board: &Board, m: u16, eval: Score, alpha: Score) -> bool {
-    if eval >= alpha {
-        return true;
-    }
-
-    if BitMove::is_prom(m) {
-        return true;
-    }
-
-    let captured = match BitMove::flag(m) {
-        MoveFlag::CAPTURE => board.piece_type(BitMove::dest(m)),
-        MoveFlag::EN_PASSANT => PieceType::Pawn,
-        /// if this move isn't a capture, then is must be a check, which we always want to search
-        _ => return true,
-    };
-
-    eval + MG_VALUE[captured.as_usize()] + DELTA_PRUNING >= alpha
 }
 
 #[inline(always)]

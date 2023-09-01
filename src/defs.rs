@@ -110,6 +110,7 @@ impl Piece {
     }
 }
 
+#[allow(unused)]
 pub const PIECES: [Piece; 12] = [
     Piece::new(PieceType::Pawn, Player::White),
     Piece::new(PieceType::Knight, Player::White),
@@ -150,10 +151,6 @@ impl PieceType {
         }
     }
 
-    pub const fn is_none(&self) -> bool {
-        matches!(self, PieceType::None)
-    }
-
     pub const fn mg_value(&self) -> Score {
         match self {
             PieceType::None => 0,
@@ -161,6 +158,7 @@ impl PieceType {
         }
     }
 
+    #[allow(unused)]
     pub const fn eg_value(&self) -> Score {
         match self {
             PieceType::None => 0,
@@ -210,12 +208,6 @@ pub const EG_VALUE: [Score; NUM_PIECES] = [208, 854, 915, 1380, 2682, 0];
 /// Passed pawn bonus score, indexed by rank
 pub const PASSED_PAWN_SCORE: [Score; 8] = [0, 5, 10, 20, 35, 60, 100, 200];
 
-pub const CASTLE_KING_FILES: u64 = BitBoard::FILE_F | BitBoard::FILE_G | BitBoard::FILE_H;
-pub const CASTLE_QUEEN_FILES: u64 = BitBoard::FILE_A | BitBoard::FILE_B | BitBoard::FILE_C;
-
-pub const CENTER_FILES: u64 =
-    BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F;
-pub const CENTER_SQUARES: u64 = (BitBoard::RANK_4 | BitBoard::RANK_5) & CENTER_FILES;
 pub const SMALL_CENTER: u64 =
     (BitBoard::RANK_4 | BitBoard::RANK_5) & (BitBoard::FILE_D | BitBoard::FILE_E);
 

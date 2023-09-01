@@ -18,7 +18,6 @@ use crate::{
 const CAPTURE_BONUS: i32 = 1_000_000;
 const KILLER_1_BONUS: i32 = 900_000;
 const KILLER_2_BONUS: i32 = 800_000;
-const CASTLE_BONUS: i32 = 700_000;
 
 /// Bitboard of all the pieces that are attacking `square`
 #[inline]
@@ -91,7 +90,6 @@ fn make_pawn_move(
 fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board, history_table: &HistoryTable) {
     assert!(!BitMove::is_cap(m));
 
-    let mut score = 0;
     let ply = board.pos.ply;
 
     let score = if board.killers[0][ply] == m {
@@ -603,41 +601,4 @@ pub const fn is_legal_move(board: &Board, m: u16) -> bool {
         }
         _ => !BitBoard::contains(blockers, src) || BitBoard::triple_aligned(src, dest, king_sq),
     }
-}
-
-pub const fn smallest_attacker(board: &Board, sq: Square, side: Player) -> (PieceType, Square) {
-    let pawns = pawn_attacks(sq, side) & board.player_piece_bb(side, PieceType::Pawn);
-    if pawns != 0 {
-        return (PieceType::Pawn, BitBoard::bit_scan_forward(pawns));
-    }
-    let knights = knight_attacks(sq) & board.player_piece_bb(side, PieceType::Knight);
-    if knights != 0 {
-        return (PieceType::Knight, BitBoard::bit_scan_forward(knights));
-    }
-
-    let occ = board.occ_bb();
-
-    let bishop_moves = bishop_attacks(sq, occ);
-    let bishops = bishop_moves & board.player_piece_bb(side, PieceType::Bishop);
-    if bishops != 0 {
-        return (PieceType::Bishop, BitBoard::bit_scan_forward(bishops));
-    }
-
-    let rook_moves = rook_attacks(sq, occ);
-    let rooks = rook_moves & board.player_piece_bb(side, PieceType::Rook);
-    if rooks != 0 {
-        return (PieceType::Rook, BitBoard::bit_scan_forward(rooks));
-    }
-
-    let queens = (bishop_moves | rook_moves) & board.player_piece_bb(side, PieceType::Queen);
-    if queens != 0 {
-        return (PieceType::Queen, BitBoard::bit_scan_forward(queens));
-    }
-
-    let king = king_attacks(sq) & board.player_piece_bb(side, PieceType::King);
-    if king != 0 {
-        return (PieceType::King, BitBoard::bit_scan_forward(king));
-    }
-
-    (PieceType::None, 64)
 }

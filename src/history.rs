@@ -1,5 +1,3 @@
-use std::slice::Iter;
-
 use crate::{defs::MAX_GAME_LENGTH, position::Position};
 
 #[derive(Copy, Clone)]
@@ -14,10 +12,6 @@ impl History {
             positions: [Position::new(); MAX_GAME_LENGTH],
             count: 0,
         }
-    }
-
-    pub fn clear(&mut self) {
-        self.count = 0;
     }
 
     pub fn push(&mut self, pos: Position) {
@@ -36,15 +30,7 @@ impl History {
         unsafe { *self.positions.get_unchecked(self.count) }
     }
 
-    pub const fn empty(&self) -> bool {
-        self.count == 0
-    }
-
     pub const fn get_key(&self, index: usize) -> u64 {
         self.positions[index].key
-    }
-
-    pub fn iter(&self) -> Iter<'_, Position> {
-        self.positions.iter()
     }
 }

@@ -2,7 +2,7 @@ use crate::{
     board::Board,
     defs::MAX_MOVES,
     movegen::{generate_all, generate_legal, generate_quiet},
-    search::{HistoryTable, Searcher},
+    search::HistoryTable,
 };
 
 #[derive(Clone, Copy)]

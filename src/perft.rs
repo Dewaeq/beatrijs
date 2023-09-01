@@ -13,6 +13,7 @@ pub struct PerftResult {
     pub check_mates: u64,
 }
 
+#[allow(unused)]
 pub fn perft_all(board: &mut Board, depth: u8) -> PerftResult {
     let mut perft = PerftResult {
         time: 0f64,

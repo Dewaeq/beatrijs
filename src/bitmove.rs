@@ -50,6 +50,7 @@ impl BitMove {
             || BitMove::flag(bitmove) == MoveFlag::CASTLE_QUEEN
     }
 
+    #[allow(unused)]
     pub const fn is_tactical(bitmove: u16) -> bool {
         BitMove::is_cap(bitmove) || BitMove::is_prom(bitmove)
     }
