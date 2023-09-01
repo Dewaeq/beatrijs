@@ -310,6 +310,10 @@ impl Board {
         let opp = self.turn.opp();
         let old_castle = self.pos.castling;
 
+        if src == dest {
+            println!("Oopsie {}", BitMove::pretty_move(m));
+        }
+
         assert!(piece != PieceType::None);
         assert!(src != dest);
 

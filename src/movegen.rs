@@ -9,16 +9,13 @@ use crate::{
         },
         between::between,
         eval::MVV_LVA,
+        pesto::MG_TABLE,
     },
     movelist::MoveList,
+    order::score_move,
     search::HistoryTable,
     utils::adjacent_files,
 };
-
-const CAPTURE_BONUS: i32 = 1_000_000;
-const KILLER_1_BONUS: i32 = 900_000;
-const KILLER_2_BONUS: i32 = 800_000;
-const CASTLE_BONUS: i32 = 700_000;
 
 /// Bitboard of all the pieces that are attacking `square`
 #[inline]
@@ -91,35 +88,26 @@ fn make_pawn_move(
 fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board, history_table: &HistoryTable) {
     assert!(!BitMove::is_cap(m));
 
-    let mut score = 0;
-    let ply = board.pos.ply;
-
-    let score = if board.killers[0][ply] == m {
-        KILLER_1_BONUS
-    } else if board.killers[1][ply] == m {
-        KILLER_2_BONUS
-    } else {
-        let src = BitMove::src(m) as usize;
-        let dest = BitMove::dest(m) as usize;
-        history_table[board.turn.as_usize()][src][dest]
-    };
-
-    move_list.push(m, score);
+    move_list.push(m, 0);
 }
 
 fn add_capture_move(m: u16, move_list: &mut MoveList, board: &Board) {
-    let move_piece = board.piece_type(BitMove::src(m));
-    let cap_piece = board.piece_type(BitMove::dest(m));
-
-    assert!(move_piece != PieceType::None);
-    assert!(cap_piece != PieceType::None);
-
-    let score = MVV_LVA[move_piece.as_usize()][cap_piece.as_usize()] + CAPTURE_BONUS;
-    move_list.push(m, score);
+    move_list.push(m, 0);
 }
 
 fn add_ep_move(m: u16, move_list: &mut MoveList) {
-    move_list.push(m, 105 + CAPTURE_BONUS);
+    move_list.push(m, 0);
+}
+
+fn add_move(
+    m: u16,
+    move_list: &mut MoveList,
+    board: &Board,
+    history_table: &HistoryTable,
+    hash_move: u16,
+) {
+    let score = score_move(m, board, history_table, hash_move);
+    move_list.push(m, score);
 }
 
 fn make_promotions(

@@ -3,6 +3,7 @@ use crate::defs::{PieceType, Score, Square, MG_VALUE};
 use crate::eval::evaluate;
 use crate::gen::tables::LMR;
 use crate::movegen::is_legal_move;
+use crate::order::sort_moves;
 use crate::search_info::SearchInfo;
 use crate::table::{Bound, HashEntry, TWrapper};
 use crate::utils::{is_draw, is_repetition, print_search_info};
@@ -331,11 +332,6 @@ impl Searcher {
         let mut best_move = 0;
         let mut best_score = -INFINITY;
         let old_alpha = alpha;
-
-        if tt_move != 0 {
-            set_tt_move_score(&mut moves, tt_move);
-        }
-
         let turn = self.board.turn;
 
         // Internal Iterative Reduction (IRR):
@@ -344,8 +340,10 @@ impl Searcher {
             depth -= 1;
         }
 
+        sort_moves(&mut moves, &self.board, tt_move, &self.history_score);
+
         for i in 0..moves.size() {
-            pick_next_move(&mut moves, i);
+            //pick_next_move(&mut moves, i);
             let (m, move_score) = moves.get_all(i);
 
             if !is_legal_move(&self.board, m) {
@@ -578,12 +576,10 @@ impl Searcher {
             eval + 155
         };
 
-        if tt_move != 0 {
-            set_tt_move_score(&mut moves, tt_move);
-        }
+        sort_moves(&mut moves, &self.board, tt_move, &self.history_score);
 
         for i in 0..moves.size() {
-            pick_next_move(&mut moves, i);
+            //pick_next_move(&mut moves, i);
             let m = moves.get(i);
 
             if !is_legal_move(&self.board, m) {
@@ -725,7 +721,7 @@ fn set_tt_move_score(moves: &mut MoveList, tt_move: u16) {
     let mut i = 0;
     while i < moves.size() {
         if moves.get(i) == tt_move {
-            moves.set_score(i, 2_000_000);
+            moves.set_score(i, 8_000_000);
             break;
         }
         i += 1;

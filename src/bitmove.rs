@@ -29,6 +29,13 @@ impl BitMove {
         (bitmove >> 6 & 0b111111) as Square
     }
 
+    pub const fn from_to(bitmove: u16) -> (Square, Square) {
+        (
+            (bitmove & 0b111111) as Square,
+            (bitmove >> 6 & 0b111111) as Square,
+        )
+    }
+
     pub const fn flag(bitmove: u16) -> u8 {
         (bitmove >> 12) as u8
     }

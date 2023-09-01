@@ -1,4 +1,4 @@
-use crate::defs::{NUM_PIECES};
+use crate::defs::NUM_PIECES;
 
 /// index by attacker and victim
 pub const MVV_LVA: [[i32; NUM_PIECES]; NUM_PIECES] = gen_mvvlva();
@@ -11,7 +11,7 @@ pub const fn gen_mvvlva() -> [[i32; NUM_PIECES]; NUM_PIECES] {
     while i < NUM_PIECES {
         let mut j = 0;
         while j < NUM_PIECES {
-            table[i][j] = VICTIM_VALUE[j] + 6 - VICTIM_VALUE[i] / 100;
+            table[i][j] = VICTIM_VALUE[j] - VICTIM_VALUE[i];
 
             j += 1;
         }
