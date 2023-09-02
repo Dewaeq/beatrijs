@@ -725,7 +725,7 @@ fn set_tt_move_score(moves: &mut MoveList, tt_move: u16) {
     let mut i = 0;
     while i < moves.size() {
         if moves.get(i) == tt_move {
-            moves.set_score(i, 2_000_000);
+            moves.set_score(i, 8_000_000);
             break;
         }
         i += 1;

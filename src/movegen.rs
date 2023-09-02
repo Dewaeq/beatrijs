@@ -15,10 +15,10 @@ use crate::{
     utils::adjacent_files,
 };
 
-const CAPTURE_BONUS: i32 = 1_000_000;
+const PROMOTE_BONUS: i32 = 4_000_000;
+const CAPTURE_BONUS: i32 = 2_000_000;
 const KILLER_1_BONUS: i32 = 900_000;
 const KILLER_2_BONUS: i32 = 800_000;
-const CASTLE_BONUS: i32 = 700_000;
 
 /// Bitboard of all the pieces that are attacking `square`
 #[inline]
@@ -94,7 +94,7 @@ fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board, history_table
     let mut score = 0;
     let ply = board.pos.ply;
 
-    let score = if board.killers[0][ply] == m {
+    let mut score = if board.killers[0][ply] == m {
         KILLER_1_BONUS
     } else if board.killers[1][ply] == m {
         KILLER_2_BONUS
@@ -103,6 +103,11 @@ fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board, history_table
         let dest = BitMove::dest(m) as usize;
         history_table[board.turn.as_usize()][src][dest]
     };
+
+    let prom_type = BitMove::prom_type(BitMove::flag(m));
+    if prom_type == PieceType::Queen {
+        score += PROMOTE_BONUS;
+    }
 
     move_list.push(m, score);
 }
@@ -114,7 +119,13 @@ fn add_capture_move(m: u16, move_list: &mut MoveList, board: &Board) {
     assert!(move_piece != PieceType::None);
     assert!(cap_piece != PieceType::None);
 
-    let score = MVV_LVA[move_piece.as_usize()][cap_piece.as_usize()] + CAPTURE_BONUS;
+    let mut score = MVV_LVA[move_piece.as_usize()][cap_piece.as_usize()] + CAPTURE_BONUS;
+
+    let prom_type = BitMove::prom_type(BitMove::flag(m));
+    if prom_type == PieceType::Queen {
+        score += PROMOTE_BONUS;
+    }
+
     move_list.push(m, score);
 }
 
