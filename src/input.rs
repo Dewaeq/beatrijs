@@ -4,7 +4,7 @@ use std::{io, thread};
 
 use crate::defs::PieceType;
 use crate::eval::evaluate;
-use crate::search::HistoryTable;
+use crate::movegen::MovegenParams;
 use crate::search_info::SearchInfo;
 use crate::table::{TWrapper, TABLE_SIZE_MB};
 use crate::utils::is_repetition;
@@ -142,7 +142,7 @@ impl Game {
     }
 
     fn print_moves(&mut self) {
-        let moves = MoveList::legal(&mut self.board, &[[[0; 64]; 64]; 2]);
+        let moves = MoveList::legal(MovegenParams::simple(&self.board));
         print!("{}: ", moves.size());
 
         for m in moves {
@@ -155,10 +155,12 @@ impl Game {
     fn print_stats(&self) {
         let hash_full = self.table.hash_full();
         let table_size = self.table.size_mb();
+        let entry = self.table.probe(self.board.key(), self.board.pos.ply);
 
         println!("\n=================================\n");
         println!("Hash full: {}", hash_full);
         println!("Table size (mb): {}", table_size);
+        println!("Current TT entry: {:?}", entry);
     }
 
     fn str_to_move(&mut self, move_str: &str) -> Option<u16> {
@@ -176,7 +178,7 @@ impl Game {
 
         let temp_ply = self.board.pos.ply;
         self.board.pos.ply = 0;
-        let mut moves = MoveList::legal(&mut self.board, &[[[0; 64]; 64]; 2]);
+        let mut moves = MoveList::legal(MovegenParams::simple(&self.board));
         self.board.pos.ply = temp_ply;
 
         moves.find(|&x| {

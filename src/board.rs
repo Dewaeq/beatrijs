@@ -914,6 +914,17 @@ impl std::fmt::Debug for Board {
             let checker_sq = BitBoard::pop_lsb(&mut checkers);
             write!(f, "{} ", square_to_string(checker_sq))?;
         }
+        writeln!(f)?;
+        writeln!(
+            f,
+            "Killer 1   : {}",
+            BitMove::pretty_move(self.killers[0][self.pos.ply])
+        )?;
+        writeln!(
+            f,
+            "Killer 2   : {}",
+            BitMove::pretty_move(self.killers[1][self.pos.ply])
+        )?;
 
         writeln!(f)
     }

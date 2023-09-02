@@ -1,17 +1,16 @@
 use crate::bitmove::MoveFlag;
-use crate::defs::{PieceType, Score, Square, MG_VALUE};
+use crate::defs::{PieceType, Score, MG_VALUE};
 use crate::eval::evaluate;
 use crate::gen::tables::LMR;
-use crate::movegen::is_legal_move;
+use crate::movegen::{is_legal_move, MovegenParams};
 use crate::search_info::SearchInfo;
 use crate::table::{Bound, HashEntry, TWrapper};
-use crate::utils::{is_draw, is_repetition, print_search_info};
+use crate::utils::{is_draw, print_search_info};
 use crate::{
-    bitmove::BitMove, board::Board, defs::Player, movelist::MoveList, order::pick_next_move,
+    bitmove::BitMove, board::Board, movelist::MoveList, order::pick_next_move,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 pub const INFINITY: Score = 32_000;
 pub const MAX_SEARCH_DEPTH: usize = 100;
@@ -91,7 +90,9 @@ impl Searcher {
         self.start();
         self.clear_for_search();
 
-        self.root_moves = MoveList::all(&mut self.board, &self.history_score);
+        let params = MovegenParams::new(&self.board, &self.history_score, 0);
+        self.root_moves = MoveList::all(params);
+
         let mut score = -INFINITY;
 
         for depth in 1..=self.info.depth as i32 {
@@ -233,7 +234,8 @@ impl Searcher {
         let mut moves = if is_root {
             self.root_moves
         } else {
-            MoveList::all(&mut self.board, &self.history_score)
+            let params = MovegenParams::new(&self.board, &self.history_score, tt_move);
+            MoveList::all(params)
         };
 
         if moves.is_empty() {
@@ -566,7 +568,9 @@ impl Searcher {
             return eval;
         }
 
-        let mut moves = MoveList::quiet(&mut self.board, &self.history_score);
+        let params = MovegenParams::new(&self.board, &self.history_score, tt_move);
+        let mut moves = MoveList::quiet(params);
+
         let mut legals = 0;
         let mut best_score = eval;
         let mut best_move = 0;
