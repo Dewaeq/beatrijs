@@ -142,7 +142,7 @@ impl Game {
     }
 
     fn print_moves(&mut self) {
-        let moves = MoveList::legal(&mut self.board, &[[[0; 64]; 64]; 2]);
+        let moves = MoveList::legal(&mut self.board, &[[[0; 64]; 64]; 2], 0);
         print!("{}: ", moves.size());
 
         for m in moves {
@@ -176,7 +176,7 @@ impl Game {
 
         let temp_ply = self.board.pos.ply;
         self.board.pos.ply = 0;
-        let mut moves = MoveList::legal(&mut self.board, &[[[0; 64]; 64]; 2]);
+        let mut moves = MoveList::legal(&mut self.board, &[[[0; 64]; 64]; 2], 0);
         self.board.pos.ply = temp_ply;
 
         moves.find(|&x| {

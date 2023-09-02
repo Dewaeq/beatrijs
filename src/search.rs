@@ -3,7 +3,6 @@ use crate::defs::{PieceType, Score, Square, MG_VALUE};
 use crate::eval::evaluate;
 use crate::gen::tables::LMR;
 use crate::movegen::is_legal_move;
-use crate::order::sort_moves;
 use crate::search_info::SearchInfo;
 use crate::table::{Bound, HashEntry, TWrapper};
 use crate::utils::{is_draw, is_repetition, print_search_info};
@@ -92,7 +91,7 @@ impl Searcher {
         self.start();
         self.clear_for_search();
 
-        self.root_moves = MoveList::all(&mut self.board, &self.history_score);
+        self.root_moves = MoveList::all(&mut self.board, &self.history_score, 0);
         let mut score = -INFINITY;
 
         for depth in 1..=self.info.depth as i32 {
@@ -234,7 +233,7 @@ impl Searcher {
         let mut moves = if is_root {
             self.root_moves
         } else {
-            MoveList::all(&mut self.board, &self.history_score)
+            MoveList::all(&mut self.board, &self.history_score, tt_move)
         };
 
         if moves.is_empty() {
@@ -340,10 +339,8 @@ impl Searcher {
             depth -= 1;
         }
 
-        sort_moves(&mut moves, &self.board, tt_move, &self.history_score);
-
         for i in 0..moves.size() {
-            //pick_next_move(&mut moves, i);
+            pick_next_move(&mut moves, i);
             let (m, move_score) = moves.get_all(i);
 
             if !is_legal_move(&self.board, m) {
@@ -564,7 +561,7 @@ impl Searcher {
             return eval;
         }
 
-        let mut moves = MoveList::quiet(&mut self.board, &self.history_score);
+        let mut moves = MoveList::quiet(&mut self.board, &self.history_score, tt_move);
         let mut legals = 0;
         let mut best_score = eval;
         let mut best_move = 0;
@@ -576,10 +573,8 @@ impl Searcher {
             eval + 155
         };
 
-        sort_moves(&mut moves, &self.board, tt_move, &self.history_score);
-
         for i in 0..moves.size() {
-            //pick_next_move(&mut moves, i);
+            pick_next_move(&mut moves, i);
             let m = moves.get(i);
 
             if !is_legal_move(&self.board, m) {

@@ -23,21 +23,21 @@ impl MoveList {
         }
     }
 
-    pub fn all(board: &mut Board, history_table: &HistoryTable) -> Self {
+    pub fn all(board: &mut Board, history_table: &HistoryTable, hash_move: u16) -> Self {
         let mut move_list = MoveList::new();
-        generate_all(board, history_table, &mut move_list);
+        generate_all(board, history_table, hash_move, &mut move_list);
         move_list
     }
 
-    pub fn legal(board: &mut Board, history_table: &HistoryTable) -> Self {
+    pub fn legal(board: &mut Board, history_table: &HistoryTable, hash_move: u16) -> Self {
         let mut move_list = MoveList::new();
-        generate_legal(board, history_table, &mut move_list);
+        generate_legal(board, history_table, hash_move, &mut move_list);
         move_list
     }
 
-    pub fn quiet(board: &mut Board, history_table: &HistoryTable) -> Self {
+    pub fn quiet(board: &mut Board, history_table: &HistoryTable, hash_move: u16) -> Self {
         let mut move_list = MoveList::new();
-        generate_quiet(board, history_table, &mut move_list);
+        generate_quiet(board, history_table, hash_move, &mut move_list);
         move_list
     }
 

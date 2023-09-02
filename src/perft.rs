@@ -63,7 +63,7 @@ fn inner_perft_all(
     depth: u8,
     perft: &mut PerftResult,
 ) {
-    let moves = MoveList::legal(board, fake_history);
+    let moves = MoveList::legal(board, fake_history, 0);
 
     if depth == 0 {
         perft.nodes += 1;
@@ -99,7 +99,7 @@ fn inner_perft_all(
 
 /// Only counts the number of leaf nodes
 fn inner_perft(root: bool, board: &mut Board, fake_history: &HistoryTable, depth: u8) -> u64 {
-    let moves = MoveList::legal(board, fake_history);
+    let moves = MoveList::legal(board, fake_history, 0);
     let mut count = 0;
 
     if depth == 0 {
@@ -110,7 +110,7 @@ fn inner_perft(root: bool, board: &mut Board, fake_history: &HistoryTable, depth
         board.make_move(m);
 
         let add = if depth == 2 {
-            MoveList::legal(board, fake_history).size() as u64
+            MoveList::legal(board, fake_history, 0).size() as u64
         } else {
             inner_perft(false, board, fake_history, depth - 1)
         };

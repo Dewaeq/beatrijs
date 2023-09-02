@@ -42,6 +42,7 @@ pub const fn is_square_attacked(
 fn make_moves(
     board: &Board,
     history_table: &HistoryTable,
+    hash_move: u16,
     src: Square,
     mut moves_bb: u64,
     opp_bb: u64,
@@ -50,17 +51,20 @@ fn make_moves(
     while moves_bb != 0 {
         let dest = BitBoard::pop_lsb(&mut moves_bb);
         if BitBoard::contains(opp_bb, dest) {
-            add_capture_move(
+            add_move(
                 BitMove::from_flag(src, dest, MoveFlag::CAPTURE),
                 move_list,
                 board,
+                history_table,
+                hash_move,
             );
         } else {
-            add_quiet_move(
+            add_move(
                 BitMove::from_squares(src, dest),
                 move_list,
                 board,
                 history_table,
+                hash_move,
             );
         }
     }
@@ -69,34 +73,14 @@ fn make_moves(
 fn make_pawn_move(
     board: &Board,
     history_table: &HistoryTable,
+    hash_move: u16,
     src: Square,
     dest: Square,
     flag: u8,
     move_list: &mut MoveList,
 ) {
     let m = BitMove::from_flag(src, dest, flag);
-
-    if flag == MoveFlag::EN_PASSANT {
-        add_ep_move(m, move_list);
-    } else if flag & MoveFlag::CAPTURE != 0 {
-        add_capture_move(m, move_list, board);
-    } else {
-        add_quiet_move(m, move_list, board, history_table)
-    }
-}
-
-fn add_quiet_move(m: u16, move_list: &mut MoveList, board: &Board, history_table: &HistoryTable) {
-    assert!(!BitMove::is_cap(m));
-
-    move_list.push(m, 0);
-}
-
-fn add_capture_move(m: u16, move_list: &mut MoveList, board: &Board) {
-    move_list.push(m, 0);
-}
-
-fn add_ep_move(m: u16, move_list: &mut MoveList) {
-    move_list.push(m, 0);
+    add_move(m, move_list, board, history_table, hash_move);
 }
 
 fn add_move(
@@ -113,6 +97,7 @@ fn add_move(
 fn make_promotions(
     board: &Board,
     history_table: &HistoryTable,
+    hash_move: u16,
     src: Square,
     dest: Square,
     gen_type: &GenType,
@@ -129,6 +114,7 @@ fn make_promotions(
         make_pawn_move(
             board,
             history_table,
+            hash_move,
             src,
             dest,
             MoveFlag::PROMOTE_QUEEN | flag,
@@ -142,6 +128,7 @@ fn make_promotions(
         make_pawn_move(
             board,
             history_table,
+            hash_move,
             src,
             dest,
             MoveFlag::PROMOTE_KNIGHT | flag,
@@ -150,6 +137,7 @@ fn make_promotions(
         make_pawn_move(
             board,
             history_table,
+            hash_move,
             src,
             dest,
             MoveFlag::PROMOTE_BISHOP | flag,
@@ -158,6 +146,7 @@ fn make_promotions(
         make_pawn_move(
             board,
             history_table,
+            hash_move,
             src,
             dest,
             MoveFlag::PROMOTE_ROOK | flag,
@@ -206,6 +195,7 @@ pub const fn pawn_caps(pawns: u64, player: Player) -> u64 {
 fn gen_pawn_moves(
     board: &Board,
     history_table: &HistoryTable,
+    hash_move: u16,
     target: u64,
     gen_type: &GenType,
     move_list: &mut MoveList,
@@ -245,13 +235,13 @@ fn gen_pawn_moves(
             let dest = BitBoard::pop_lsb(&mut m1);
             let src = dest - pawn_dir;
             let flag = MoveFlag::QUIET;
-            make_pawn_move(board, history_table, src, dest, flag, move_list);
+            make_pawn_move(board, history_table, hash_move, src, dest, flag, move_list);
         }
         while m2 != 0 {
             let dest = BitBoard::pop_lsb(&mut m2);
             let src = dest - pawn_dir - pawn_dir;
             let flag = MoveFlag::DOUBLE_PAWN_PUSH;
-            make_pawn_move(board, history_table, src, dest, flag, move_list);
+            make_pawn_move(board, history_table, hash_move, src, dest, flag, move_list);
         }
     }
 
@@ -273,6 +263,7 @@ fn gen_pawn_moves(
             make_pawn_move(
                 board,
                 history_table,
+                hash_move,
                 dest - pawn_dir - 1,
                 dest,
                 flag,
@@ -285,6 +276,7 @@ fn gen_pawn_moves(
             make_pawn_move(
                 board,
                 history_table,
+                hash_move,
                 dest - pawn_dir + 1,
                 dest,
                 flag,
@@ -304,6 +296,7 @@ fn gen_pawn_moves(
                 make_pawn_move(
                     board,
                     history_table,
+                    hash_move,
                     src,
                     board.pos.ep_square,
                     flag,
@@ -331,18 +324,45 @@ fn gen_pawn_moves(
         while m1 != 0 {
             let dest = BitBoard::pop_lsb(&mut m1);
             let src = dest - pawn_dir;
-            make_promotions(board, history_table, src, dest, gen_type, false, move_list);
+            make_promotions(
+                board,
+                history_table,
+                hash_move,
+                src,
+                dest,
+                gen_type,
+                false,
+                move_list,
+            );
         }
 
         while m2 != 0 {
             let dest = BitBoard::pop_lsb(&mut m2);
             let src = dest - pawn_dir - 1;
-            make_promotions(board, history_table, src, dest, gen_type, true, move_list);
+            make_promotions(
+                board,
+                history_table,
+                hash_move,
+                src,
+                dest,
+                gen_type,
+                true,
+                move_list,
+            );
         }
         while m3 != 0 {
             let dest = BitBoard::pop_lsb(&mut m3);
             let src = dest - pawn_dir + 1;
-            make_promotions(board, history_table, src, dest, gen_type, true, move_list);
+            make_promotions(
+                board,
+                history_table,
+                hash_move,
+                src,
+                dest,
+                gen_type,
+                true,
+                move_list,
+            );
         }
     }
 }
@@ -351,6 +371,7 @@ fn gen_pawn_moves(
 fn gen_piece_moves(
     board: &Board,
     history_table: &HistoryTable,
+    hash_move: u16,
     piece: PieceType,
     target: u64,
     checks: bool,
@@ -373,6 +394,7 @@ fn gen_piece_moves(
         make_moves(
             board,
             history_table,
+            hash_move,
             sq,
             bb,
             board.player_bb(board.turn.opp()),
@@ -384,6 +406,7 @@ fn gen_piece_moves(
 fn generate_all_moves(
     board: &Board,
     history_table: &HistoryTable,
+    hash_move: u16,
     gen_type: GenType,
     move_list: &mut MoveList,
 ) {
@@ -407,10 +430,18 @@ fn generate_all_moves(
             GenType::Quiets | GenType::QuietChecks => !board.occ_bb(),
         };
 
-        gen_pawn_moves(board, history_table, target_bb, &gen_type, move_list);
+        gen_pawn_moves(
+            board,
+            history_table,
+            hash_move,
+            target_bb,
+            &gen_type,
+            move_list,
+        );
         gen_piece_moves(
             board,
             history_table,
+            hash_move,
             PieceType::Knight,
             target_bb,
             checks,
@@ -419,6 +450,7 @@ fn generate_all_moves(
         gen_piece_moves(
             board,
             history_table,
+            hash_move,
             PieceType::Bishop,
             target_bb,
             checks,
@@ -427,6 +459,7 @@ fn generate_all_moves(
         gen_piece_moves(
             board,
             history_table,
+            hash_move,
             PieceType::Rook,
             target_bb,
             checks,
@@ -435,6 +468,7 @@ fn generate_all_moves(
         gen_piece_moves(
             board,
             history_table,
+            hash_move,
             PieceType::Queen,
             target_bb,
             checks,
@@ -460,17 +494,20 @@ fn generate_all_moves(
         while bb != 0 {
             let dest = BitBoard::pop_lsb(&mut bb);
             if BitBoard::contains(opp_bb, dest) {
-                add_capture_move(
+                add_move(
                     BitMove::from_flag(king_sq, dest, MoveFlag::CAPTURE),
                     move_list,
                     board,
+                    history_table,
+                    hash_move,
                 );
             } else {
-                add_quiet_move(
+                add_move(
                     BitMove::from_squares(king_sq, dest),
                     move_list,
                     board,
                     history_table,
+                    hash_move,
                 );
             }
         }
@@ -485,11 +522,12 @@ fn generate_all_moves(
                 && !BitBoard::contains(occ, king_sq + 1)
                 && !BitBoard::contains(occ, king_sq + 2)
             {
-                add_quiet_move(
+                add_move(
                     BitMove::from_flag(king_sq, king_sq + 2, MoveFlag::CASTLE_KING),
                     move_list,
                     board,
                     history_table,
+                    hash_move,
                 );
             }
             if board.can_castle_queen(board.turn)
@@ -497,29 +535,52 @@ fn generate_all_moves(
                 && !BitBoard::contains(occ, king_sq - 2)
                 && !BitBoard::contains(occ, king_sq - 3)
             {
-                add_quiet_move(
+                add_move(
                     BitMove::from_flag(king_sq, king_sq - 2, MoveFlag::CASTLE_QUEEN),
                     move_list,
                     board,
                     history_table,
+                    hash_move,
                 );
             }
         }
     }
 }
 
-pub fn generate_all(board: &mut Board, history_table: &HistoryTable, move_list: &mut MoveList) {
+pub fn generate_all(
+    board: &mut Board,
+    history_table: &HistoryTable,
+    hash_move: u16,
+    move_list: &mut MoveList,
+) {
     if board.in_check() {
-        generate_all_moves(board, history_table, GenType::Evasions, move_list);
+        generate_all_moves(
+            board,
+            history_table,
+            hash_move,
+            GenType::Evasions,
+            move_list,
+        );
     } else {
-        generate_all_moves(board, history_table, GenType::NonEvasions, move_list);
+        generate_all_moves(
+            board,
+            history_table,
+            hash_move,
+            GenType::NonEvasions,
+            move_list,
+        );
     }
 }
 
 /// Wrapper around [`generate_all`]
-pub fn generate_legal(board: &mut Board, history_table: &HistoryTable, move_list: &mut MoveList) {
+pub fn generate_legal(
+    board: &mut Board,
+    history_table: &HistoryTable,
+    hash_move: u16,
+    move_list: &mut MoveList,
+) {
     let mut pseudo = MoveList::new();
-    generate_all(board, history_table, &mut pseudo);
+    generate_all(board, history_table, hash_move, &mut pseudo);
 
     let mut i = 0;
     while i < pseudo.size() {
@@ -532,12 +593,35 @@ pub fn generate_legal(board: &mut Board, history_table: &HistoryTable, move_list
     }
 }
 
-pub fn generate_quiet(board: &mut Board, history_table: &HistoryTable, move_list: &mut MoveList) {
+pub fn generate_quiet(
+    board: &mut Board,
+    history_table: &HistoryTable,
+    hash_move: u16,
+    move_list: &mut MoveList,
+) {
     if board.in_check() {
-        generate_all_moves(board, history_table, GenType::EvadingCaptures, move_list);
+        generate_all_moves(
+            board,
+            history_table,
+            hash_move,
+            GenType::EvadingCaptures,
+            move_list,
+        );
     } else {
-        generate_all_moves(board, history_table, GenType::Captures, move_list);
-        generate_all_moves(board, history_table, GenType::QuietChecks, move_list);
+        generate_all_moves(
+            board,
+            history_table,
+            hash_move,
+            GenType::Captures,
+            move_list,
+        );
+        generate_all_moves(
+            board,
+            history_table,
+            hash_move,
+            GenType::QuietChecks,
+            move_list,
+        );
     }
 }
 
