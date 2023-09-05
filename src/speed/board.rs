@@ -2,14 +2,16 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     color::Color,
-    defs::{Castling, Piece, PieceType, Square, NUM_PIECES, NUM_SIDES},
+    defs::{Castling, Piece, PieceType, Score, Square, NUM_PIECES, NUM_SIDES},
     gen::{
-        attack::{knight_attacks, pawn_attacks},
+        attack::{bishop_attacks, knight_attacks, pawn_attacks, rook_attacks},
         between::between,
         ray::{DIAGONALS, ORTHOGONALS},
     },
     zobrist::Zobrist,
 };
+
+use super::movegen::attackers;
 
 #[derive(Clone, Copy)]
 pub struct Board {
@@ -148,6 +150,32 @@ impl Board {
         }
     }
 
+    pub const fn turn(&self) -> Color {
+        self.turn
+    }
+
+    pub const fn checkers(&self) -> u64 {
+        self.checkers
+    }
+
+    pub const fn in_check(&self) -> bool {
+        self.checkers != 0
+    }
+
+    pub const fn can_castle_queen(&self) -> bool {
+        match self.turn {
+            Color::White => self.castling & Castling::WQ != 0,
+            Color::Black => self.castling & Castling::BQ != 0,
+        }
+    }
+
+    pub const fn can_castle_king(&self) -> bool {
+        match self.turn {
+            Color::White => self.castling & Castling::WK != 0,
+            Color::Black => self.castling & Castling::BK != 0,
+        }
+    }
+
     pub fn pieces(&self, piece: PieceType) -> u64 {
         unsafe { *self.pieces.get_unchecked(piece.as_usize()) }
     }
@@ -160,6 +188,10 @@ impl Board {
         }
     }
 
+    pub fn colored_piece_like(&self, piece: PieceType, color: Color) -> u64 {
+        self.piece_like(piece) & self.color(color)
+    }
+
     pub fn color(&self, color: Color) -> u64 {
         unsafe { *self.colors.get_unchecked(color.as_usize()) }
     }
@@ -168,7 +200,11 @@ impl Board {
         self.pieces(piece) & self.color(color)
     }
 
-    fn king_sq(&self, color: Color) -> Square {
+    pub const fn occupied(&self) -> u64 {
+        self.occupied
+    }
+
+    pub fn king_sq(&self, color: Color) -> Square {
         BitBoard::to_sq(self.colored_piece(PieceType::King, color))
     }
 
@@ -194,5 +230,92 @@ impl Board {
         self.castling &= Castling::RIGHTS[dest as usize];
 
         self.hash ^= Zobrist::castle(self.castling);
+    }
+
+    pub fn see_ge(&self, m: u16, threshold: Score) -> bool {
+        if BitMove::is_prom(m) {
+            return true;
+        }
+
+        let src = BitMove::src(m);
+        let dest = BitMove::dest(m);
+
+        let captured = self.piece_on(dest);
+        let mut balance = captured.mg_value() - threshold;
+
+        if balance < 0 {
+            return false;
+        }
+
+        let attacker = self.piece_on(src);
+        balance -= attacker.mg_value();
+
+        if balance >= 0 {
+            return true;
+        }
+
+        let bishop_like = self.piece_like(PieceType::Bishop);
+        let rook_like = self.piece_like(PieceType::Rook);
+        let mut occ = self.occupied ^ BitBoard::from_sq(src) ^ BitBoard::from_sq(dest);
+        let mut attackers = attackers(&self, dest, occ);
+
+        let mut stm = self.turn.opp();
+
+        loop {
+            attackers &= occ;
+
+            let stm_attackers = attackers & self.color(stm);
+            if stm_attackers == 0 {
+                break;
+            }
+
+            let next_piece = self.smallest_attacker(stm_attackers);
+
+            stm = stm.opp();
+            balance = -balance - 1 - next_piece.mg_value();
+
+            if balance >= 0 {
+                if next_piece == PieceType::King && (attackers & self.color(stm)) != 0 {
+                    stm = stm.opp();
+                }
+                break;
+            }
+
+            let attacker_bb = stm_attackers & self.pieces(next_piece);
+            let attacker_sq = BitBoard::bit_scan_forward(attacker_bb);
+            occ ^= BitBoard::from_sq(attacker_sq);
+
+            if next_piece == PieceType::Pawn
+                || next_piece == PieceType::Bishop
+                || next_piece == PieceType::Queen
+            {
+                attackers |= bishop_attacks(dest, occ) & bishop_like;
+            }
+
+            if next_piece == PieceType::Rook || next_piece == PieceType::Queen {
+                attackers |= rook_attacks(dest, occ) & rook_like;
+            }
+        }
+
+        stm != self.turn
+    }
+
+    fn smallest_attacker(&self, stm_attackers: u64) -> PieceType {
+        let pieces = [
+            PieceType::Pawn,
+            PieceType::King,
+            PieceType::Bishop,
+            PieceType::Rook,
+            PieceType::Queen,
+            PieceType::King,
+        ];
+
+        for piece in pieces {
+            if self.pieces(piece) & stm_attackers != 0 {
+                return piece;
+            }
+        }
+
+        panic!()
     }
 }

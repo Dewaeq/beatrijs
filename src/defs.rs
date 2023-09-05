@@ -214,6 +214,7 @@ pub enum GenType {
     /// Captures, non-captures and promotions (everything except evasions)
     /// Only use if not in check
     NonEvasions,
+    All,
 }
 
 pub const MG_VALUE: [Score; NUM_PIECES] = [126, 781, 825, 1276, 2538, 0];

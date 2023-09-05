@@ -375,6 +375,7 @@ fn generate_all_moves(gen_type: GenType, params: &MovegenParams, move_list: &mut
             GenType::NonEvasions => !params.board.cur_player_bb(),
             GenType::Captures => params.board.player_bb(params.board.turn.opp()),
             GenType::Quiets | GenType::QuietChecks => !params.board.occ_bb(),
+            _ => panic!(),
         };
 
         gen_pawn_moves(params, target_bb, &gen_type, move_list);
