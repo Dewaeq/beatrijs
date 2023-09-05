@@ -18,7 +18,8 @@ pub struct Board {
     pieces: [u64; NUM_PIECES],
     colors: [u64; NUM_SIDES],
     occupied: u64,
-    pinned: u64,
+    pinned_diag: u64,
+    pinned_ortho: u64,
     checkers: u64,
     turn: Color,
     hash: u64,
@@ -33,8 +34,10 @@ impl Board {
     pub fn make_move(&self, m: u16) -> Board {
         let mut target = *self;
 
-        target.pinned = 0;
+        target.pinned_ortho = 0;
+        target.pinned_diag = 0;
         target.checkers = 0;
+
         // Reset ep square
         if let Some(ep_square) = self.ep_square {
             target.ep_square = None;
@@ -105,9 +108,8 @@ impl Board {
         }
 
         // Update checkers and pinners
-        let mut attackers = DIAGONALS[opp_king_sq as usize] & target.piece_like(PieceType::Bishop);
-        attackers |= ORTHOGONALS[opp_king_sq as usize] & target.piece_like(PieceType::Queen);
-        attackers &= target.color(self.turn);
+        let mut attackers = DIAGONALS[opp_king_sq as usize]
+            & target.colored_piece_like(PieceType::Bishop, self.turn);
 
         while attackers != 0 {
             let sq = BitBoard::pop_lsb(&mut attackers);
@@ -116,7 +118,21 @@ impl Board {
             if between == 0 {
                 target.checkers |= BitBoard::from_sq(sq);
             } else if BitBoard::only_one(between) {
-                target.pinned ^= between;
+                target.pinned_diag ^= between;
+            }
+        }
+
+        attackers = ORTHOGONALS[opp_king_sq as usize]
+            & target.colored_piece_like(PieceType::Queen, self.turn);
+
+        while attackers != 0 {
+            let sq = BitBoard::pop_lsb(&mut attackers);
+            let between = between(sq, opp_king_sq);
+
+            if between == 0 {
+                target.checkers |= BitBoard::from_sq(sq);
+            } else if BitBoard::only_one(between) {
+                target.pinned_ortho ^= between;
             }
         }
 
@@ -206,6 +222,18 @@ impl Board {
 
     pub fn king_sq(&self, color: Color) -> Square {
         BitBoard::to_sq(self.colored_piece(PieceType::King, color))
+    }
+
+    pub const fn pinned_diag(&self) -> u64 {
+        self.pinned_diag
+    }
+
+    pub const fn pinned_ortho(&self) -> u64 {
+        self.pinned_ortho
+    }
+
+    pub const fn pinned(&self) -> u64 {
+        self.pinned_diag | self.pinned_ortho
     }
 
     fn toggle(&mut self, piece: PieceType, bb: u64, color: Color) {
