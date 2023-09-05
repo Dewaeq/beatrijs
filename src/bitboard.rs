@@ -43,6 +43,10 @@ impl BitBoard {
         1 << sq
     }
 
+    pub const fn to_sq(bb: u64) -> Square {
+        BitBoard::bit_scan_forward(bb)
+    }
+
     pub const fn file_bb(sq: Square) -> u64 {
         let file = sq % 8;
         BitBoard::FILE_A << file

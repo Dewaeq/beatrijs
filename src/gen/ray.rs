@@ -8,6 +8,9 @@ pub const RAY: [[u64; 64]; Dir::N_DIRS] = gen_rays();
 pub const LINE: [[u64; 64]; 64] = gen_lines();
 pub const SQ_TO_EDGE: [[Square; 64]; Dir::N_DIRS] = gen_sq_to_edge();
 
+pub const ORTHOGONALS: [u64; 64] = gen_orthogonals();
+pub const DIAGONALS: [u64; 64] = gen_diagonals();
+
 pub const fn ray(dir_idx: usize, square: Square) -> u64 {
     if square == 64 {
         return 0;
@@ -177,4 +180,33 @@ const fn gen_sq_to_edge() -> [[Square; 64]; Dir::N_DIRS] {
     }
 
     sq_to_edge
+}
+
+const fn gen_orthogonals() -> [u64; 64] {
+    let mut table = [0; 64];
+
+    let mut sq = 0;
+    while sq < 64 {
+        table[sq as usize] = BitBoard::file_bb(sq) | BitBoard::rank_bb(sq);
+        sq += 1;
+    }
+
+    table
+}
+
+const fn gen_diagonals() -> [u64; 64] {
+    let mut table = [0; 64];
+
+    let mut sq = 0;
+    while sq < 64 {
+        table[sq as usize] |= BitBoard::from_sq(sq);
+        table[sq as usize] |= ray(Dir::NORTH_EAST, sq);
+        table[sq as usize] |= ray(Dir::SOUTH_EAST, sq);
+        table[sq as usize] |= ray(Dir::SOUTH_WEST, sq);
+        table[sq as usize] |= ray(Dir::NORTH_WEST, sq);
+
+        sq += 1;
+    }
+
+    table
 }

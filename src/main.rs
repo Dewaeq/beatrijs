@@ -25,6 +25,9 @@ mod uci;
 mod utils;
 mod zobrist;
 
+mod color;
+mod speed;
+
 use crate::input::Game;
 
 fn main() {

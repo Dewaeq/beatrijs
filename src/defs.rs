@@ -26,6 +26,18 @@ impl Castling {
     pub const WHITE_ALL: u8 = 3;
     pub const BLACK_ALL: u8 = 12;
     pub const NONE: u8 = 0;
+
+    #[rustfmt::skip]
+    pub const RIGHTS: [u8; 64] = [
+        14, 15, 15, 15, 12, 15, 15, 13,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15,
+        11, 15, 15, 15,  3, 15, 15,  7,
+    ];
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

@@ -6,6 +6,7 @@ use crate::{
 
 pub const BETWEEN: [[u64; 64]; 64] = gen_between();
 
+/// Both source and dest are excluded
 pub const fn between(source: Square, dest: Square) -> u64 {
     BETWEEN[source as usize][dest as usize]
 }
