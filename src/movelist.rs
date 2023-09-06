@@ -5,7 +5,7 @@ use crate::{
     search::{HistoryTable, Searcher},
 };
 
-#[derive(Clone, Copy)]
+//#[derive(Clone, Copy)]
 pub struct MoveList {
     moves: [u16; MAX_MOVES],
     scores: [i32; MAX_MOVES],

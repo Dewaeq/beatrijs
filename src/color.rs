@@ -1,4 +1,7 @@
-use crate::defs::{Player, Square};
+use crate::{
+    bitboard::BitBoard,
+    defs::{Player, Square},
+};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Color {
@@ -29,6 +32,20 @@ impl Color {
         match self {
             Color::White => Player::White,
             _ => Player::Black,
+        }
+    }
+
+    pub const fn rank_2(&self) -> u64 {
+        match self {
+            Color::White => BitBoard::RANK_2,
+            _ => BitBoard::RANK_7,
+        }
+    }
+
+    pub const fn rank_8(&self) -> u64 {
+        match self {
+            Color::White => BitBoard::RANK_8,
+            _ => BitBoard::RANK_1,
         }
     }
 }

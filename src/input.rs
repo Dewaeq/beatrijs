@@ -2,10 +2,11 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::{io, thread};
 
-use crate::defs::PieceType;
+use crate::defs::{PieceType, FEN_START_STRING};
 use crate::eval::evaluate;
 use crate::movegen::MovegenParams;
 use crate::search_info::SearchInfo;
+use crate::speed;
 use crate::table::{TWrapper, TABLE_SIZE_MB};
 use crate::utils::is_repetition;
 use crate::{
@@ -16,6 +17,7 @@ use std::sync::atomic::AtomicBool;
 
 pub struct Game {
     pub board: Board,
+    pub speed_board: speed::board::Board,
     pub abort_search: Arc<AtomicBool>,
     pub search_thread: Option<JoinHandle<()>>,
     pub table: Arc<TWrapper>,
@@ -25,6 +27,7 @@ impl Game {
     fn new() -> Self {
         Game {
             board: Board::start_pos(),
+            speed_board: speed::board::Board::from_fen(FEN_START_STRING),
             abort_search: Arc::new(AtomicBool::new(false)),
             search_thread: None,
             table: Arc::new(TWrapper::with_size(TABLE_SIZE_MB)),
@@ -76,7 +79,10 @@ impl Game {
         }
         // Custom commands
         else if base_command == "d" {
+            println!("old board:");
             println!("{:?}", self.board);
+            println!("speed board:");
+            println!("{:?}", self.speed_board);
         } else if base_command == "perft" {
             self.parse_perft(commands);
         } else if base_command == "test" {
@@ -94,6 +100,10 @@ impl Game {
             println!("{}", is_repetition(&self.board));
         } else if base_command == "stat" {
             self.print_stats();
+        } else if base_command == "speed" {
+            self.parse_speed_perft(commands);
+        } else if base_command == "speedmove" {
+            self.parse_speed_move(commands);
         }
     }
 
@@ -120,6 +130,12 @@ impl Game {
         perft(&mut self.board, depth, true);
     }
 
+    fn parse_speed_perft(&self, commands: Vec<&str>) {
+        let depth = commands[3].parse::<u8>().unwrap();
+
+        let nodes = speed::perft::perft(&self.speed_board, depth);
+    }
+
     fn parse_test(&self, commands: Vec<&str>) {
         assert!(commands.len() == 2);
 
@@ -139,6 +155,14 @@ impl Game {
         self.make_moves(&commands[1..]);
 
         println!("{:?}", self.board);
+    }
+
+    fn parse_speed_move(&mut self, commands: Vec<&str>) {
+        assert!(commands.len() >= 2);
+
+        self.speed_make_moves(&commands[1..]);
+
+        println!("{:?}", self.speed_board);
     }
 
     fn print_moves(&mut self) {
@@ -176,10 +200,11 @@ impl Game {
             _ => PieceType::None,
         };
 
-        let temp_ply = self.board.pos.ply;
-        self.board.pos.ply = 0;
-        let mut moves = MoveList::legal(MovegenParams::simple(&self.board));
-        self.board.pos.ply = temp_ply;
+        //let temp_ply = self.board.pos.ply;
+        //self.board.pos.ply = 0;
+        //let mut moves = MoveList::legal(MovegenParams::simple(&self.board));
+        let mut moves = speed::movegen::MoveGen::simple(&self.speed_board);
+        //self.board.pos.ply = temp_ply;
 
         moves.find(|&x| {
             BitMove::src(x) == src
@@ -193,6 +218,18 @@ impl Game {
             let bitmove = self.str_to_move(move_str);
             if let Some(m) = bitmove {
                 self.board.make_move(m);
+            } else {
+                eprintln!("failed to parse move {}", move_str);
+                return;
+            }
+        }
+    }
+
+    pub fn speed_make_moves(&mut self, moves: &[&str]) {
+        for move_str in moves {
+            let bitmove = self.str_to_move(move_str);
+            if let Some(m) = bitmove {
+                self.speed_board = self.speed_board.make_move(m);
             } else {
                 eprintln!("failed to parse move {}", move_str);
                 return;

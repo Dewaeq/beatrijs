@@ -2,12 +2,13 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     color::Color,
-    defs::{Castling, Piece, PieceType, Score, Square, NUM_PIECES, NUM_SIDES},
+    defs::{Castling, Piece, PieceType, Score, Square, FEN_START_STRING, NUM_PIECES, NUM_SIDES},
     gen::{
         attack::{bishop_attacks, knight_attacks, pawn_attacks, rook_attacks},
         between::between,
         ray::{DIAGONALS, ORTHOGONALS},
     },
+    utils::{square_from_string, square_to_string},
     zobrist::Zobrist,
 };
 
@@ -31,6 +32,27 @@ pub struct Board {
 }
 
 impl Board {
+    pub const fn new() -> Self {
+        Board {
+            pieces: [0; 6],
+            colors: [0; 2],
+            occupied: 0,
+            pinned_diag: 0,
+            pinned_ortho: 0,
+            checkers: 0,
+            turn: Color::White,
+            hash: 0,
+            ep_square: None,
+            castling: 15,
+            fifty_move: 0,
+            his_ply: 0,
+        }
+    }
+
+    pub fn start_pos() -> Self {
+        Board::from_fen(FEN_START_STRING)
+    }
+
     pub fn make_move(&self, m: u16) -> Board {
         let mut target = *self;
 
@@ -47,7 +69,6 @@ impl Board {
         let opp = self.turn.opp();
         let opp_king_sq = self.king_sq(opp);
 
-        let is_castle = BitMove::is_castle(m);
         let src = BitMove::src(m);
         let dest = BitMove::dest(m);
 
@@ -95,7 +116,7 @@ impl Board {
         }
         // TODO: does first checking if [piece] == PieceType::King improve performance?
         else if BitMove::is_castle(m) {
-            let king_side = dest % 8 < 4;
+            let king_side = (dest % 8) > 4;
 
             let (rook_src, rook_dest) = if king_side {
                 (dest + 1, dest - 1)
@@ -113,7 +134,7 @@ impl Board {
 
         while attackers != 0 {
             let sq = BitBoard::pop_lsb(&mut attackers);
-            let between = between(sq, opp_king_sq);
+            let between = between(sq, opp_king_sq) & target.occupied;
 
             if between == 0 {
                 target.checkers |= BitBoard::from_sq(sq);
@@ -123,11 +144,11 @@ impl Board {
         }
 
         attackers = ORTHOGONALS[opp_king_sq as usize]
-            & target.colored_piece_like(PieceType::Queen, self.turn);
+            & target.colored_piece_like(PieceType::Rook, self.turn);
 
         while attackers != 0 {
             let sq = BitBoard::pop_lsb(&mut attackers);
-            let between = between(sq, opp_king_sq);
+            let between = between(sq, opp_king_sq) & target.occupied;
 
             if between == 0 {
                 target.checkers |= BitBoard::from_sq(sq);
@@ -166,8 +187,16 @@ impl Board {
         }
     }
 
+    pub const fn is_occupied(&self, sq: Square) -> bool {
+        self.occupied & BitBoard::from_sq(sq) != 0
+    }
+
     pub const fn turn(&self) -> Color {
         self.turn
+    }
+
+    pub const fn ep_square(&self) -> Option<Square> {
+        self.ep_square
     }
 
     pub const fn checkers(&self) -> u64 {
@@ -236,7 +265,7 @@ impl Board {
         self.pinned_diag | self.pinned_ortho
     }
 
-    fn toggle(&mut self, piece: PieceType, bb: u64, color: Color) {
+    pub fn toggle(&mut self, piece: PieceType, bb: u64, color: Color) {
         self.hash ^= Zobrist::piece(color.to_player(), piece, BitBoard::to_sq(bb));
         self.occupied ^= bb;
 
@@ -331,7 +360,7 @@ impl Board {
     fn smallest_attacker(&self, stm_attackers: u64) -> PieceType {
         let pieces = [
             PieceType::Pawn,
-            PieceType::King,
+            PieceType::Knight,
             PieceType::Bishop,
             PieceType::Rook,
             PieceType::Queen,
@@ -345,5 +374,210 @@ impl Board {
         }
 
         panic!()
+    }
+
+    fn set_check_info(&mut self) {
+        let opp = self.color(self.turn.opp());
+        let king_sq = self.king_sq(self.turn);
+
+        let checkers = attackers(&self, self.king_sq(self.turn), self.occupied) & opp;
+
+        // Update checkers and pinners
+        let mut attackers = DIAGONALS[king_sq as usize]
+            & self.colored_piece_like(PieceType::Bishop, self.turn.opp());
+
+        while attackers != 0 {
+            let sq = BitBoard::pop_lsb(&mut attackers);
+            let between = between(sq, king_sq);
+
+            if between == 0 {
+                self.checkers |= BitBoard::from_sq(sq);
+            } else if BitBoard::only_one(between) {
+                self.pinned_diag ^= between;
+            }
+        }
+
+        attackers = ORTHOGONALS[king_sq as usize]
+            & self.colored_piece_like(PieceType::Rook, self.turn.opp());
+
+        while attackers != 0 {
+            let sq = BitBoard::pop_lsb(&mut attackers);
+            let between = between(sq, king_sq);
+
+            if between == 0 {
+                self.checkers |= BitBoard::from_sq(sq);
+            } else if BitBoard::only_one(between) {
+                self.pinned_ortho ^= between;
+            }
+        }
+
+        assert!(self.checkers == checkers);
+    }
+
+    pub fn from_fen(fen: &str) -> Self {
+        let mut board = Board::new();
+
+        let sections: Vec<&str> = fen.split_whitespace().collect();
+        assert!(sections.len() == 6, "Invalid FEN string");
+
+        let pieces_str = sections[0];
+        let turn_str = sections[1];
+        let castle_str = sections[2];
+        let ep_str = sections[3];
+        let half_move_str = sections[4];
+        let full_move_str = sections[5];
+
+        // Turn to move
+        board.turn = match turn_str {
+            "w" => Color::White,
+            "b" => Color::Black,
+            _ => panic!(),
+        };
+
+        // Castling permissions
+        if !castle_str.contains('-') {
+            for symbol in castle_str.split("") {
+                if symbol.is_empty() {
+                    continue;
+                }
+                board.castling |= match symbol {
+                    "K" => Castling::WK,
+                    "Q" => Castling::WQ,
+                    "k" => Castling::BK,
+                    "q" => Castling::BQ,
+                    _ => panic!("Invalid castling values in FEN string"),
+                }
+            }
+        }
+
+        // EP-square
+        if !ep_str.contains('-') {
+            board.set_ep(square_from_string(ep_str));
+        }
+
+        board.fifty_move = half_move_str.parse::<u8>().unwrap();
+        board.his_ply = full_move_str.parse::<u8>().unwrap();
+
+        let mut file = 0;
+        let mut rank = 7;
+
+        // Piece locations
+        for symbol in pieces_str.split("") {
+            if symbol.is_empty() {
+                continue;
+            }
+            let c: &str = &symbol.to_lowercase();
+            let color = if c != symbol {
+                Color::White
+            } else {
+                Color::Black
+            };
+
+            if c == "/" {
+                file = 0;
+                rank -= 1;
+                continue;
+            }
+            if ["1", "2", "3", "4", "5", "6", "7", "8"].contains(&c) {
+                file += c.parse::<Square>().unwrap();
+                continue;
+            }
+
+            let square = rank * 8 + file;
+            let piece = match c {
+                "p" => PieceType::Pawn,
+                "n" => PieceType::Knight,
+                "b" => PieceType::Bishop,
+                "r" => PieceType::Rook,
+                "q" => PieceType::Queen,
+                "k" => PieceType::King,
+                _ => panic!(),
+            };
+
+            board.toggle(piece, BitBoard::from_sq(square), color);
+            file += 1;
+        }
+
+        board.set_check_info();
+        board.hash ^= Zobrist::castle(board.castling);
+
+        if board.turn == Color::Black {
+            board.hash ^= Zobrist::side();
+        }
+
+        board
+    }
+}
+
+impl Board {
+    pub fn pretty_string(&self) -> String {
+        let mut output = String::from("\n");
+
+        for y in 0..8 {
+            output.push_str("+---+---+---+---+---+---+---+---+\n");
+            for x in 0..8 {
+                let square = 8 * (7 - y) + x;
+                let is_white = BitBoard::from_sq(square) & self.color(Color::White) != 0;
+
+                let piece_str = match self.piece_on(square) {
+                    PieceType::Pawn => " p ",
+                    PieceType::Knight => " n ",
+                    PieceType::Bishop => " b ",
+                    PieceType::Rook => " r ",
+                    PieceType::Queen => " q ",
+                    PieceType::King => " k ",
+                    PieceType::None => "   ",
+                };
+
+                output.push('|');
+                if is_white {
+                    output.push_str(&piece_str.to_uppercase());
+                } else {
+                    output.push_str(piece_str);
+                }
+
+                if x == 7 {
+                    output.push('|');
+                    output.push_str(&format!(" {}", (8 - y)));
+                    output.push('\n');
+                }
+            }
+        }
+        output.push_str("+---+---+---+---+---+---+---+---+\n");
+        output.push_str("  a   b   c   d   e   f   g   h  \n\n");
+
+        output
+    }
+}
+
+impl std::fmt::Debug for Board {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.pretty_string())?;
+        writeln!(
+            f,
+            "Turn       : {}",
+            match self.turn {
+                Color::White => "White",
+                Color::Black => "Black",
+            }
+        )?;
+        writeln!(f, "Ply        : {}", self.his_ply)?;
+        writeln!(f, "Key        : {}", self.hash)?;
+        writeln!(f, "Castling   : {:b}", self.castling)?;
+        writeln!(
+            f,
+            "EP Square  : {}",
+            square_to_string(self.ep_square.unwrap_or(64))
+        )?;
+        write!(f, "Checkers   : ")?;
+        let mut checkers = self.checkers;
+        while checkers != 0 {
+            let checker_sq = BitBoard::pop_lsb(&mut checkers);
+            write!(f, "{} ", square_to_string(checker_sq))?;
+        }
+        writeln!(f)?;
+        writeln!(f, "Pinned: ")?;
+        writeln!(f, "{}", BitBoard::pretty_string(self.pinned()))?;
+        writeln!(f)
     }
 }

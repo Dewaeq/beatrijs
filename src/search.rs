@@ -6,9 +6,7 @@ use crate::movegen::{is_legal_move, MovegenParams};
 use crate::search_info::SearchInfo;
 use crate::table::{Bound, HashEntry, TWrapper};
 use crate::utils::{is_draw, print_search_info};
-use crate::{
-    bitmove::BitMove, board::Board, movelist::MoveList, order::pick_next_move,
-};
+use crate::{bitmove::BitMove, board::Board, movelist::MoveList, order::pick_next_move};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -232,7 +230,8 @@ impl Searcher {
         self.num_nodes += 1;
 
         let mut moves = if is_root {
-            self.root_moves
+            let params = MovegenParams::new(&self.board, &self.history_score, tt_move);
+            MoveList::all(params)
         } else {
             let params = MovegenParams::new(&self.board, &self.history_score, tt_move);
             MoveList::all(params)
