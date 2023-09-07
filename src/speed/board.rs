@@ -19,8 +19,7 @@ pub struct Board {
     pieces: [u64; NUM_PIECES],
     colors: [u64; NUM_SIDES],
     occupied: u64,
-    pinned_diag: u64,
-    pinned_ortho: u64,
+    pinned: u64,
     checkers: u64,
     turn: Color,
     hash: u64,
@@ -37,13 +36,12 @@ impl Board {
             pieces: [0; 6],
             colors: [0; 2],
             occupied: 0,
-            pinned_diag: 0,
-            pinned_ortho: 0,
             checkers: 0,
+            pinned: 0,
             turn: Color::White,
             hash: 0,
             ep_square: None,
-            castling: 15,
+            castling: 0,
             fifty_move: 0,
             his_ply: 0,
         }
@@ -56,9 +54,8 @@ impl Board {
     pub fn make_move(&self, m: u16) -> Board {
         let mut target = *self;
 
-        target.pinned_ortho = 0;
-        target.pinned_diag = 0;
         target.checkers = 0;
+        target.pinned = 0;
 
         // Reset ep square
         if let Some(ep_square) = self.ep_square {
@@ -129,8 +126,10 @@ impl Board {
         }
 
         // Update checkers and pinners
-        let mut attackers = DIAGONALS[opp_king_sq as usize]
-            & target.colored_piece_like(PieceType::Bishop, self.turn);
+        let mut attackers = (DIAGONALS[opp_king_sq as usize]
+            & target.piece_like(PieceType::Bishop)
+            | ORTHOGONALS[opp_king_sq as usize] & target.piece_like(PieceType::Rook))
+            & target.color(self.turn);
 
         while attackers != 0 {
             let sq = BitBoard::pop_lsb(&mut attackers);
@@ -139,21 +138,7 @@ impl Board {
             if between == 0 {
                 target.checkers |= BitBoard::from_sq(sq);
             } else if BitBoard::only_one(between) {
-                target.pinned_diag ^= between;
-            }
-        }
-
-        attackers = ORTHOGONALS[opp_king_sq as usize]
-            & target.colored_piece_like(PieceType::Rook, self.turn);
-
-        while attackers != 0 {
-            let sq = BitBoard::pop_lsb(&mut attackers);
-            let between = between(sq, opp_king_sq) & target.occupied;
-
-            if between == 0 {
-                target.checkers |= BitBoard::from_sq(sq);
-            } else if BitBoard::only_one(between) {
-                target.pinned_ortho ^= between;
+                target.pinned ^= between;
             }
         }
 
@@ -253,16 +238,8 @@ impl Board {
         BitBoard::to_sq(self.colored_piece(PieceType::King, color))
     }
 
-    pub const fn pinned_diag(&self) -> u64 {
-        self.pinned_diag
-    }
-
-    pub const fn pinned_ortho(&self) -> u64 {
-        self.pinned_ortho
-    }
-
     pub const fn pinned(&self) -> u64 {
-        self.pinned_diag | self.pinned_ortho
+        self.pinned
     }
 
     pub fn toggle(&mut self, piece: PieceType, bb: u64, color: Color) {
@@ -376,42 +353,25 @@ impl Board {
         panic!()
     }
 
+    /// Update checkers and pinners
     fn set_check_info(&mut self) {
         let opp = self.color(self.turn.opp());
         let king_sq = self.king_sq(self.turn);
 
-        let checkers = attackers(&self, self.king_sq(self.turn), self.occupied) & opp;
-
-        // Update checkers and pinners
-        let mut attackers = DIAGONALS[king_sq as usize]
-            & self.colored_piece_like(PieceType::Bishop, self.turn.opp());
+        let mut attackers = (DIAGONALS[king_sq as usize] & self.piece_like(PieceType::Bishop)
+            | ORTHOGONALS[king_sq as usize] & self.piece_like(PieceType::Rook))
+            & opp;
 
         while attackers != 0 {
             let sq = BitBoard::pop_lsb(&mut attackers);
-            let between = between(sq, king_sq);
+            let between = between(sq, king_sq) & self.occupied;
 
             if between == 0 {
                 self.checkers |= BitBoard::from_sq(sq);
             } else if BitBoard::only_one(between) {
-                self.pinned_diag ^= between;
+                self.pinned ^= between;
             }
         }
-
-        attackers = ORTHOGONALS[king_sq as usize]
-            & self.colored_piece_like(PieceType::Rook, self.turn.opp());
-
-        while attackers != 0 {
-            let sq = BitBoard::pop_lsb(&mut attackers);
-            let between = between(sq, king_sq);
-
-            if between == 0 {
-                self.checkers |= BitBoard::from_sq(sq);
-            } else if BitBoard::only_one(between) {
-                self.pinned_ortho ^= between;
-            }
-        }
-
-        assert!(self.checkers == checkers);
     }
 
     pub fn from_fen(fen: &str) -> Self {
