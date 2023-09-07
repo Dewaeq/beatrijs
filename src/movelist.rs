@@ -1,7 +1,5 @@
 use crate::{
-    board::Board,
     defs::MAX_MOVES,
-    movegen::{generate_all, generate_legal, generate_quiet, MovegenParams},
     search::{HistoryTable, Searcher},
 };
 
@@ -22,24 +20,6 @@ impl MoveList {
             count: 0,
             current: 0,
         }
-    }
-
-    pub fn all(params: MovegenParams) -> Self {
-        let mut move_list = MoveList::new();
-        generate_all(&params, &mut move_list);
-        move_list
-    }
-
-    pub fn legal(params: MovegenParams) -> Self {
-        let mut move_list = MoveList::new();
-        generate_legal(&params, &mut move_list);
-        move_list
-    }
-
-    pub fn quiet(params: MovegenParams) -> Self {
-        let mut move_list = MoveList::new();
-        generate_quiet(&params, &mut move_list);
-        move_list
     }
 
     pub fn push(&mut self, m: u16, score: i32) {

@@ -56,12 +56,8 @@ impl Board {
 
         target.checkers = 0;
         target.pinned = 0;
-
-        // Reset ep square
-        if let Some(ep_square) = self.ep_square {
-            target.ep_square = None;
-            target.hash ^= Zobrist::ep(ep_square % 8);
-        }
+        target.fifty_move += 1;
+        target.try_reset_ep();
 
         let opp = self.turn.opp();
         let opp_king_sq = self.king_sq(opp);
@@ -80,10 +76,13 @@ impl Board {
         // Remove the captured piece
         if captured != PieceType::None {
             target.toggle(captured, dest_bb, opp);
+            target.fifty_move = 0;
         }
 
         // Handle edge cases
         if piece == PieceType::Pawn {
+            target.fifty_move = 0;
+
             if BitMove::is_prom(m) {
                 // Remove the pawn from the 1/8th rank, as it will
                 // promote to a piece
@@ -96,7 +95,7 @@ impl Board {
                     target.checkers |= knight_attacks(opp_king_sq) & dest_bb;
                 }
             } else {
-                target.checkers |= pawn_attacks(opp_king_sq, opp.to_player()) & dest_bb;
+                target.checkers |= pawn_attacks(opp_king_sq, opp) & dest_bb;
 
                 if BitMove::flag(m) == MoveFlag::DOUBLE_PAWN_PUSH {
                     target.set_ep(dest - self.turn.pawn_dir());
@@ -143,9 +142,22 @@ impl Board {
         }
 
         target.update_castling(src, dest);
-
+        target.his_ply += 1;
         target.turn = opp;
         target.hash ^= Zobrist::side();
+
+        target
+    }
+
+    pub fn make_null_move(&self) -> Board {
+        let mut target = *self;
+
+        target.his_ply += 1;
+        target.fifty_move += 1;
+        target.turn = self.turn.opp();
+        target.hash ^= Zobrist::side();
+        target.try_reset_ep();
+        target.set_check_info();
 
         target
     }
@@ -176,8 +188,28 @@ impl Board {
         self.occupied & BitBoard::from_sq(sq) != 0
     }
 
+    pub fn piece_color(&self, sq: Square) -> Color {
+        if BitBoard::from_sq(sq) & self.color(Color::White) != 0 {
+            Color::White
+        } else {
+            Color::Black
+        }
+    }
+
     pub const fn turn(&self) -> Color {
         self.turn
+    }
+
+    pub const fn fifty_move(&self) -> u8 {
+        self.fifty_move
+    }
+
+    pub const fn his_ply(&self) -> u8 {
+        self.his_ply
+    }
+
+    pub const fn hash(&self) -> u64 {
+        self.hash
     }
 
     pub const fn ep_square(&self) -> Option<Square> {
@@ -204,6 +236,13 @@ impl Board {
             Color::White => self.castling & Castling::WK != 0,
             Color::Black => self.castling & Castling::BK != 0,
         }
+    }
+
+    pub fn has_non_pawns(&self) -> bool {
+        self.colored_piece(PieceType::Knight, self.turn) != 0
+            || self.colored_piece(PieceType::Bishop, self.turn) != 0
+            || self.colored_piece(PieceType::Rook, self.turn) != 0
+            || self.colored_piece(PieceType::Queen, self.turn) != 0
     }
 
     pub fn pieces(&self, piece: PieceType) -> u64 {
@@ -249,6 +288,13 @@ impl Board {
         unsafe {
             *self.pieces.get_unchecked_mut(piece.as_usize()) ^= bb;
             *self.colors.get_unchecked_mut(color.as_usize()) ^= bb;
+        }
+    }
+
+    fn try_reset_ep(&mut self) {
+        if let Some(ep_square) = self.ep_square {
+            self.ep_square = None;
+            self.hash ^= Zobrist::ep(ep_square % 8);
         }
     }
 

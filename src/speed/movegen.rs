@@ -208,8 +208,7 @@ impl<'a> MoveGen<'a> {
         let mut not_pinned = pieces & !self.board.pinned();
         while not_pinned != 0 {
             let src = BitBoard::pop_lsb(&mut not_pinned);
-            let moves =
-                attacks(piece, src, occupied, self.board.turn().to_player()) & mask & check_mask;
+            let moves = attacks(piece, src, occupied, self.board.turn()) & mask & check_mask;
             self.add_moves(src, moves);
         }
 
@@ -217,7 +216,7 @@ impl<'a> MoveGen<'a> {
             let mut pinned = pieces & self.board.pinned();
             while pinned != 0 {
                 let src = BitBoard::pop_lsb(&mut pinned);
-                let moves = attacks(piece, src, occupied, self.board.turn().to_player())
+                let moves = attacks(piece, src, occupied, self.board.turn())
                     & mask
                     & line(self.king_sq, src);
                 self.add_moves(src, moves);
@@ -251,8 +250,7 @@ impl<'a> MoveGen<'a> {
         }
 
         if let Some(ep_square) = self.board.ep_square() {
-            let mut ep_candidates =
-                pawn_attacks(ep_square, self.board.turn().opp().to_player()) & pawns;
+            let mut ep_candidates = pawn_attacks(ep_square, self.board.turn().opp()) & pawns;
 
             while ep_candidates != 0 {
                 let src = BitBoard::pop_lsb(&mut ep_candidates);
@@ -347,8 +345,7 @@ impl<'a> MoveGen<'a> {
 }
 
 fn is_square_attacked(board: &Board, sq: Square, color: Color, occ: u64) -> bool {
-    if pawn_attacks(sq, color.opp().to_player()) & board.colored_piece(PieceType::Pawn, color) != 0
-    {
+    if pawn_attacks(sq, color.opp()) & board.colored_piece(PieceType::Pawn, color) != 0 {
         return true;
     }
     if knight_attacks(sq) & board.colored_piece(PieceType::Knight, color) != 0 {
@@ -370,9 +367,8 @@ fn is_square_attacked(board: &Board, sq: Square, color: Color, occ: u64) -> bool
 }
 
 pub fn attackers(board: &Board, sq: Square, occ: u64) -> u64 {
-    pawn_attacks(sq, Color::White.to_player()) & board.colored_piece(PieceType::Pawn, Color::Black)
-        | pawn_attacks(sq, Color::Black.to_player())
-            & board.colored_piece(PieceType::Pawn, Color::White)
+    pawn_attacks(sq, Color::White) & board.colored_piece(PieceType::Pawn, Color::Black)
+        | pawn_attacks(sq, Color::Black) & board.colored_piece(PieceType::Pawn, Color::White)
         | knight_attacks(sq) & board.pieces(PieceType::Knight)
         | king_attacks(sq) & board.pieces(PieceType::King)
         | bishop_attacks(sq, occ) & board.piece_like(PieceType::Bishop)
@@ -382,13 +378,13 @@ pub fn attackers(board: &Board, sq: Square, occ: u64) -> u64 {
 const fn pawn_moves(sq: Square, blockers: u64, opponent: u64, color: Color) -> u64 {
     let bb = BitBoard::from_sq(sq);
 
-    let mut pushes = pawn_push(bb, color.to_player()) & !blockers;
+    let mut pushes = pawn_push(bb, color) & !blockers;
     // Double push for pawns on home rank
     if bb & color.rank_2() != 0 {
-        pushes |= pawn_push(pushes, color.to_player()) & !blockers;
+        pushes |= pawn_push(pushes, color) & !blockers;
     }
 
-    let captures = pawn_attacks(sq, color.to_player()) & opponent;
+    let captures = pawn_attacks(sq, color) & opponent;
 
     pushes | captures
 }

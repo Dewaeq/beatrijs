@@ -1,5 +1,7 @@
 use crate::{
-    bitmove::BitMove, board::Board, movegen::MovegenParams, movelist::MoveList,
+    bitmove::BitMove,
+    movelist::MoveList,
+    speed::{board::Board, movegen::MoveGen},
 };
 use std::time::Instant;
 
@@ -15,7 +17,7 @@ pub struct PerftResult {
     pub check_mates: u64,
 }
 
-pub fn perft_all(board: &mut Board, depth: u8) -> PerftResult {
+pub fn perft_all(board: &Board, depth: u8) -> PerftResult {
     let mut perft = PerftResult {
         time: 0f64,
         nodes: 0,
@@ -28,7 +30,7 @@ pub fn perft_all(board: &mut Board, depth: u8) -> PerftResult {
     };
 
     let start = Instant::now();
-    inner_perft_all(board, depth, &mut perft);
+    inner_perft_all(&board, depth, &mut perft);
     let end = start.elapsed();
 
     perft.time = end.as_secs_f64() * 1000f64;
@@ -36,34 +38,8 @@ pub fn perft_all(board: &mut Board, depth: u8) -> PerftResult {
     perft
 }
 
-pub fn perft(board: &mut Board, depth: u8, print_info: bool) -> u64 {
-    let start = Instant::now();
-    let nodes = inner_perft(print_info, board, depth);
-    let end = start.elapsed();
-
-    if print_info {
-        println!("\n=================================\n");
-        println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
-        println!(
-            "Num moves      :   {}",
-            MoveList::legal(MovegenParams::simple(board)).size()
-        );
-        println!("Num nodes      :   {nodes}");
-        println!(
-            "Nodes/s        :   {}",
-            (nodes as f64 / end.as_secs_f64()) as u64
-        );
-    }
-
-    nodes
-}
-
-fn inner_perft_all(
-    board: &mut Board,
-    depth: u8,
-    perft: &mut PerftResult,
-) {
-    let moves = MoveList::legal(MovegenParams::simple(board));
+fn inner_perft_all(board: &Board, depth: u8, perft: &mut PerftResult) {
+    let moves = MoveGen::simple(board);
 
     if depth == 0 {
         perft.nodes += 1;
@@ -90,16 +66,34 @@ fn inner_perft_all(
                 }
             }
 
-            board.make_move(m);
-            inner_perft_all(board, depth - 1, perft);
-            board.unmake_move(m);
+            let new_board = board.make_move(m);
+            inner_perft_all(&new_board, depth - 1, perft);
         }
     }
 }
 
+pub fn perft(board: &Board, depth: u8, log: bool) -> u64 {
+    let start = Instant::now();
+    let nodes = inner_perft(log, board, depth);
+    let end = start.elapsed();
+
+    if log {
+        println!("\n=================================\n");
+        println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
+        println!("Num moves      :   {}", MoveGen::simple(&board).size());
+        println!("Num nodes      :   {nodes}");
+        println!(
+            "Nodes/s        :   {}",
+            (nodes as f64 / end.as_secs_f64()) as u64
+        );
+    }
+
+    nodes
+}
+
 /// Only counts the number of leaf nodes
-fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
-    let moves = MoveList::legal(MovegenParams::simple(board));
+fn inner_perft(log: bool, board: &Board, depth: u8) -> u64 {
+    let moves = MoveGen::simple(board);
     let mut count = 0;
 
     if depth == 0 {
@@ -107,19 +101,17 @@ fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
     }
 
     for m in moves {
-        board.make_move(m);
+        let new_board = board.make_move(m);
 
         let add = if depth == 2 {
-            MoveList::legal(MovegenParams::simple(board)).size() as u64
+            MoveGen::simple(&new_board).size() as u64
         } else {
-            inner_perft(false, board, depth - 1)
+            inner_perft(false, &new_board, depth - 1)
         };
-
-        board.unmake_move(m);
 
         count += add;
 
-        if root {
+        if log {
             let pretty = BitMove::pretty_move(m);
             println!("{pretty}: {add}");
         }
@@ -130,7 +122,7 @@ fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{board::Board, perft::perft_all};
+    use crate::{perft::perft_all, speed::board::Board};
 
     fn perft_all_test(
         fen: &str,

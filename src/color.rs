@@ -42,6 +42,20 @@ impl Color {
         }
     }
 
+    pub const fn rank_3(&self) -> u64 {
+        match self {
+            Color::White => BitBoard::RANK_3,
+            _ => BitBoard::RANK_6,
+        }
+    }
+
+    pub const fn rank_7(&self) -> u64 {
+        match self {
+            Color::White => BitBoard::RANK_7,
+            _ => BitBoard::RANK_2,
+        }
+    }
+
     pub const fn rank_8(&self) -> u64 {
         match self {
             Color::White => BitBoard::RANK_8,

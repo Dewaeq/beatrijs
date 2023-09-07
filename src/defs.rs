@@ -1,4 +1,4 @@
-use crate::bitboard::BitBoard;
+use crate::{bitboard::BitBoard, color::Color};
 
 pub const WHITE_IDX: usize = 0;
 pub const BLACK_IDX: usize = 1;
@@ -160,6 +160,10 @@ impl PieceType {
             PieceType::King => 5,
             PieceType::None => 6,
         }
+    }
+
+    pub const fn index(self, color: Color) -> usize {
+        self.as_usize() + color.as_usize() * 6
     }
 
     pub const fn is_none(&self) -> bool {

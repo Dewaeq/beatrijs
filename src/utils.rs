@@ -1,7 +1,8 @@
 use crate::bitmove::BitMove;
-use crate::board::Board;
-use crate::defs::{PieceType, Player, Score};
+use crate::color::Color;
+use crate::defs::{PieceType, Score};
 use crate::search::{IS_MATE, MATE};
+use crate::speed::board::Board;
 use crate::{bitboard::BitBoard, defs::Square};
 
 pub fn square_from_string(str: &str) -> Square {
@@ -74,7 +75,6 @@ pub fn print_search_info(
     num_nodes: u64,
     hash_full: usize,
     pv: &[u16],
-    turn: Player,
 ) {
     let score_str = if score.abs() == MATE {
         format!("mate",)
@@ -115,14 +115,16 @@ pub const fn mirror(sq: Square) -> Square {
     sq ^ 56
 }
 
-pub const fn is_draw(board: &Board) -> bool {
-    board.pos.half_move_count >= 100 || is_repetition(board) || is_material_draw(board)
+pub fn is_draw(board: &Board, repetitions: &[u64]) -> bool {
+    board.fifty_move() >= 100 || is_repetition(board, repetitions) || is_material_draw(board)
 }
 
-pub const fn is_repetition(board: &Board) -> bool {
-    let mut i = board.history.count as i32 - 2;
-    while i >= 0 && i >= board.history.count as i32 - board.pos.half_move_count as i32 {
-        if board.history.get_key(i as usize) == board.key() {
+pub fn is_repetition(board: &Board, repetitions: &[u64]) -> bool {
+    let len = repetitions.len() as i32;
+    let mut i = len as i32 - 2;
+
+    while i >= 0 && i >= len - board.fifty_move() as i32 {
+        if repetitions[i as usize] == board.hash() {
             return true;
         }
 
@@ -130,43 +132,33 @@ pub const fn is_repetition(board: &Board) -> bool {
     }
 
     return false;
-
-    /*board
-    .history
-    .iter()
-    .take(board.history.count)
-    .rev()
-    .take(board.pos.half_move_count as usize)
-    .skip(1)
-    .step_by(2)
-    .any(|pos| pos.key == board.key())*/
 }
 
-const fn is_material_draw(board: &Board) -> bool {
-    let only_white_king = BitBoard::only_one(board.player_bb(Player::White));
-    let only_black_king = BitBoard::only_one(board.player_bb(Player::Black));
+fn is_material_draw(board: &Board) -> bool {
+    let only_white_king = BitBoard::only_one(board.color(Color::White));
+    let only_black_king = BitBoard::only_one(board.color(Color::Black));
 
     if only_black_king && only_white_king {
         return true;
     }
 
-    let pawns = board.piece_bb(PieceType::Pawn);
+    let pawns = board.pieces(PieceType::Pawn);
     if pawns != 0 {
         return false;
     }
 
-    let rooks = board.piece_bb(PieceType::Rook);
+    let rooks = board.pieces(PieceType::Rook);
     if rooks != 0 {
         return false;
     }
 
-    let queens = board.piece_bb(PieceType::Queen);
+    let queens = board.pieces(PieceType::Queen);
     if queens != 0 {
         return false;
     }
 
-    let num_knights = BitBoard::count(board.piece_bb(PieceType::Knight));
-    let bishops = board.piece_bb(PieceType::Bishop);
+    let num_knights = BitBoard::count(board.pieces(PieceType::Knight));
+    let bishops = board.pieces(PieceType::Bishop);
 
     // KvN, KvNN and KvB are draws
     if (only_white_king || only_black_king)
@@ -179,29 +171,29 @@ const fn is_material_draw(board: &Board) -> bool {
     return false;
 }
 
-pub const fn ranks_in_front_of(side: Player, sq: Square) -> u64 {
+pub const fn ranks_in_front_of(color: Color, sq: Square) -> u64 {
     let bb = BitBoard::rank_bb(sq);
-    front_span(side, bb)
+    front_span(color, bb)
 }
 
-pub const fn front_span(side: Player, bb: u64) -> u64 {
-    match side {
-        Player::White => north_one(north_fill(bb)),
-        Player::Black => south_one(south_fill(bb)),
+pub const fn front_span(color: Color, bb: u64) -> u64 {
+    match color {
+        Color::White => north_one(north_fill(bb)),
+        Color::Black => south_one(south_fill(bb)),
     }
 }
 
-pub const fn fill_up(side: Player, bb: u64) -> u64 {
-    match side {
-        Player::White => north_fill(bb),
-        Player::Black => south_fill(bb),
+pub const fn fill_up(color: Color, bb: u64) -> u64 {
+    match color {
+        Color::White => north_fill(bb),
+        Color::Black => south_fill(bb),
     }
 }
 
-pub const fn fill_down(side: Player, bb: u64) -> u64 {
-    match side {
-        Player::White => south_fill(bb),
-        Player::Black => north_fill(bb),
+pub const fn fill_down(color: Color, bb: u64) -> u64 {
+    match color {
+        Color::White => south_fill(bb),
+        Color::Black => north_fill(bb),
     }
 }
 

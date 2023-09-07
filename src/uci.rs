@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::{process::exit, sync::atomic::Ordering, thread::JoinHandle, time::Instant};
 
 use crate::search::MAX_SEARCH_DEPTH;
-use crate::{bitmove::BitMove, board::Board, input::Game, search_info::SearchInfo};
+use crate::{bitmove::BitMove, input::Game, search_info::SearchInfo, speed::board::Board};
 
 /// Gui to engine
 impl Game {
@@ -50,16 +50,13 @@ impl Game {
             };
 
             self.board = Board::from_fen(&fen_str);
-            self.speed_board = speed::board::Board::from_fen(&fen_str);
         } else if commands.contains(&"startpos") {
             self.board = Board::start_pos();
-            self.speed_board = speed::board::Board::start_pos();
         }
 
         match moves_idx {
             Some(idx) => {
                 self.make_moves(&commands[(idx + 1)..]);
-                self.speed_make_moves(&commands[(idx + 1)..]);
             }
             _ => (),
         }
@@ -125,7 +122,7 @@ impl Game {
 /// Engine to Gui
 impl Game {
     pub fn best_move(&self) {
-        let best_move = self.table.best_move(self.board.key());
+        let best_move = self.table.best_move(self.board.hash());
         println!("bestmove {}", BitMove::pretty_move(best_move.unwrap_or(0)));
     }
 }

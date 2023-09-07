@@ -1,11 +1,9 @@
-use std::cell::SyncUnsafeCell;
-
 use crate::{
-    board::Board,
     defs::Score,
-    movegen::is_legal_move,
     search::{INFINITY, IS_MATE},
+    speed::{board::Board, movegen::MoveGen},
 };
+use std::cell::SyncUnsafeCell;
 
 pub const TABLE_SIZE_MB: usize = 128;
 type TT = HashTable<HashEntry>;
@@ -103,7 +101,7 @@ impl HashTable<HashEntry> {
     pub fn extract_pv(&self, board: &Board, depth: u8) -> Vec<u16> {
         let mut board = board.clone();
         let mut pv = vec![];
-        let mut m = self.best_move(board.key());
+        let mut m = self.best_move(board.hash());
         let mut i = 0;
 
         while i < depth && m.is_some() {
@@ -113,13 +111,14 @@ impl HashTable<HashEntry> {
                 break;
             }
 
-            if !is_legal_move(&mut board, pv_move) {
+            let mut legals = MoveGen::simple(&board);
+            if !legals.any(|m| m == pv_move) {
                 break;
             }
 
             pv.push(pv_move);
-            board.make_move(pv_move);
-            m = self.best_move(board.key());
+            board = board.make_move(pv_move);
+            m = self.best_move(board.hash());
             i += 1;
         }
 

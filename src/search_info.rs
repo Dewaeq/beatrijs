@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use crate::{defs::Player, search::MAX_SEARCH_DEPTH};
+use crate::{color::Color, defs::Player, search::MAX_SEARCH_DEPTH};
 
 #[derive(Clone, Copy, Debug)]
 pub struct SearchInfo {
@@ -38,10 +38,10 @@ impl SearchInfo {
         info
     }
 
-    pub fn my_time(&self, side: Player) -> Option<usize> {
-        match side {
-            Player::White => self.w_time,
-            Player::Black => self.b_time,
+    pub fn my_time(&self, color: Color) -> Option<usize> {
+        match color {
+            Color::White => self.w_time,
+            _ => self.b_time,
         }
     }
 
@@ -53,14 +53,14 @@ impl SearchInfo {
         }
     }
 
-    pub fn start(&mut self, side: Player) {
+    pub fn start(&mut self, color: Color) {
         self.started = Instant::now();
 
         if self.time_set {
             let search_time = if let Some(move_time) = self.move_time {
                 Duration::from_millis(move_time as u64)
             } else {
-                let my_time = self.my_time(side).unwrap();
+                let my_time = self.my_time(color).unwrap();
                 Duration::from_millis((my_time / 30) as u64)
             };
             self.stop_time = Instant::now() + search_time;
