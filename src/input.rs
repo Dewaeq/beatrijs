@@ -133,7 +133,7 @@ impl Game {
     fn parse_speed_perft(&self, commands: Vec<&str>) {
         let depth = commands[3].parse::<u8>().unwrap();
 
-        let nodes = speed::perft::perft(&self.speed_board, depth);
+        let nodes = speed::perft::perft(&self.speed_board, depth, true);
     }
 
     fn parse_test(&self, commands: Vec<&str>) {

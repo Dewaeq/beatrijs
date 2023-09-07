@@ -228,13 +228,14 @@ impl<'a> MoveGen<'a> {
     fn generate_pawn_moves<const IN_CHECK: bool>(&mut self, mask: u64, check_mask: u64) {
         let turn = self.board.turn();
         let occ = self.board.occupied();
+        let opp = self.board.color(turn.opp());
         let pawns = self.board.colored_piece(PieceType::Pawn, turn);
         let mut not_pinned = pawns & !self.board.pinned();
 
         while not_pinned != 0 {
             let src = BitBoard::pop_lsb(&mut not_pinned);
 
-            let moves = pawn_moves(src, occ, turn) & mask & check_mask;
+            let moves = pawn_moves(src, occ, opp, turn) & mask & check_mask;
             self.add_pawn_moves(src, moves);
         }
 
@@ -244,7 +245,7 @@ impl<'a> MoveGen<'a> {
             while pinned != 0 {
                 let src = BitBoard::pop_lsb(&mut pinned);
 
-                let moves = pawn_moves(src, occ, turn) & mask & line(self.king_sq, src);
+                let moves = pawn_moves(src, occ, opp, turn) & mask & line(self.king_sq, src);
                 self.add_pawn_moves(src, moves);
             }
         }
@@ -378,7 +379,7 @@ pub fn attackers(board: &Board, sq: Square, occ: u64) -> u64 {
         | rook_attacks(sq, occ) & board.piece_like(PieceType::Rook)
 }
 
-const fn pawn_moves(sq: Square, blockers: u64, color: Color) -> u64 {
+const fn pawn_moves(sq: Square, blockers: u64, opponent: u64, color: Color) -> u64 {
     let bb = BitBoard::from_sq(sq);
 
     let mut pushes = pawn_push(bb, color.to_player()) & !blockers;
@@ -387,7 +388,7 @@ const fn pawn_moves(sq: Square, blockers: u64, color: Color) -> u64 {
         pushes |= pawn_push(pushes, color.to_player()) & !blockers;
     }
 
-    let captures = pawn_attacks(sq, color.to_player()) & blockers;
+    let captures = pawn_attacks(sq, color.to_player()) & opponent;
 
     pushes | captures
 }

@@ -106,42 +106,26 @@ const fn gen_lines() -> [[u64; 64]; 64] {
         while dest < 64 {
             if src == dest {
                 dest += 1;
+                continue;
             }
 
             let (dest_file, dest_rank) = coord_from_square(dest);
 
-            // Bishop-like ray
-            if (source_file - dest_file).abs() == (source_rank - dest_rank).abs() {
-                let offset = if source_file > dest_file {
-                    if source_rank > dest_rank {
-                        DIRS[Dir::SOUTH_WEST]
-                    } else {
-                        DIRS[Dir::NORTH_WEST]
-                    }
-                } else if source_rank > dest_rank {
-                    DIRS[Dir::SOUTH_EAST]
-                } else {
-                    DIRS[Dir::NORTH_EAST]
-                };
-
-                let bb = get_line_bb(src, offset);
-                lines[src as usize][dest as usize] = bb;
-            }
-            // Rook-like ray
-            else if (source_file == dest_file) || (source_rank == dest_rank) {
-                let offset = if source_file > dest_file {
-                    DIRS[Dir::WEST]
-                } else if source_file < dest_file {
-                    DIRS[Dir::EAST]
-                } else if source_rank > dest_rank {
-                    DIRS[Dir::SOUTH]
-                } else {
-                    DIRS[Dir::NORTH]
-                };
-
-                let bb = get_line_bb(src, offset);
-                lines[src as usize][dest as usize] = bb;
-            }
+            lines[src as usize][dest as usize] = if source_file == dest_file {
+                // Vertical
+                BitBoard::file_bb(src)
+            } else if source_rank == dest_rank {
+                // Horizontal
+                BitBoard::rank_bb(src)
+            } else if source_file + source_rank == dest_file + dest_rank {
+                // Diagonal
+                ray(Dir::SOUTH_EAST, src) | ray(Dir::NORTH_WEST, src) | BitBoard::from_sq(src)
+            } else if (source_file - source_rank).abs() == (dest_file - dest_rank).abs() {
+                // Anti-diagonal
+                ray(Dir::NORTH_EAST, src) | ray(Dir::SOUTH_WEST, src) | BitBoard::from_sq(src)
+            } else {
+                0
+            };
 
             dest += 1;
         }

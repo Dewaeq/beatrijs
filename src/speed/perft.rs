@@ -2,25 +2,27 @@ use super::{board::Board, movegen::MoveGen};
 use crate::bitmove::BitMove;
 use std::time::Instant;
 
-pub fn perft(board: &Board, depth: u8) -> u64 {
+pub fn perft(board: &Board, depth: u8, log: bool) -> u64 {
     let start = Instant::now();
-    let nodes = inner_perft(true, board, depth);
+    let nodes = inner_perft(log, board, depth);
     let end = start.elapsed();
 
-    println!("\n=================================\n");
-    println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
-    println!("Num moves      :   {}", MoveGen::simple(&board).size());
-    println!("Num nodes      :   {nodes}");
-    println!(
-        "Nodes/s        :   {}",
-        (nodes as f64 / end.as_secs_f64()) as u64
-    );
+    if log {
+        println!("\n=================================\n");
+        println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
+        println!("Num moves      :   {}", MoveGen::simple(&board).size());
+        println!("Num nodes      :   {nodes}");
+        println!(
+            "Nodes/s        :   {}",
+            (nodes as f64 / end.as_secs_f64()) as u64
+        );
+    }
 
     nodes
 }
 
 /// Only counts the number of leaf nodes
-fn inner_perft(root: bool, board: &Board, depth: u8) -> u64 {
+fn inner_perft(log: bool, board: &Board, depth: u8) -> u64 {
     let moves = MoveGen::simple(board);
     let mut count = 0;
 
@@ -39,7 +41,7 @@ fn inner_perft(root: bool, board: &Board, depth: u8) -> u64 {
 
         count += add;
 
-        if root {
+        if log {
             let pretty = BitMove::pretty_move(m);
             println!("{pretty}: {add}");
         }

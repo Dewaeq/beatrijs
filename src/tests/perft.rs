@@ -3,7 +3,7 @@ use std::{
     thread,
 };
 
-use crate::{board::Board, perft::perft};
+use crate::speed::{board::Board, perft::perft};
 
 pub fn test_perft() {
     let mut handles = vec![];
@@ -19,7 +19,7 @@ pub fn test_perft() {
             let nodes = a.next().unwrap().parse::<u64>().unwrap();
 
             let mut board = Board::from_fen(fen);
-            let nodes_counted = perft(&mut board, depth, false);
+            let nodes_counted = perft(&board, depth, false);
             let mut counter = counter.lock().unwrap();
 
             if nodes_counted == nodes {
