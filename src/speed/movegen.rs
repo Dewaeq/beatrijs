@@ -329,7 +329,7 @@ impl<'a> MoveGen<'a> {
                 MVV_LVA[move_piece.as_usize()][cap_piece.as_usize()]
             };
 
-            if board.see_ge(m, -130) {
+            if board.see_ge(m, -100) {
                 GOOD_CAPTURE_BONUS + mvv_lva
             } else {
                 BAD_CAPTURE_BONUS + mvv_lva

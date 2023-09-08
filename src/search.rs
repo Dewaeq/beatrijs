@@ -103,7 +103,7 @@ impl Searcher {
             }
 
             let elapsed = self.info.started.elapsed().as_secs_f64() * 1000f64;
-            let pv = self.table.extract_pv(&mut self.board, depth);
+            let pv = self.table.extract_pv(&self.board, depth);
             // let hash_full = self.table.hash_full();
 
             if pv.len() > 0 {
@@ -231,7 +231,11 @@ impl Searcher {
 
         self.num_nodes += 1;
 
-        let mut moves = MoveGen::all(board, tt_move, &self.killers[ply], &self.history_score);
+        let mut moves = if is_root {
+            self.root_moves
+        } else {
+            MoveGen::all(board, tt_move, &self.killers[ply], &self.history_score)
+        };
 
         if moves.is_empty() {
             if ply > self.sel_depth {
@@ -364,9 +368,7 @@ impl Searcher {
                 continue;
             }
 
-            //let gives_check = self.board.gives_check(m);
-            //TODO
-            let gives_check = false;
+            let gives_check = board.gives_check(m);
 
             if !is_root && best_score > -IS_MATE && board.has_non_pawns() {
                 if is_cap || is_prom || gives_check {
@@ -377,7 +379,7 @@ impl Searcher {
                     }
 
                     // SEE pruning
-                    if !board.see_ge(m, -200 * depth) {
+                    if depth < 8 && !board.see_ge(m, -200 * depth) {
                         continue;
                     }
 
@@ -425,6 +427,8 @@ impl Searcher {
 
             self.repetitions.push(board.hash());
             let new_board = board.make_move(m);
+
+            assert!(new_board.in_check() == gives_check);
 
             let mut score = 0;
 
@@ -583,7 +587,7 @@ impl Searcher {
             return eval;
         }
 
-        let mut moves = MoveGen::all(board, tt_move, &self.killers[ply], &self.history_score);
+        let mut moves = MoveGen::captures(board, tt_move, &self.killers[ply], &self.history_score);
 
         let mut legals = 0;
         let mut best_score = eval;
@@ -601,9 +605,7 @@ impl Searcher {
             let m = moves.get(i);
 
             let is_prom = BitMove::is_prom(m);
-            //let gives_check = self.board.gives_check(m);
-            // TODO
-            let gives_check = false;
+            let gives_check = board.gives_check(m);
 
             legals += 1;
 
@@ -648,6 +650,8 @@ impl Searcher {
 
             self.repetitions.push(board.hash());
             let new_board = board.make_move(m);
+
+            assert!(new_board.in_check() == gives_check);
 
             let score = -self.quiescence(&new_board, -beta, -alpha, ply + 1);
 

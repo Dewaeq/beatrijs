@@ -4,7 +4,7 @@ use crate::{
     color::Color,
     defs::{Castling, Piece, PieceType, Score, Square, FEN_START_STRING, NUM_PIECES, NUM_SIDES},
     gen::{
-        attack::{bishop_attacks, knight_attacks, pawn_attacks, rook_attacks},
+        attack::{attacks, bishop_attacks, knight_attacks, pawn_attacks, rook_attacks},
         between::between,
         ray::{DIAGONALS, ORTHOGONALS},
     },
@@ -222,6 +222,64 @@ impl Board {
 
     pub const fn in_check(&self) -> bool {
         self.checkers != 0
+    }
+
+    pub fn gives_check(&self, m: u16) -> bool {
+        let src = BitMove::src(m);
+        let dest = BitMove::dest(m);
+        let from_bb = BitBoard::from_sq(src);
+        let to_bb = BitBoard::from_sq(dest);
+        let piece = self.piece_on(src);
+        let opp = self.turn.opp();
+        let opp_king = self.colored_piece(PieceType::King, opp);
+        let opp_king_sq = self.king_sq(opp);
+
+        // Direct check
+        if piece == PieceType::Knight {
+            if knight_attacks(dest) & opp_king != 0 {
+                return true;
+            }
+        } else if piece == PieceType::Pawn {
+            if pawn_attacks(dest, self.turn) & opp_king != 0 {
+                return true;
+            }
+        }
+
+        if BitMove::is_prom(m) {
+            let prom_type = BitMove::prom_type(BitMove::flag(m));
+            let occ = self.occupied ^ from_bb;
+
+            if attacks(prom_type, dest, occ, self.turn) & opp_king != 0 {
+                return true;
+            }
+        }
+
+        if BitMove::is_ep(m) {
+            let captured_sq = dest - self.turn.pawn_dir();
+            let occ = (self.occupied ^ from_bb ^ BitBoard::from_sq(captured_sq)) | to_bb;
+
+            let bishop_attacks =
+                bishop_attacks(opp_king_sq, occ) & self.colored_piece(PieceType::Bishop, self.turn);
+            if bishop_attacks != 0 {
+                return true;
+            }
+
+            let rook_attacks =
+                rook_attacks(opp_king_sq, occ) & self.colored_piece(PieceType::Rook, self.turn);
+            if rook_attacks != 0 {
+                return true;
+            }
+        }
+
+        if BitMove::is_castle(m) {
+            let rook_dest = if dest > src { dest - 1 } else { dest + 1 };
+            let occ = self.occupied ^ from_bb ^ to_bb;
+
+            return rook_attacks(rook_dest, occ) & opp_king != 0;
+        }
+
+        let new_board = self.make_move(m);
+        new_board.in_check()
     }
 
     pub const fn can_castle_queen(&self) -> bool {

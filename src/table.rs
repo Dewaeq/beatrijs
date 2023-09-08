@@ -220,7 +220,7 @@ impl TWrapper {
         unsafe { (*self.inner.get()).best_move(key) }
     }
 
-    pub fn extract_pv(&self, board: &mut Board, depth: i32) -> Vec<u16> {
+    pub fn extract_pv(&self, board: &Board, depth: i32) -> Vec<u16> {
         unsafe { (*self.inner.get()).extract_pv(board, depth as u8) }
     }
 

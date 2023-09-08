@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::{io, thread};
 
-use crate::defs::{PieceType, FEN_START_STRING};
+use crate::defs::{PieceType, Score, FEN_START_STRING};
 use crate::eval::evaluate;
 use crate::search_info::SearchInfo;
 use crate::speed::board::Board;
@@ -95,6 +95,8 @@ impl Game {
             //println!("{}", is_repetition(&self.board));
         } else if base_command == "stat" {
             self.print_stats();
+        } else if base_command == "see" {
+            self.see(commands);
         }
     }
 
@@ -164,6 +166,20 @@ impl Game {
         println!("Hash full: {}", hash_full);
         println!("Table size (mb): {}", table_size);
         println!("Current TT entry: {:?}", entry);
+    }
+
+    fn see(&self, commands: Vec<&str>) {
+        let threshold = if commands.len() == 3 {
+            commands[2].parse::<Score>().unwrap()
+        } else {
+            0
+        };
+
+        let moves = MoveGen::simple(&self.board);
+        for m in moves {
+            let see = self.board.see_ge(m, threshold);
+            println!("{}: {see}", BitMove::pretty_move(m));
+        }
     }
 
     fn str_to_move(&mut self, move_str: &str) -> Option<u16> {

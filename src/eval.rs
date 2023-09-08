@@ -428,7 +428,8 @@ fn eval_pawns(
     let num_my_rooks_behind_passers =
         BitBoard::count(board.colored_piece(PieceType::Rook, color) & behind_passers) as Score;
     let num_opp_rooks_behind_passers =
-        BitBoard::count(board.colored_piece(PieceType::Rook, color) & behind_passers) as Score;
+        BitBoard::count(board.colored_piece(PieceType::Rook, color.opp()) & behind_passers)
+            as Score;
 
     score += num_my_rooks_behind_passers * 7;
     score += num_opp_rooks_behind_passers * -13;
