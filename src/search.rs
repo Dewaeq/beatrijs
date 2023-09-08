@@ -638,11 +638,11 @@ impl Searcher {
 
             // if eval + SEE exceeds beta, return early, as the opponent should've
             // had a better option earlier
-            //let see = self.board.see_approximate(m);
-            //if see + eval > beta {
-            //best_score = see;
-            //break;
-            //}
+            let see = self.board.see_approximate(m);
+            if see + eval > beta {
+                best_score = see;
+                break;
+            }
 
             if !board.see_ge(m, 0) {
                 continue;

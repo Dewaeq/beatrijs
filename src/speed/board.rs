@@ -438,6 +438,26 @@ impl Board {
         stm != self.turn
     }
 
+    pub fn see_approximate(&self, m: u16) -> Score {
+        let src = BitMove::src(m);
+        let dest = BitMove::dest(m);
+
+        let piece = self.piece_on(src);
+        let captured = if BitMove::is_ep(m) {
+            PieceType::Pawn
+        } else {
+            self.piece_on(dest)
+        };
+
+        let mut score = captured.mg_value();
+
+        if BitMove::is_prom(m) {
+            score += BitMove::prom_type(BitMove::flag(m)).mg_value() - piece.mg_value();
+        }
+
+        score - piece.mg_value()
+    }
+
     fn smallest_attacker(&self, stm_attackers: u64) -> PieceType {
         let pieces = [
             PieceType::Pawn,
