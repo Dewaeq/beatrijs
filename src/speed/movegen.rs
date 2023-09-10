@@ -59,6 +59,13 @@ impl<'a> MoveGen<'a> {
         generator.move_list
     }
 
+    pub fn simple_captures(board: &Board) -> MoveList {
+        let mut generator = MoveGen::new(board, 0, &[0; 2], &[[[0; 64]; 64]; 2]);
+        generator.generate_all(GenType::Captures);
+
+        generator.move_list
+    }
+
     pub fn all(
         board: &Board,
         hash_move: u16,

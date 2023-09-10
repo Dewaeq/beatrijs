@@ -91,6 +91,8 @@ impl Game {
             self.parse_move(commands);
         } else if base_command == "moves" {
             self.print_moves();
+        } else if base_command == "captures" {
+            self.print_captures();
         } else if base_command == "rep" {
             //println!("{}", is_repetition(&self.board));
         } else if base_command == "stat" {
@@ -144,8 +146,19 @@ impl Game {
         println!("{:?}", self.board);
     }
 
-    fn print_moves(&mut self) {
+    fn print_moves(&self) {
         let moves = MoveGen::simple(&self.board);
+        print!("{}: ", moves.size());
+
+        for m in moves {
+            print!("{}, ", BitMove::pretty_move(m));
+        }
+
+        println!();
+    }
+
+    fn print_captures(&self) {
+        let moves = MoveGen::simple_captures(&self.board);
         print!("{}: ", moves.size());
 
         for m in moves {
