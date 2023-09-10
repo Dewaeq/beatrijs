@@ -587,7 +587,11 @@ impl Searcher {
             return eval;
         }
 
-        let mut moves = MoveGen::captures(board, tt_move, &self.killers[ply], &self.history_score);
+        let mut moves = if board.in_check() {
+            MoveGen::all(board, tt_move, &self.killers[ply], &self.history_score)
+        } else {
+            MoveGen::captures(board, tt_move, &self.killers[ply], &self.history_score)
+        };
 
         let mut legals = 0;
         let mut best_score = eval;
