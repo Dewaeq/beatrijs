@@ -59,7 +59,7 @@ pub fn perft(board: &mut Board, depth: u8, print_info: bool) -> u64 {
 }
 
 fn inner_perft_all(
-    board: &mut Board,
+    board: &Board,
     depth: u8,
     perft: &mut PerftResult,
 ) {
@@ -90,15 +90,14 @@ fn inner_perft_all(
                 }
             }
 
-            board.make_move(m);
-            inner_perft_all(board, depth - 1, perft);
-            board.unmake_move(m);
+            let new_board = board.make_move(m);
+            inner_perft_all(&new_board, depth - 1, perft);
         }
     }
 }
 
 /// Only counts the number of leaf nodes
-fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
+fn inner_perft(root: bool, board: &Board, depth: u8) -> u64 {
     let moves = MoveList::legal(MovegenParams::simple(board));
     let mut count = 0;
 
@@ -107,15 +106,13 @@ fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
     }
 
     for m in moves {
-        board.make_move(m);
+        let new_board = board.make_move(m);
 
         let add = if depth == 2 {
-            MoveList::legal(MovegenParams::simple(board)).size() as u64
+            MoveList::legal(MovegenParams::simple(&new_board)).size() as u64
         } else {
-            inner_perft(false, board, depth - 1)
+            inner_perft(false, &new_board, depth - 1)
         };
-
-        board.unmake_move(m);
 
         count += add;
 

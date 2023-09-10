@@ -115,31 +115,22 @@ pub const fn mirror(sq: Square) -> Square {
     sq ^ 56
 }
 
-pub const fn is_draw(board: &Board) -> bool {
-    board.pos.half_move_count >= 100 || is_repetition(board) || is_material_draw(board)
+pub const fn is_draw(board: &Board, repetitions: &[u64]) -> bool {
+    board.pos.half_move_count >= 100 || is_repetition(board, repetitions) || is_material_draw(board)
 }
 
-pub const fn is_repetition(board: &Board) -> bool {
-    let mut i = board.history.count as i32 - 2;
-    while i >= 0 && i >= board.history.count as i32 - board.pos.half_move_count as i32 {
-        if board.history.get_key(i as usize) == board.key() {
+pub const fn is_repetition(board: &Board, repetitions: &[u64]) -> bool {
+    let len = repetitions.len();
+    let mut i = len as i32 - 2;
+    while i >= 0 && i >= len as i32 - board.pos.half_move_count as i32 {
+        if repetitions[i as usize] == board.key() {
             return true;
         }
 
         i -= 2;
     }
 
-    return false;
-
-    /*board
-    .history
-    .iter()
-    .take(board.history.count)
-    .rev()
-    .take(board.pos.half_move_count as usize)
-    .skip(1)
-    .step_by(2)
-    .any(|pos| pos.key == board.key())*/
+    false
 }
 
 const fn is_material_draw(board: &Board) -> bool {

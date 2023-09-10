@@ -26,14 +26,16 @@ pub struct MovegenParams<'a> {
     board: &'a Board,
     history_table: &'a HistoryTable,
     hash_move: u16,
+    killers: &'a [u16; 2],
 }
 
 impl<'a> MovegenParams<'a> {
-    pub fn new(board: &'a Board, history_table: &'a HistoryTable, hash_move: u16) -> Self {
+    pub fn new(board: &'a Board, history_table: &'a HistoryTable, hash_move: u16, killers: &'a [u16; 2]) -> Self {
         MovegenParams {
             board,
             history_table,
             hash_move,
+            killers
         }
     }
 
@@ -42,6 +44,7 @@ impl<'a> MovegenParams<'a> {
             board,
             history_table: &[[[0; 64]; 64]; 2],
             hash_move: 0,
+            killers: &[0; 2]
         }
     }
 }
@@ -113,9 +116,9 @@ fn score_move(m: u16, params: &MovegenParams) -> i32 {
         } else {
             BAD_CAPTURE_BONUS + mvv_lva
         }
-    } else if m == params.board.killers[0][params.board.pos.ply] {
+    } else if m == params.killers[0] {
         KILLER_1_BONUS
-    } else if m == params.board.killers[1][params.board.pos.ply] {
+    } else if m == params.killers[1] {
         KILLER_2_BONUS
     } else {
         params.history_table[params.board.turn.as_usize()][src as usize][dest as usize]

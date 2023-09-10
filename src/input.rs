@@ -84,14 +84,14 @@ impl Game {
         } else if base_command == "static" {
             self.parse_static(commands);
         } else if base_command == "take" {
-            self.board.unmake_last_move();
+            // self.board.unmake_last_move();
             println!("{:?}", self.board);
         } else if base_command == "move" {
             self.parse_move(commands);
         } else if base_command == "moves" {
             self.print_moves();
         } else if base_command == "rep" {
-            println!("{}", is_repetition(&self.board));
+            // println!("{}", is_repetition(&self.board));
         } else if base_command == "stat" {
             self.print_stats();
         }
@@ -192,7 +192,7 @@ impl Game {
         for move_str in moves {
             let bitmove = self.str_to_move(move_str);
             if let Some(m) = bitmove {
-                self.board.make_move(m);
+                self.board = self.board.make_move(m);
             } else {
                 eprintln!("failed to parse move {}", move_str);
                 return;
