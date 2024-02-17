@@ -20,6 +20,7 @@ pub struct Game {
     pub abort_search: Arc<AtomicBool>,
     pub search_thread: Option<JoinHandle<()>>,
     pub table: Arc<TWrapper>,
+    repetitions: Vec<u64>
 }
 
 impl Game {
@@ -29,6 +30,7 @@ impl Game {
             abort_search: Arc::new(AtomicBool::new(false)),
             search_thread: None,
             table: Arc::new(TWrapper::with_size(TABLE_SIZE_MB)),
+            repetitions: vec![]
         }
     }
 
@@ -94,7 +96,7 @@ impl Game {
         } else if base_command == "captures" {
             self.print_captures();
         } else if base_command == "rep" {
-            //println!("{}", is_repetition(&self.board));
+            println!("{}", is_repetition(&self.board, &self.repetitions));
         } else if base_command == "stat" {
             self.print_stats();
         } else if base_command == "see" {
@@ -221,6 +223,7 @@ impl Game {
         for move_str in moves {
             let bitmove = self.str_to_move(move_str);
             if let Some(m) = bitmove {
+                self.repetitions.push(self.board.hash());
                 self.board = self.board.make_move(m);
             } else {
                 eprintln!("failed to parse move {}", move_str);

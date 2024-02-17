@@ -94,6 +94,7 @@ impl Searcher {
         self.root_moves = MoveGen::all(&self.board, 0, &self.killers[0], &self.history_score);
 
         let mut score = -INFINITY;
+        let mut best_move = None;
 
         for depth in 1..=self.info.depth as i32 {
             score = self.aspiration_search(&self.board.clone(), depth, score);
@@ -108,6 +109,7 @@ impl Searcher {
 
             if pv.len() > 0 {
                 self.best_root_move = pv[0];
+                best_move = Some(pv[0]);
             }
             print_search_info(
                 depth,
@@ -120,10 +122,8 @@ impl Searcher {
             );
         }
 
-        let best_move = self
-            .table
-            .best_move(self.board.hash())
-            .unwrap_or(self.best_root_move);
+        let best_move = best_move.unwrap_or(self.best_root_move);
+        
         println!("bestmove {}", BitMove::pretty_move(best_move));
     }
 
