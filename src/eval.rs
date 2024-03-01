@@ -15,7 +15,7 @@ use crate::{
 };
 
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
-const BISHOP_PAIR_BONUS: Score = 7;
+const BISHOP_PAIR_BONUS: Score = 9;
 
 const SHIELD_MISSING: [i32; 4] = [-2, -23, -38, -55];
 const SHIELD_MISSING_ON_OPEN_FILE: [i32; 4] = [-8, -10, -37, -66];
@@ -228,9 +228,9 @@ fn mobility(board: &Board, piece: Piece, sq: Square, attacked_by: &mut AttackedB
         PieceType::Bishop => 17 * open + 30 * att + 15 * def,
         PieceType::Rook => 15 * open + 20 * att + 15 * def,
         PieceType::Queen => 5 * open + 15 * att + 8 * def,
-        PieceType::King => 4 * open + 15 * att + 10 * def,
+        PieceType::King => 2 * open + 8 * att + 10 * def,
         _ => panic!(),
-    } / 30) as Score;
+    } / 10) as Score;
 
     match piece.c {
         Player::White => score,
@@ -356,10 +356,10 @@ fn eval_bishops(board: &Board, side: Player, my_pawns: u64) -> Score {
     }
 
     if bishops & DARK_SQUARES != 0 {
-        score -= BitBoard::count(my_pawns & DARK_SQUARES) as Score;
+        score -= (BitBoard::count(my_pawns & DARK_SQUARES) * 5) as Score;
     }
     if bishops & LIGHT_SQUARES != 0 {
-        score -= BitBoard::count(my_pawns & LIGHT_SQUARES) as Score;
+        score -= (BitBoard::count(my_pawns & LIGHT_SQUARES) * 5) as Score;
     }
 
     score
@@ -385,7 +385,7 @@ fn eval_pawns(
 
     // Pawns controlling centre of the board
     let num_pawns_behind_center = BitBoard::count(my_pawns & pawn_caps(SMALL_CENTER, side.opp())) as Score;
-    score += num_pawns_behind_center * -20;
+    score -= num_pawns_behind_center * 20;
 
     // Pawn mobility
     let attacks = pawn_caps(my_pawns & !side.rank_7(), side);
@@ -402,8 +402,8 @@ fn eval_pawns(
     let num_isolated =
         BitBoard::count(file_fill(my_pawns) & !west_one(my_pawns) & !east_one(my_pawns)) as Score;
 
-    score += num_doubled * -11;
-    score += num_isolated * -8;
+    score -= num_doubled * 11;
+    score -= num_isolated * 8;
 
     // Backward pawns, see https://www.chessprogramming.org/Backward_Pawns_(Bitboards)#Telestop_Weakness
     let my_attack_spans = fill_up(side, my_pawn_attacks);
@@ -411,7 +411,7 @@ fn eval_pawns(
     let my_backward_area = fill_down(side, stops);
     let num_backward = BitBoard::count(my_backward_area & my_pawns) as Score;
 
-    score += num_backward * -6;
+    score -= num_backward * 6;
 
     // Passed pawns
     let mut opp_front_spans = front_span(side.opp(), opp_pawns);
@@ -424,8 +424,8 @@ fn eval_pawns(
         BitBoard::count(board.player_piece_bb(side.opp(), PieceType::Rook) & behind_passers)
             as Score;
 
-    score += num_my_rooks_behind_passers * 7;
-    score += num_opp_rooks_behind_passers * -13;
+    score += num_my_rooks_behind_passers * 17;
+    score -= num_opp_rooks_behind_passers * 13;
 
     while passers != 0 {
         let sq = BitBoard::pop_lsb(&mut passers);
