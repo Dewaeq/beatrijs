@@ -16,21 +16,14 @@ use crate::{
     utils::adjacent_files,
 };
 
-// pub const HASH_BONUS: Score = 9_000_000;
-// const QUEEN_PROMOTE_BONUS: Score = 7_000_000;
-// const KNIGHT_PROMOTE_BONUS: Score = 7_500_000;
-// const GOOD_CAPTURE_BONUS: Score = 6_000_000;
-// const KILLER_1_BONUS: Score = 5_000_000;
-// const KILLER_2_BONUS: Score = 4_000_000;
-// const BAD_CAPTURE_MALUS: Score = -3_000_000;
-// const BAD_PROMOTE_MALUS: Score = -5_000_000;
-
-pub const HASH_BONUS: i32 = 9_000_000;
-const PROMOTE_BONUS: i32 = 7_000_000;
-const GOOD_CAPTURE_BONUS: i32 = 6_000_000;
-const KILLER_1_BONUS: i32 = 5_000_000;
-const KILLER_2_BONUS: i32 = 4_000_000;
-const BAD_CAPTURE_BONUS: i32 = 3_000_000;
+ pub const HASH_BONUS: Score = 9_000_000;
+ const QUEEN_PROMOTE_BONUS: Score = 8_000_000;
+ const KNIGHT_PROMOTE_BONUS: Score = 7_000_000;
+ const GOOD_CAPTURE_BONUS: Score = 6_000_000;
+ const KILLER_1_BONUS: Score = 5_000_000;
+ const KILLER_2_BONUS: Score = 4_000_000;
+ const BAD_CAPTURE_BONUS: Score = 3_000_000;
+ const BAD_PROMOTE_MALUS: Score = -5_000_000;
 
 pub struct MovegenParams<'a> {
     board: &'a Board,
@@ -100,12 +93,11 @@ fn score_move(m: u16, params: &MovegenParams) -> Score {
     if m == params.hash_move {
         HASH_BONUS
     } else if BitMove::is_prom(m) {
-        PROMOTE_BONUS
-        // match BitMove::prom_type(BitMove::flag(m)) {
-        //     PieceType::Queen => QUEEN_PROMOTE_BONUS,
-        //     PieceType::Knight => KNIGHT_PROMOTE_BONUS,
-        //     _ => BAD_PROMOTE_MALUS,
-        // }
+         match BitMove::prom_type(BitMove::flag(m)) {
+             PieceType::Queen => QUEEN_PROMOTE_BONUS,
+             PieceType::Knight => KNIGHT_PROMOTE_BONUS,
+             _ => BAD_PROMOTE_MALUS,
+         }
     } else if BitMove::is_cap(m) {
         let (src, dest) = BitMove::to_squares(m);
         let piece = params.board.piece(src);
@@ -125,7 +117,6 @@ fn score_move(m: u16, params: &MovegenParams) -> Score {
         if params.board.see_ge(m, 0) {
             GOOD_CAPTURE_BONUS + mvv_lva
         } else {
-            // BAD_CAPTURE_MALUS + mvv_lva
             BAD_CAPTURE_BONUS + mvv_lva
         }
     } else if m == params.heuristics.killers[params.board.pos.ply][0] {
@@ -133,7 +124,6 @@ fn score_move(m: u16, params: &MovegenParams) -> Score {
     } else if m == params.heuristics.killers[params.board.pos.ply][1] {
         KILLER_2_BONUS
     } else {
-        // HISTORY_MALUS + params.history_table[params.board.turn.as_usize()][src as usize][dest as usize]
         params
             .heuristics
             .get_history(params.board.turn, src as usize, dest as usize)
