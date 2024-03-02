@@ -45,12 +45,12 @@ os.system(f"""
 cutechess-cli \
 -engine cmd=tmp/beatrijs-new name=new \
 -engine cmd=tmp/beatrijs-master name=master \
--each restart=on tc=inf/8+0.08 book={book_path} \
+-each restart=on tc=inf/12+0.08 book={book_path} \
 bookdepth=4 proto=uci {f"option.Hash={args.hash}" if args.hash else ""} \
 -games 2 -rounds 2500 -repeat 2 -maxmoves 200 \
 -sprt elo0=0 elo1=10 alpha=0.05 beta=0.05 \
 -concurrency {args.threads} \
 -ratinginterval 10 \
 -recover \
--pgnout 'tmp/sprt.pgn'
+-pgnout tmp/sprt.pgn
 """)
