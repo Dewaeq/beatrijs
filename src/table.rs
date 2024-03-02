@@ -221,7 +221,7 @@ impl TWrapper {
         unsafe { (*self.inner.get()).best_move(key) }
     }
 
-    pub fn extract_pv(&self, board: &mut Board, depth: i32) -> Vec<u16> {
+    pub fn extract_pv(&self, board: &mut Board, depth: i16) -> Vec<u16> {
         unsafe { (*self.inner.get()).extract_pv(board, depth as u8) }
     }
 
@@ -268,7 +268,7 @@ impl Default for HashEntry {
 impl HashEntry {
     pub fn new(
         key: u64,
-        depth: i32,
+        depth: i16,
         m: u16,
         score: Score,
         static_eval: Score,

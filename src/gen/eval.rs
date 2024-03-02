@@ -1,10 +1,10 @@
-use crate::defs::{NUM_PIECES};
+use crate::defs::{Score, NUM_PIECES};
 
 /// index by attacker and victim
-pub const MVV_LVA: [[i32; NUM_PIECES]; NUM_PIECES] = gen_mvvlva();
-const VICTIM_VALUE: [i32; NUM_PIECES] = [100, 200, 300, 400, 500, 600];
+pub const MVV_LVA: [[Score; NUM_PIECES]; NUM_PIECES] = gen_mvvlva();
+const VICTIM_VALUE: [Score; NUM_PIECES] = [100, 200, 300, 400, 500, 600];
 
-pub const fn gen_mvvlva() -> [[i32; NUM_PIECES]; NUM_PIECES] {
+pub const fn gen_mvvlva() -> [[Score; NUM_PIECES]; NUM_PIECES] {
     let mut table = [[0; NUM_PIECES]; NUM_PIECES];
 
     let mut i = 0;

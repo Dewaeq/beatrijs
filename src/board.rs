@@ -15,7 +15,7 @@ use crate::{
     history::History,
     movegen::{attackers_to, smallest_attacker},
     position::Position,
-    search::MAX_SEARCH_DEPTH,
+    search::MAX_STACK_SIZE,
     utils::{square_from_string, square_to_string},
     zobrist::Zobrist,
 };
@@ -29,7 +29,7 @@ pub struct Board {
     pub pos: Position,
     pub history: History,
     /// Quiet moves that caused a beta-cutoff, used for ordering
-    pub killers: [[u16; MAX_SEARCH_DEPTH]; 2],
+    pub killers: [[u16; MAX_STACK_SIZE]; 2],
 }
 
 /// Getter methods
@@ -467,7 +467,7 @@ impl Board {
     }
 
     pub fn clear_killers(&mut self) {
-        self.killers = [[0; MAX_SEARCH_DEPTH]; 2];
+        self.killers = [[0; MAX_STACK_SIZE]; 2];
     }
 
     pub fn see_capture(&self, m: u16) -> Score {
@@ -735,7 +735,7 @@ impl Board {
             pieces: [Piece::NONE; 64],
             pos: Position::new(),
             history: History::new(),
-            killers: [[0; MAX_SEARCH_DEPTH]; 2],
+            killers: [[0; MAX_STACK_SIZE]; 2],
         }
     }
 

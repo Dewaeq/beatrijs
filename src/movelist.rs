@@ -1,14 +1,11 @@
 use crate::{
-    board::Board,
-    defs::MAX_MOVES,
-    movegen::{generate_all, generate_legal, generate_quiet, MovegenParams},
-    search::{HistoryTable, Searcher},
+    board::Board, defs::{Score, MAX_MOVES}, heuristics::Heuristics, movegen::{generate_all, generate_legal, generate_quiet, MovegenParams}, search::{HistoryTable, Searcher}
 };
 
 #[derive(Clone, Copy)]
 pub struct MoveList {
     moves: [u16; MAX_MOVES],
-    scores: [i32; MAX_MOVES],
+    scores: [Score; MAX_MOVES],
     count: usize,
     /// Should only be used by iterator implementation
     current: usize,
@@ -36,13 +33,21 @@ impl MoveList {
         move_list
     }
 
+    pub fn simple(board: &Board) -> Self {
+        let mut move_list = MoveList::new();
+        let heuristics = Heuristics::new();
+        let params = MovegenParams::new(board, &heuristics, 0);
+        generate_legal(&params, &mut move_list);
+        move_list
+    }
+
     pub fn quiet(params: MovegenParams) -> Self {
         let mut move_list = MoveList::new();
         generate_quiet(&params, &mut move_list);
         move_list
     }
 
-    pub fn push(&mut self, m: u16, score: i32) {
+    pub fn push(&mut self, m: u16, score: Score) {
         unsafe {
             *self.moves.get_unchecked_mut(self.count) = m;
             *self.scores.get_unchecked_mut(self.count) = score;
@@ -50,7 +55,7 @@ impl MoveList {
         self.count += 1;
     }
 
-    pub const fn get_all(&self, index: usize) -> (u16, i32) {
+    pub const fn get_all(&self, index: usize) -> (u16, Score) {
         assert!(index < MAX_MOVES);
         (self.moves[index], self.scores[index])
     }
@@ -60,12 +65,12 @@ impl MoveList {
         self.moves[index]
     }
 
-    pub const fn get_score(&self, index: usize) -> i32 {
+    pub const fn get_score(&self, index: usize) -> Score {
         assert!(index < MAX_MOVES);
         self.scores[index]
     }
 
-    pub fn set_score(&mut self, index: usize, score: i32) {
+    pub fn set_score(&mut self, index: usize, score: Score) {
         unsafe {
             *self.scores.get_unchecked_mut(index) = score;
         }
@@ -77,8 +82,8 @@ impl MoveList {
             let b_ptr: *mut u16 = &mut self.moves[b];
             std::ptr::swap(a_ptr, b_ptr);
 
-            let a_score_ptr: *mut i32 = &mut self.scores[a];
-            let b_score_ptr: *mut i32 = &mut self.scores[b];
+            let a_score_ptr: *mut Score = &mut self.scores[a];
+            let b_score_ptr: *mut Score = &mut self.scores[b];
             std::ptr::swap(a_score_ptr, b_score_ptr)
         }
     }

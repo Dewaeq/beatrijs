@@ -1,8 +1,9 @@
+use crate::defs::Depth;
 use crate::table::TWrapper;
 use std::sync::Arc;
 use std::{process::exit, sync::atomic::Ordering, thread::JoinHandle, time::Instant};
 
-use crate::search::MAX_SEARCH_DEPTH;
+use crate::search::MAX_STACK_SIZE;
 use crate::{bitmove::BitMove, board::Board, input::Game, search_info::SearchInfo};
 
 /// Gui to engine
@@ -66,11 +67,11 @@ impl Game {
             let command = commands[i];
             match command.to_lowercase().as_str() {
                 "infinite" => {
-                    info.depth = MAX_SEARCH_DEPTH;
+                    info.depth = MAX_STACK_SIZE as Depth;
                     info.time_set = false;
                 }
                 "depth" => {
-                    info.depth = commands[i + 1].parse::<usize>().unwrap();
+                    info.depth = commands[i + 1].parse::<Depth>().unwrap();
                     i += 1;
                 }
                 "movetime" => {

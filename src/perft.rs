@@ -46,7 +46,7 @@ pub fn perft(board: &mut Board, depth: u8, print_info: bool) -> u64 {
         println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
         println!(
             "Num moves      :   {}",
-            MoveList::legal(MovegenParams::simple(board)).size()
+            MoveList::simple(board).size()
         );
         println!("Num nodes      :   {nodes}");
         println!(
@@ -63,7 +63,7 @@ fn inner_perft_all(
     depth: u8,
     perft: &mut PerftResult,
 ) {
-    let moves = MoveList::legal(MovegenParams::simple(board));
+    let moves = MoveList::simple(board);
 
     if depth == 0 {
         perft.nodes += 1;
@@ -99,7 +99,7 @@ fn inner_perft_all(
 
 /// Only counts the number of leaf nodes
 fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
-    let moves = MoveList::legal(MovegenParams::simple(board));
+    let moves = MoveList::simple(board);
     let mut count = 0;
 
     if depth == 0 {
@@ -110,7 +110,7 @@ fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
         board.make_move(m);
 
         let add = if depth == 2 {
-            MoveList::legal(MovegenParams::simple(board)).size() as u64
+            MoveList::simple(board).size() as u64
         } else {
             inner_perft(false, board, depth - 1)
         };

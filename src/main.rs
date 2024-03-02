@@ -9,6 +9,7 @@ mod board;
 mod defs;
 mod eval;
 mod gen;
+mod heuristics;
 mod history;
 mod input;
 mod movegen;

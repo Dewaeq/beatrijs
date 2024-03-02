@@ -17,6 +17,10 @@ impl BitMove {
         src as u16 | ((dest as u16) << 6)
     }
 
+    pub const fn to_squares(m: u16) -> (Square, Square) {
+        (BitMove::src(m), BitMove::dest(m))
+    }
+
     pub const fn from_flag(src: Square, dest: Square, flag: u8) -> u16 {
         BitMove::from_squares(src, dest) | ((flag as u16) << 12)
     }

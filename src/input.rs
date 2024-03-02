@@ -142,7 +142,7 @@ impl Game {
     }
 
     fn print_moves(&mut self) {
-        let moves = MoveList::legal(MovegenParams::simple(&self.board));
+        let moves = MoveList::simple(&self.board);
         print!("{}: ", moves.size());
 
         for m in moves {
@@ -178,7 +178,7 @@ impl Game {
 
         let temp_ply = self.board.pos.ply;
         self.board.pos.ply = 0;
-        let mut moves = MoveList::legal(MovegenParams::simple(&self.board));
+        let mut moves = MoveList::simple(&self.board);
         self.board.pos.ply = temp_ply;
 
         moves.find(|&x| {

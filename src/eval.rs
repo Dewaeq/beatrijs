@@ -17,8 +17,8 @@ use crate::{
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
 const BISHOP_PAIR_BONUS: Score = 9;
 
-const SHIELD_MISSING: [i32; 4] = [-2, -23, -38, -55];
-const SHIELD_MISSING_ON_OPEN_FILE: [i32; 4] = [-8, -10, -37, -66];
+const SHIELD_MISSING: [Score; 4] = [-2, -23, -38, -55];
+const SHIELD_MISSING_ON_OPEN_FILE: [Score; 4] = [-8, -10, -37, -66];
 
 const SAFE_MASK: [u64; 2] = [
     (BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F)
@@ -278,7 +278,7 @@ const fn missing_shield_pawns(
     pawns: u64,
     opp_pawns: u64,
     king_front_span: u64,
-) -> i32 {
+) -> Score {
     let mut pawns_missing = 0;
     let mut pawns_open_file_missing = 0;
     while pawn_shield != 0 {

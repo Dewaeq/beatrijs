@@ -1,6 +1,6 @@
 use crate::bitmove::BitMove;
 use crate::board::Board;
-use crate::defs::{PieceType, Player, Score};
+use crate::defs::{Depth, PieceType, Player, Score};
 use crate::search::{IS_MATE, MATE};
 use crate::{bitboard::BitBoard, defs::Square};
 
@@ -67,7 +67,7 @@ pub const fn b_max(a: Square, b: Square) -> Square {
 ///
 /// * `elapsed` - Elapsed time from the start of the search, in milliseconds
 pub fn print_search_info(
-    depth: i32,
+    depth: Depth,
     sel_depth: usize,
     score: Score,
     elapsed: f64,

@@ -2,7 +2,7 @@ use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     board::Board,
-    defs::{GenType, PieceType, Player, Square},
+    defs::{GenType, PieceType, Player, Score, Square},
     gen::{
         attack::{
             attacks, bishop_attacks, king_attacks, knight_attacks, pawn_attacks, rook_attacks,
@@ -10,12 +10,22 @@ use crate::{
         between::between,
         eval::MVV_LVA,
     },
+    heuristics::Heuristics,
     movelist::MoveList,
     search::HistoryTable,
     utils::adjacent_files,
 };
 
-const HASH_BONUS: i32 = 9_000_000;
+// pub const HASH_BONUS: Score = 9_000_000;
+// const QUEEN_PROMOTE_BONUS: Score = 7_000_000;
+// const KNIGHT_PROMOTE_BONUS: Score = 7_500_000;
+// const GOOD_CAPTURE_BONUS: Score = 6_000_000;
+// const KILLER_1_BONUS: Score = 5_000_000;
+// const KILLER_2_BONUS: Score = 4_000_000;
+// const BAD_CAPTURE_MALUS: Score = -3_000_000;
+// const BAD_PROMOTE_MALUS: Score = -5_000_000;
+
+pub const HASH_BONUS: i32 = 9_000_000;
 const PROMOTE_BONUS: i32 = 7_000_000;
 const GOOD_CAPTURE_BONUS: i32 = 6_000_000;
 const KILLER_1_BONUS: i32 = 5_000_000;
@@ -24,24 +34,16 @@ const BAD_CAPTURE_BONUS: i32 = 3_000_000;
 
 pub struct MovegenParams<'a> {
     board: &'a Board,
-    history_table: &'a HistoryTable,
+    heuristics: &'a Heuristics,
     hash_move: u16,
 }
 
 impl<'a> MovegenParams<'a> {
-    pub fn new(board: &'a Board, history_table: &'a HistoryTable, hash_move: u16) -> Self {
+    pub fn new(board: &'a Board, heuristics: &'a Heuristics, hash_move: u16) -> Self {
         MovegenParams {
             board,
-            history_table,
+            heuristics,
             hash_move,
-        }
-    }
-
-    pub fn simple(board: &'a Board) -> Self {
-        MovegenParams {
-            board,
-            history_table: &[[[0; 64]; 64]; 2],
-            hash_move: 0,
         }
     }
 }
@@ -92,33 +94,49 @@ fn add_move(m: u16, params: &MovegenParams, move_list: &mut MoveList) {
     move_list.push(m, score);
 }
 
-fn score_move(m: u16, params: &MovegenParams) -> i32 {
+fn score_move(m: u16, params: &MovegenParams) -> Score {
     let (src, dest) = (BitMove::src(m), BitMove::dest(m));
 
     if m == params.hash_move {
         HASH_BONUS
     } else if BitMove::is_prom(m) {
         PROMOTE_BONUS
+        // match BitMove::prom_type(BitMove::flag(m)) {
+        //     PieceType::Queen => QUEEN_PROMOTE_BONUS,
+        //     PieceType::Knight => KNIGHT_PROMOTE_BONUS,
+        //     _ => BAD_PROMOTE_MALUS,
+        // }
     } else if BitMove::is_cap(m) {
-        let mvv_lva = if BitMove::is_ep(m) {
-            MVV_LVA[0][0]
+        let (src, dest) = BitMove::to_squares(m);
+        let piece = params.board.piece(src);
+        let captured = if BitMove::is_ep(m) {
+            PieceType::Pawn
         } else {
-            let move_piece = params.board.piece_type(BitMove::src(m));
-            let cap_piece = params.board.piece_type(BitMove::dest(m));
-            MVV_LVA[move_piece.as_usize()][cap_piece.as_usize()]
+            params.board.piece_type(dest)
         };
 
+        //let history_score = params
+        //.heuristics
+        //.get_capture(piece, dest as usize, captured);
+        //let score = captured.mg_value() * 32 + history_score;
+        let mvv_lva = MVV_LVA[piece.t.as_usize()][captured.as_usize()];
+
+        //if params.board.see_ge(m, -score / 64) {
         if params.board.see_ge(m, 0) {
             GOOD_CAPTURE_BONUS + mvv_lva
         } else {
+            // BAD_CAPTURE_MALUS + mvv_lva
             BAD_CAPTURE_BONUS + mvv_lva
         }
-    } else if m == params.board.killers[0][params.board.pos.ply] {
+    } else if m == params.heuristics.killers[params.board.pos.ply][0] {
         KILLER_1_BONUS
-    } else if m == params.board.killers[1][params.board.pos.ply] {
+    } else if m == params.heuristics.killers[params.board.pos.ply][1] {
         KILLER_2_BONUS
     } else {
-        params.history_table[params.board.turn.as_usize()][src as usize][dest as usize]
+        // HISTORY_MALUS + params.history_table[params.board.turn.as_usize()][src as usize][dest as usize]
+        params
+            .heuristics
+            .get_history(params.board.turn, src as usize, dest as usize)
     }
 }
 

@@ -1,26 +1,25 @@
 use crate::bitmove::MoveFlag;
-use crate::defs::{PieceType, Score, MG_VALUE};
+use crate::defs::{Depth, PieceType, Score, MG_VALUE};
 use crate::eval::evaluate;
 use crate::gen::tables::LMR;
-use crate::movegen::{is_legal_move, MovegenParams};
+use crate::heuristics::Heuristics;
+use crate::movegen::{is_legal_move, MovegenParams, HASH_BONUS};
 use crate::search_info::SearchInfo;
 use crate::table::{Bound, HashEntry, TWrapper};
 use crate::utils::{is_draw, print_search_info};
-use crate::{
-    bitmove::BitMove, board::Board, movelist::MoveList, order::pick_next_move,
-};
+use crate::{bitmove::BitMove, board::Board, movelist::MoveList, order::pick_next_move};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 pub const INFINITY: Score = 32_000;
-pub const MAX_SEARCH_DEPTH: usize = 100;
+pub const MAX_STACK_SIZE: usize = 100;
 pub const MATE: Score = 31_000;
 pub const IS_MATE: Score = MATE - 1000;
 
 pub type HistoryTable = [[[Score; 64]; 64]; 2];
 
 const DELTA_PRUNING: Score = 100;
-const STATIC_NULL_MOVE_DEPTH: i32 = 5;
+const STATIC_NULL_MOVE_DEPTH: Depth = 5;
 const STATIC_NULL_MOVE_MARGIN: Score = 120;
 
 pub struct Searcher {
@@ -33,9 +32,10 @@ pub struct Searcher {
     info: SearchInfo,
     best_root_move: u16,
     root_moves: MoveList,
-    history_score: HistoryTable,
-    quiets_tried: [[Option<u16>; 128]; MAX_SEARCH_DEPTH],
+    //history_score: HistoryTable,
+    quiets_tried: [[Option<u16>; 128]; MAX_STACK_SIZE],
     eval_history: [Score; 128],
+    heuristics: Heuristics,
 }
 
 impl Searcher {
@@ -50,9 +50,10 @@ impl Searcher {
             info,
             best_root_move: 0,
             root_moves: MoveList::new(),
-            history_score: [[[0; 64]; 64]; 2],
-            quiets_tried: [[None; 128]; MAX_SEARCH_DEPTH],
+            //history_score: [[[0; 64]; 64]; 2],
+            quiets_tried: [[None; 128]; MAX_STACK_SIZE],
             eval_history: [0; 128],
+            heuristics: Heuristics::new(),
         }
     }
 
@@ -84,18 +85,24 @@ impl Searcher {
         self.num_nodes = 0;
         self.board.pos.ply = 0;
         self.board.clear_killers();
+        self.heuristics.clear();
+        self.quiets_tried = [[None; 128]; MAX_STACK_SIZE];
     }
 
     pub fn iterate(&mut self) {
         self.start();
         self.clear_for_search();
 
-        let params = MovegenParams::new(&self.board, &self.history_score, 0);
+        let params = MovegenParams::new(
+            &self.board,
+            &self.heuristics,
+            self.table.best_move(self.board.key()).unwrap_or(0),
+        );
         self.root_moves = MoveList::all(params);
 
         let mut score = -INFINITY;
 
-        for depth in 1..=self.info.depth as i32 {
+        for depth in 1..=self.info.depth {
             score = self.aspiration_search(depth, score);
 
             if self.should_stop() {
@@ -128,7 +135,7 @@ impl Searcher {
         println!("bestmove {}", BitMove::pretty_move(best_move));
     }
 
-    fn aspiration_search(&mut self, search_depth: i32, score: Score) -> Score {
+    fn aspiration_search(&mut self, search_depth: Depth, score: Score) -> Score {
         let mut alpha = -INFINITY;
         let mut beta = INFINITY;
         let mut delta = 12;
@@ -153,7 +160,7 @@ impl Searcher {
                 depth = search_depth;
             } else if best_score >= beta {
                 beta = INFINITY.min(beta + delta);
-                depth -= (best_score.abs() <= IS_MATE) as Score;
+                depth -= (best_score.abs() <= IS_MATE) as Depth;
             } else {
                 return best_score;
             }
@@ -164,7 +171,7 @@ impl Searcher {
 
     fn negamax(
         &mut self,
-        mut depth: i32,
+        mut depth: Depth,
         mut alpha: Score,
         mut beta: Score,
         do_null: bool,
@@ -180,7 +187,7 @@ impl Searcher {
         }
 
         let ply = self.board.pos.ply;
-        if ply >= MAX_SEARCH_DEPTH {
+        if ply >= MAX_STACK_SIZE {
             return evaluate(&self.board);
         }
 
@@ -234,7 +241,7 @@ impl Searcher {
         let mut moves = if is_root {
             self.root_moves
         } else {
-            let params = MovegenParams::new(&self.board, &self.history_score, tt_move);
+            let params = MovegenParams::new(&self.board, &self.heuristics, tt_move);
             MoveList::all(params)
         };
 
@@ -285,7 +292,7 @@ impl Searcher {
             && self.board.has_non_pawns(self.board.turn)
         {
             self.board.make_null_move();
-            let r = 4 + depth / 6 + ((static_eval - beta) / 200).min(3);
+            let r = 4 + depth / 6 + ((static_eval - beta) / 200).min(3) as Depth;
             let score = -self.negamax((depth - r).max(0), -beta, -beta + 1, false);
             self.board.unmake_null_move();
 
@@ -303,7 +310,7 @@ impl Searcher {
         if !is_pv
             && !in_check
             && depth < 9
-            && static_eval - 214 * (depth - improving as i32) >= beta
+            && static_eval - 214 * (depth as Score - improving as Score) >= beta
             && static_eval < 10_000
         {
             return static_eval;
@@ -322,11 +329,13 @@ impl Searcher {
 
         // Razoring
         if !is_pv && !in_check && tt_move == 0 && do_null && depth <= 3 {
-            if static_eval + 300 + (depth - 1) * 60 < alpha {
+            if static_eval + 300 + (depth as Score - 1) * 60 < alpha {
                 return self.quiescence(alpha, beta);
             }
         }
 
+        let mut quiets = MoveList::new();
+        let mut noisy = MoveList::new();
         let mut legals = 0;
         let mut quiets_tried: usize = 0;
         let mut search_quiets = true;
@@ -334,7 +343,8 @@ impl Searcher {
         let mut best_score = -INFINITY;
         let old_alpha = alpha;
 
-        if tt_move != 0 {
+        // only needed at root
+        if tt_move != 0 && is_root {
             set_tt_move_score(&mut moves, tt_move);
         }
 
@@ -361,7 +371,7 @@ impl Searcher {
             let is_quiet = !is_cap && !is_prom;
             let src = BitMove::src(m) as usize;
             let dest = BitMove::dest(m) as usize;
-            let history_score = self.history_score[turn.as_usize()][src][dest];
+            let history_score = self.heuristics.get_heuristic(&self.board, m);
 
             if !search_quiets && is_quiet {
                 continue;
@@ -371,26 +381,29 @@ impl Searcher {
 
             if !is_root && best_score > -IS_MATE && self.board.has_non_pawns(turn) {
                 if is_cap || is_prom || gives_check {
-                    // History pruning: skip quiet moves at low depth
-                    // that yielded bad results in previous searches
-                    if depth <= 2 && history_score < 0 && !gives_check {
-                        continue;
-                    }
 
                     // SEE pruning
-                    if !self.board.see_ge(m, -200 * depth) {
+                    if !self.board.see_ge(m, -200 * depth as Score) {
                         continue;
                     }
 
                     // Futility pruning
-                    if depth <= 8 && move_score < -50 * depth * depth && !gives_check {
+                    if depth <= 8 && move_score < -50 * (depth * depth) as Score && !gives_check {
                         continue;
                     }
                 } else {
                     // Futility pruning: parent node
-                    if !in_check && depth <= 8 && (static_eval + MG_VALUE[1] + 30 * depth <= alpha)
+                    if !in_check
+                        && depth <= 8
+                        && (static_eval + MG_VALUE[1] + 30 * depth as Score <= alpha)
                     {
                         search_quiets = false;
+                        continue;
+                    }
+
+                    // History pruning: skip quiet moves at low depth
+                    // that yielded bad results in previous searches
+                    if depth <= 2 && history_score < -200 && !gives_check {
                         continue;
                     }
 
@@ -404,7 +417,7 @@ impl Searcher {
                     }
 
                     // SEE pruning
-                    if depth <= 8 && !self.board.see_ge(m, -21 * depth * depth) {
+                    if depth <= 8 && !self.board.see_ge(m, -21 * (depth * depth) as Score) {
                         continue;
                     }
                 }
@@ -425,6 +438,13 @@ impl Searcher {
             }
 
             self.board.make_move(m);
+
+            if is_quiet {
+                quiets.push(m, 0);
+            } else {
+                noisy.push(m, 0);
+            }
+
             let mut score = 0;
 
             // search pv move in a full window, at full depth
@@ -463,21 +483,21 @@ impl Searcher {
 
             if score >= beta {
                 if !is_cap {
-                    self.board.killers[1][ply] = self.board.killers[0][ply];
-                    self.board.killers[0][ply] = m;
-
-                    self.history_score[turn.as_usize()][src][dest] += depth * depth;
-
-                    for i in 0..quiets_tried {
-                        let mv = self.quiets_tried[ply][i].unwrap();
-                        let m_src = BitMove::src(mv) as usize;
-                        let m_dest = BitMove::dest(mv) as usize;
-                        self.history_score[turn.as_usize()][m_src][m_dest] -= depth * depth;
-                    }
+                    self.heuristics.add_killer(m, ply);
                 }
 
+                self.heuristics.update(
+                    &self.board,
+                    depth,
+                    best_move,
+                    quiets,
+                    noisy,
+                    &self.quiets_tried[ply][..quiets_tried],
+                );
+
                 break;
-            } else if !is_cap {
+            }
+            if !is_cap {
                 self.quiets_tried[ply][quiets_tried] = Some(m);
                 quiets_tried += 1;
             }
@@ -568,7 +588,7 @@ impl Searcher {
             return eval;
         }
 
-        let params = MovegenParams::new(&self.board, &self.history_score, tt_move);
+        let params = MovegenParams::new(&self.board, &self.heuristics, tt_move);
         let mut moves = MoveList::quiet(params);
 
         let mut legals = 0;
@@ -581,10 +601,6 @@ impl Searcher {
         } else {
             eval + 155
         };
-
-        if tt_move != 0 {
-            set_tt_move_score(&mut moves, tt_move);
-        }
 
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
@@ -729,14 +745,14 @@ fn set_tt_move_score(moves: &mut MoveList, tt_move: u16) {
     let mut i = 0;
     while i < moves.size() {
         if moves.get(i) == tt_move {
-            moves.set_score(i, 8_000_000);
+            moves.set_score(i, HASH_BONUS);
             break;
         }
         i += 1;
     }
 }
 
-const fn table_cutoff(entry: HashEntry, depth: i32, alpha: Score, beta: Score) -> Option<Score> {
+const fn table_cutoff(entry: HashEntry, depth: Depth, alpha: Score, beta: Score) -> Option<Score> {
     if entry.depth < depth as u8 {
         return None;
     }
@@ -763,22 +779,22 @@ const fn table_cutoff(entry: HashEntry, depth: i32, alpha: Score, beta: Score) -
 
 /// If the entry from one depth lower failed low and, even with an added margin, it
 /// still can't beat the current alpha, it will likely fail low again, so return early
-fn will_fail_low(entry: HashEntry, depth: i32, alpha: Score) -> bool {
-    entry.depth as i32 >= depth - 1
+fn will_fail_low(entry: HashEntry, depth: Depth, alpha: Score) -> bool {
+    entry.depth as Depth >= depth - 1
         && entry.bound == Bound::Upper
         && entry.score + MG_VALUE[0] <= alpha
 }
 
 fn lmr_reduction(
-    depth: i32,
+    depth: Depth,
     index: usize,
     is_pv: bool,
     is_tactical: bool,
     improving: bool,
     gives_check: bool,
     in_check: bool,
-    history_score: i32,
-) -> i32 {
+    history_score: Score,
+) -> Depth {
     let mut reduction = LMR[depth.min(31) as usize][index.min(63)];
 
     if is_tactical {
@@ -807,5 +823,5 @@ fn lmr_reduction(
 
     reduction = reduction.min(depth as f32 - 1f32);
 
-    reduction.max(1f32) as i32
+    reduction.max(1f32) as Depth
 }
