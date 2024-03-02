@@ -794,7 +794,7 @@ impl Board {
         }
 
         board.pos.half_move_count = half_move_str.parse::<u8>().unwrap();
-        board.pos.ply = full_move_str.parse::<usize>().unwrap();
+        //board.pos.ply = full_move_str.parse::<usize>().unwrap();
 
         let mut file = 0;
         let mut rank = 7;
