@@ -193,6 +193,7 @@ impl Game {
             let bitmove = self.str_to_move(move_str);
             if let Some(m) = bitmove {
                 self.board.make_move(m);
+                self.board.pos.ply = 0;
             } else {
                 eprintln!("failed to parse move {}", move_str);
                 return;

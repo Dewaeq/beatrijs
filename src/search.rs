@@ -84,8 +84,7 @@ impl Searcher {
     fn clear_for_search(&mut self) {
         self.num_nodes = 0;
         self.board.pos.ply = 0;
-        self.board.clear_killers();
-        self.heuristics.clear();
+        self.heuristics.clear_non_killers();
         self.quiets_tried = [[None; 128]; MAX_STACK_SIZE];
     }
 
@@ -381,7 +380,6 @@ impl Searcher {
 
             if !is_root && best_score > -IS_MATE && self.board.has_non_pawns(turn) {
                 if is_cap || is_prom || gives_check {
-
                     // SEE pruning
                     if !self.board.see_ge(m, -200 * depth as Score) {
                         continue;
@@ -464,6 +462,10 @@ impl Searcher {
 
             self.board.unmake_move(m);
 
+            if self.should_stop() {
+                return 0;
+            }
+
             if is_root {
                 self.root_moves.set_score(i, score);
             }
@@ -472,7 +474,7 @@ impl Searcher {
                 alpha = score;
             }
 
-            if score > best_score && !self.should_stop() {
+            if score > best_score {
                 best_score = score;
                 best_move = m;
 

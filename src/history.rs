@@ -1,6 +1,6 @@
 use std::slice::Iter;
 
-use crate::{defs::MAX_GAME_LENGTH, position::Position};
+use crate::{defs::{Piece, MAX_GAME_LENGTH}, position::Position};
 
 #[derive(Copy, Clone)]
 pub struct History {
@@ -42,6 +42,10 @@ impl History {
 
     pub const fn get_key(&self, index: usize) -> u64 {
         self.positions[index].key
+    }
+
+    pub const fn get_move(&self, index: usize) -> Option<(u16, Piece)> {
+        self.positions[index].last_move
     }
 
     pub fn iter(&self) -> Iter<'_, Position> {
