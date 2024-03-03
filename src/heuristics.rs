@@ -11,8 +11,8 @@ use crate::{
 pub struct Heuristics {
     pub history: [[[Score; 64]; 64]; 2],
     pub capture: [[[Score; 6]; 64]; 12],
+    pub continuation: Vec<[[[Score; 64]; 12]; 64]>,
     pub killers: [[u16; 2]; MAX_STACK_SIZE],
-    //pub continuation: [[[[Score; 64]; 12]; 64]; 12],
 }
 
 impl Heuristics {
@@ -21,21 +21,18 @@ impl Heuristics {
             history: [[[0; 64]; 64]; 2],
             capture: [[[0; 6]; 64]; 12],
             killers: [[0; 2]; MAX_STACK_SIZE],
-            //continuation: [[[[0; 64]; 12]; 64]; 12],
+            continuation: vec![[[[0; 64]; 12]; 64]; 12],
         }
     }
 
-    pub fn clear(&mut self) {
-        unsafe {
-            let ptr = self.history.as_mut_ptr();
-            ptr.write_bytes(0, self.history.len());
+    pub fn clear_non_killers(&mut self) {
+        _clear(&mut self.history);
+        _clear(&mut self.capture);
+        _clear(&mut self.continuation);
+    }
 
-            //let ptr = self.continuation.as_mut_ptr();
-            //ptr.write_bytes(0, size_of_val(&self.continuation));
-
-            let ptr = self.capture.as_mut_ptr();
-            ptr.write_bytes(0, self.capture.len());
-        }
+    pub fn clear_killers(&mut self) {
+        _clear(&mut self.killers)
     }
 
     pub fn add_killer(&mut self, killer: u16, ply: usize) {
@@ -78,7 +75,7 @@ impl Heuristics {
                     continue;
                 }
 
-                //self.update_history(board, m, -bonus);
+                self.update_history(board, m, -bonus);
                 self.update_continuation(board, m, -bonus);
             }
         }
@@ -116,8 +113,34 @@ impl Heuristics {
         self.capture[piece.as_usize()][dest as usize][captured.as_usize()] += scaled;
     }
 
-    /// TODO
-    fn update_continuation(&mut self, board: &Board, m: u16, bonus: Score) {}
+    fn update_continuation(&mut self, board: &Board, m: u16, bonus: Score) {
+        let scaled = bonus - bonus.abs() * self.get_continuation(board, m) / 32768;
+
+        let dest = BitMove::dest(m) as usize;
+        let piece = board.piece(BitMove::src(m)).as_usize();
+        let index = board.history.count - 1;
+
+        if board.pos.ply > 0 {
+            if let Some((m, p)) = board.pos.last_move {
+                assert!(p.t != PieceType::None && m != 0);
+                self.continuation[p.as_usize()][BitMove::dest(m) as usize][piece][dest] += scaled;
+            }
+            if board.pos.ply > 1 {
+                if let Some((m, p)) = board.history.get_move(index) {
+                    assert!(p.t != PieceType::None && m != 0);
+                    self.continuation[p.as_usize()][BitMove::dest(m) as usize][piece][dest] +=
+                        scaled;
+                }
+                if board.pos.ply > 3 {
+                    if let Some((m, p)) = board.history.get_move(index - 2) {
+                        assert!(p.t != PieceType::None && m != 0);
+                        self.continuation[p.as_usize()][BitMove::dest(m) as usize][piece][dest] +=
+                            scaled;
+                    }
+                }
+            }
+        }
+    }
 
     pub fn get_heuristic(&self, board: &Board, m: u16) -> Score {
         let (src, dest) = BitMove::to_squares(m);
@@ -135,6 +158,7 @@ impl Heuristics {
                 board.piece_type(dest)
             };
 
+            // self.get_capture(piece, dest as usize, captured) + 2 * self.get_continuation(board, m)
             self.get_capture(piece, dest as usize, captured)
         }
     }
@@ -146,4 +170,35 @@ impl Heuristics {
     pub fn get_capture(&self, piece: Piece, dest: usize, captured: PieceType) -> Score {
         self.capture[piece.as_usize()][dest][captured.as_usize()]
     }
+
+    pub fn get_continuation(&self, board: &Board, m: u16) -> Score {
+        let mut score = 0;
+
+        let dest = BitMove::dest(m) as usize;
+        let piece = board.piece(BitMove::src(m)).as_usize();
+        let index = board.history.count;
+
+        if board.pos.ply > 0 {
+            if let Some((m, p)) = board.pos.last_move {
+                score += self.continuation[p.as_usize()][BitMove::dest(m) as usize][piece][dest];
+            }
+        }
+        if board.pos.ply > 1 {
+            if let Some((m, p)) = board.history.get_move(index - 1) {
+                score += self.continuation[p.as_usize()][BitMove::dest(m) as usize][piece][dest];
+            }
+        }
+        if board.pos.ply > 3 {
+            if let Some((m, p)) = board.history.get_move(index - 3) {
+                score += self.continuation[p.as_usize()][BitMove::dest(m) as usize][piece][dest];
+            }
+        }
+
+        score
+    }
+}
+
+fn _clear<T>(arr: &mut [T]) {
+    let ptr = arr.as_mut_ptr();
+    unsafe { ptr.write_bytes(0, arr.len()) }
 }
