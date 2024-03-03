@@ -34,7 +34,7 @@ pub struct Searcher {
     root_moves: MoveList,
     //history_score: HistoryTable,
     quiets_tried: [[Option<u16>; 128]; MAX_STACK_SIZE],
-    eval_history: [Score; 128],
+    eval_history: [Score; MAX_STACK_SIZE],
     heuristics: Heuristics,
 }
 
@@ -50,9 +50,8 @@ impl Searcher {
             info,
             best_root_move: 0,
             root_moves: MoveList::new(),
-            //history_score: [[[0; 64]; 64]; 2],
             quiets_tried: [[None; 128]; MAX_STACK_SIZE],
-            eval_history: [0; 128],
+            eval_history: [0; MAX_STACK_SIZE],
             heuristics: Heuristics::new(),
         }
     }

@@ -16,14 +16,14 @@ use crate::{
     utils::adjacent_files,
 };
 
- pub const HASH_BONUS: Score = 9_000_000;
- const QUEEN_PROMOTE_BONUS: Score = 8_000_000;
- const KNIGHT_PROMOTE_BONUS: Score = 7_000_000;
- const GOOD_CAPTURE_BONUS: Score = 6_000_000;
- const KILLER_1_BONUS: Score = 5_000_000;
- const KILLER_2_BONUS: Score = 4_000_000;
- const BAD_CAPTURE_BONUS: Score = 3_000_000;
- const BAD_PROMOTE_MALUS: Score = -5_000_000;
+pub const HASH_BONUS: Score = 9_000_000;
+const QUEEN_PROMOTE_BONUS: Score = 8_000_000;
+const KNIGHT_PROMOTE_BONUS: Score = 7_000_000;
+const GOOD_CAPTURE_BONUS: Score = 6_000_000;
+const KILLER_1_BONUS: Score = 5_000_000;
+const KILLER_2_BONUS: Score = 4_000_000;
+const BAD_CAPTURE_BONUS: Score = 3_000_000;
+const BAD_PROMOTE_MALUS: Score = -5_000_000;
 
 pub struct MovegenParams<'a> {
     board: &'a Board,
@@ -93,11 +93,11 @@ fn score_move(m: u16, params: &MovegenParams) -> Score {
     if m == params.hash_move {
         HASH_BONUS
     } else if BitMove::is_prom(m) {
-         match BitMove::prom_type(BitMove::flag(m)) {
-             PieceType::Queen => QUEEN_PROMOTE_BONUS,
-             PieceType::Knight => KNIGHT_PROMOTE_BONUS,
-             _ => BAD_PROMOTE_MALUS,
-         }
+        match BitMove::prom_type(BitMove::flag(m)) {
+            PieceType::Queen => QUEEN_PROMOTE_BONUS,
+            PieceType::Knight => KNIGHT_PROMOTE_BONUS,
+            _ => BAD_PROMOTE_MALUS,
+        }
     } else if BitMove::is_cap(m) {
         let (src, dest) = BitMove::to_squares(m);
         let piece = params.board.piece(src);
@@ -107,17 +107,17 @@ fn score_move(m: u16, params: &MovegenParams) -> Score {
             params.board.piece_type(dest)
         };
 
-        //let history_score = params
-        //.heuristics
-        //.get_capture(piece, dest as usize, captured);
+        let history_score = params
+            .heuristics
+            .get_capture(piece, dest as usize, captured);
         //let score = captured.mg_value() * 32 + history_score;
         let mvv_lva = MVV_LVA[piece.t.as_usize()][captured.as_usize()];
 
         //if params.board.see_ge(m, -score / 64) {
         if params.board.see_ge(m, 0) {
-            GOOD_CAPTURE_BONUS + mvv_lva
+            GOOD_CAPTURE_BONUS + mvv_lva + history_score
         } else {
-            BAD_CAPTURE_BONUS + mvv_lva
+            BAD_CAPTURE_BONUS + mvv_lva + history_score
         }
     } else if m == params.heuristics.killers[params.board.pos.ply][0] {
         KILLER_1_BONUS

@@ -49,18 +49,18 @@ impl Heuristics {
         noisy: MoveList,
         quiets_tried: &[Option<u16>],
     ) {
-        if !BitMove::is_cap(best_move) {
-            let (src, dest) = BitMove::to_squares(best_move);
-            self.history[board.turn.as_usize()][src as usize][dest as usize] +=
-                (depth * depth) as Score;
-            for m in quiets_tried {
-                let m_src = BitMove::src(m.unwrap()) as usize;
-                let m_dest = BitMove::dest(m.unwrap()) as usize;
-                self.history[board.turn.as_usize()][m_src][m_dest] -= (depth * depth) as Score;
-            }
-        }
+        //if !BitMove::is_cap(best_move) {
+        //let (src, dest) = BitMove::to_squares(best_move);
+        //self.history[board.turn.as_usize()][src as usize][dest as usize] +=
+        //(depth * depth) as Score;
+        //for m in quiets_tried {
+        //let m_src = BitMove::src(m.unwrap()) as usize;
+        //let m_dest = BitMove::dest(m.unwrap()) as usize;
+        //self.history[board.turn.as_usize()][m_src][m_dest] -= (depth * depth) as Score;
+        //}
+        //}
 
-        return;
+        //return;
 
         let bonus = (16 * (depth + 1) * (depth + 1)).min(1200) as Score;
 
