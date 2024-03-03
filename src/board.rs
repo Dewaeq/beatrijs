@@ -28,8 +28,6 @@ pub struct Board {
     pub pieces: [Piece; NUM_SQUARES],
     pub pos: Position,
     pub history: History,
-    /// Quiet moves that caused a beta-cutoff, used for ordering
-    pub killers: [[u16; MAX_STACK_SIZE]; 2],
 }
 
 /// Getter methods
@@ -314,7 +312,7 @@ impl Board {
         assert!(src != dest);
 
         self.history.push(self.pos);
-        self.pos.last_move = Some(m);
+        self.pos.last_move = Some((m, self.piece(src)));
 
         // Remove all castling rights for the moving side when a king move occurs
         if piece == PieceType::King {
@@ -392,8 +390,9 @@ impl Board {
 
         self.remove_piece(self.turn, piece, src);
         self.set_castling_from_move(m);
-        self.turn = self.turn.opp();
         self.pos.ply += 1;
+        self.pos.full_moves += self.turn.as_usize();
+        self.turn = self.turn.opp();
         self.set_check_info();
     }
 
@@ -443,7 +442,7 @@ impl Board {
     }
 
     pub fn unmake_last_move(&mut self) {
-        if let Some(m) = self.pos.last_move {
+        if let Some((m, p)) = self.pos.last_move {
             self.unmake_move(m);
         }
     }
@@ -453,6 +452,7 @@ impl Board {
 
         self.pos.last_move = None;
         self.pos.ply += 1;
+        self.pos.full_moves += self.turn.as_usize();
         self.pos.key ^= Zobrist::side();
         self.turn = self.turn.opp();
         if self.can_ep() {
@@ -464,10 +464,6 @@ impl Board {
     pub fn unmake_null_move(&mut self) {
         self.pos = self.history.pop();
         self.turn = self.turn.opp();
-    }
-
-    pub fn clear_killers(&mut self) {
-        self.killers = [[0; MAX_STACK_SIZE]; 2];
     }
 
     pub fn see_capture(&self, m: u16) -> Score {
@@ -714,7 +710,7 @@ impl Board {
 
         let mut b = self.clone();
         while !b.history.empty() {
-            let m = b.pos.last_move.unwrap();
+            let (m, p) = b.pos.last_move.unwrap();
             println!("{}", BitMove::pretty_move(m));
             if m == 0 {
                 b.unmake_null_move();
@@ -735,7 +731,6 @@ impl Board {
             pieces: [Piece::NONE; 64],
             pos: Position::new(),
             history: History::new(),
-            killers: [[0; MAX_STACK_SIZE]; 2],
         }
     }
 
@@ -794,6 +789,7 @@ impl Board {
         }
 
         board.pos.half_move_count = half_move_str.parse::<u8>().unwrap();
+        board.pos.full_moves = full_move_str.parse::<usize>().unwrap();
         //board.pos.ply = full_move_str.parse::<usize>().unwrap();
 
         let mut file = 0;
@@ -904,7 +900,7 @@ impl std::fmt::Debug for Board {
                 Player::Black => "Black",
             }
         )?;
-        writeln!(f, "Ply        : {}", self.pos.ply)?;
+        writeln!(f, "Ply        : {}", self.pos.full_moves)?;
         writeln!(f, "Key        : {}", self.pos.key)?;
         writeln!(f, "Castling   : {:b}", self.pos.castling)?;
         writeln!(f, "EP Square  : {}", square_to_string(self.pos.ep_square))?;
@@ -915,16 +911,9 @@ impl std::fmt::Debug for Board {
             write!(f, "{} ", square_to_string(checker_sq))?;
         }
         writeln!(f)?;
-        writeln!(
-            f,
-            "Killer 1   : {}",
-            BitMove::pretty_move(self.killers[0][self.pos.ply])
-        )?;
-        writeln!(
-            f,
-            "Killer 2   : {}",
-            BitMove::pretty_move(self.killers[1][self.pos.ply])
-        )?;
+        if let Some((m, p)) = self.pos.last_move {
+            writeln!(f, "Last move  : {}", BitMove::pretty_move(m))?;
+        }
 
         writeln!(f)
     }

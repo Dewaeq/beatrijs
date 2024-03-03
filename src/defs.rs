@@ -84,7 +84,7 @@ impl Player {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Piece {
     pub t: PieceType,
     pub c: Player,

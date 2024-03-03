@@ -1,4 +1,4 @@
-use crate::defs::{Castling, PieceType, Square, NUM_PIECES, NUM_SIDES};
+use crate::defs::{Castling, Piece, PieceType, Square, NUM_PIECES, NUM_SIDES};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Position {
@@ -12,7 +12,10 @@ pub struct Position {
     /// 50 move rule counter
     pub half_move_count: u8,
     /// Ply at this position, starting from zero
+    /// Solely used in search, does not represent the total number of moves played
     pub ply: usize,
+    /// Total number of moves played + ply received from fen string
+    pub full_moves: usize,
     /// Square behind the pawn, 64 if none
     pub ep_square: Square,
 
@@ -29,7 +32,7 @@ pub struct Position {
     pub check_squares: [u64; NUM_PIECES],
     /// `PIECE_NONE` if none
     pub captured_piece: PieceType,
-    pub last_move: Option<u16>,
+    pub last_move: Option<(u16, Piece)>,
 }
 
 impl Position {
@@ -38,6 +41,7 @@ impl Position {
             castling: Castling::NONE,
             half_move_count: 0,
             ply: 0,
+            full_moves: 0,
             key: 0,
             ep_square: 64,
             checkers_bb: 0,
