@@ -126,6 +126,17 @@ pub const PIECES: [Piece; 12] = [
     Piece::new(PieceType::King, Player::Black),
 ];
 
+pub const WHITE_PAWN: Piece = Piece::new(PieceType::Pawn, Player::White);
+pub const BLACK_PAWN: Piece = Piece::new(PieceType::Pawn, Player::Black);
+pub const WHITE_KNIGHT: Piece = Piece::new(PieceType::Knight, Player::White);
+pub const BLACK_KNIGHT: Piece = Piece::new(PieceType::Knight, Player::Black);
+pub const WHITE_BISHOP: Piece = Piece::new(PieceType::Bishop, Player::White);
+pub const BLACK_BISHOP: Piece = Piece::new(PieceType::Bishop, Player::Black);
+pub const WHITE_ROOK: Piece = Piece::new(PieceType::Rook, Player::White);
+pub const BLACK_ROOK: Piece = Piece::new(PieceType::Rook, Player::Black);
+pub const WHITE_QUEEN: Piece = Piece::new(PieceType::Queen, Player::White);
+pub const BLACK_QUEEN: Piece = Piece::new(PieceType::Queen, Player::Black);
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PieceType {
     Pawn,
