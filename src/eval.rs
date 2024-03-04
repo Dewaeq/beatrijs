@@ -1,11 +1,11 @@
 use crate::{
     bitboard::BitBoard,
     board::Board,
+    defs::pieces::*,
     defs::{
-        Piece, PieceType, Player, Score, Square, BLACK_BISHOP, BLACK_KNIGHT, BLACK_PAWN,
-        BLACK_QUEEN, BLACK_ROOK, CASTLE_KING_FILES, CASTLE_QUEEN_FILES, CENTER_SQUARES,
-        DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE, SMALL_CENTER,
-        WHITE_BISHOP, WHITE_KNIGHT, WHITE_PAWN, WHITE_QUEEN, WHITE_ROOK,
+        Piece, PieceType, Player, Score, Square, CASTLE_KING_FILES, CASTLE_QUEEN_FILES,
+        CENTER_SQUARES, DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE,
+        SMALL_CENTER,
     },
     gen::{
         attack::{attacks, king_attacks, knight_attacks, rook_attacks},
@@ -443,8 +443,8 @@ const fn eval_space(
 fn eval_knights(board: &Board, side: Player, attacked_by: &AttackedBy) -> Score {
     let mut score = 0;
 
-    let knights = board.player_piece_bb(side, PieceType::Knight);
     let opp_pawns = board.player_piece_bb(side.opp(), PieceType::Pawn);
+    let mut knights = board.player_piece_bb(side, PieceType::Knight);
     let mut supported = knights & attacked_by.pawns(side);
 
     while supported != 0 {
