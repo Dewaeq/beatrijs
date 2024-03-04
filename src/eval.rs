@@ -3,10 +3,11 @@ use crate::{
     board::Board,
     defs::{
         Piece, PieceType, Player, Score, Square, CASTLE_KING_FILES, CASTLE_QUEEN_FILES,
-        CENTER_SQUARES, DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE, SMALL_CENTER,
+        CENTER_SQUARES, DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE,
+        SMALL_CENTER,
     },
     gen::{
-        attack::{attacks, king_attacks},
+        attack::{attacks, king_attacks, knight_attacks, rook_attacks},
         pesto::{EG_TABLE, MG_TABLE},
         tables::{CENTER_DISTANCE, DISTANCE, ISOLATED, PASSED, SHIELDING_PAWNS},
     },
@@ -16,6 +17,11 @@ use crate::{
 
 const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
 const BISHOP_PAIR_BONUS: Score = 9;
+const SUPPORTED_KNIGHT: Score = 10;
+const OUTPOST_KNIGHT: Score = 25;
+const CONNECTED_KNIGHT: Score = 8;
+const CONNECTED_ROOK: Score = 17;
+const ROOK_ON_SEVENTH: Score = 11;
 
 const SHIELD_MISSING: [Score; 4] = [-2, -23, -38, -55];
 const SHIELD_MISSING_ON_OPEN_FILE: [Score; 4] = [-8, -10, -37, -66];
@@ -98,19 +104,22 @@ pub fn evaluate(board: &Board) -> Score {
         w_pawn_attacks,
     );
 
-    score += eval_knights(board, Player::White, w_pawn_attacks, b_pawns);
-    score -= eval_knights(board, Player::Black, b_pawn_attacks, w_pawns);
-
-    score += eval_bishops(board, Player::White, w_pawns);
-    score -= eval_bishops(board, Player::Black, b_pawns);
-
-    // attacks on king
     let w_king_sq = board.king_square(Player::White);
     let b_king_sq = board.king_square(Player::Black);
 
     let w_king_bb = BitBoard::from_sq(w_king_sq);
     let b_king_bb = BitBoard::from_sq(b_king_sq);
 
+    score += eval_knights(board, Player::White, w_pawn_attacks, b_pawns);
+    score -= eval_knights(board, Player::Black, b_pawn_attacks, w_pawns);
+
+    score += eval_bishops(board, Player::White, w_pawns);
+    score -= eval_bishops(board, Player::Black, b_pawns);
+
+    score += eval_rooks(board, Player::White, b_king_bb, b_pawns);
+    score -= eval_rooks(board, Player::Black, w_king_bb, w_pawns);
+
+    // attacks on king
     score -= (BitBoard::count(attacked_by.black & king_attacks(w_king_sq)) * 9) as Score;
     score -= (BitBoard::count(attacked_by.black & w_king_bb) * 16) as Score;
 
@@ -333,16 +342,26 @@ const fn eval_space(
 fn eval_knights(board: &Board, side: Player, my_pawn_attacks: u64, opp_pawns: u64) -> Score {
     let mut score = 0;
 
-    let knights = board.player_piece_bb(side, PieceType::Knight);
+    let mut knights = board.player_piece_bb(side, PieceType::Knight);
     let mut supported = knights & my_pawn_attacks;
 
     while supported != 0 {
         let sq = BitBoard::pop_lsb(&mut supported);
+        score += SUPPORTED_KNIGHT;
         // Check if this is an outpost knight, i.e. it can't be attacked by a pawn on the neighbouring files
         if PASSED[side.as_usize()][sq as usize] & opp_pawns & !BitBoard::file_bb(sq) == 0 {
-            score += 25;
+            score += OUTPOST_KNIGHT;
         }
     }
+
+    let mut connected = 0;
+    let mut att_bb = 0;
+    while knights != 0 {
+        let sq = BitBoard::pop_lsb(&mut knights);
+        att_bb |= knight_attacks(sq);
+    }
+
+    score += BitBoard::count(att_bb & knights) as Score * CONNECTED_KNIGHT / 2;
 
     score
 }
@@ -361,6 +380,31 @@ fn eval_bishops(board: &Board, side: Player, my_pawns: u64) -> Score {
     if bishops & LIGHT_SQUARES != 0 {
         score -= (BitBoard::count(my_pawns & LIGHT_SQUARES) * 5) as Score;
     }
+
+    score
+}
+
+fn eval_rooks(board: &Board, side: Player, opp_king_bb: u64, opp_pawns: u64) -> Score {
+    let mut score = 0;
+
+    let occ = board.occ_bb();
+    let mut rooks = board.player_piece_bb(side, PieceType::Rook);
+
+    // Rooks on seventh rank are only valuable if they cut of the king
+    // or can goble up some pawns
+    if opp_king_bb & side.rank_8() != 0 || opp_pawns & side.rank_7() != 0 {
+        score += BitBoard::count(rooks & side.rank_7()) as Score * ROOK_ON_SEVENTH;
+    }
+
+    // Connected rooks
+    let mut connected = 0;
+    while BitBoard::more_than_one(rooks) {
+        let sq = BitBoard::pop_lsb(&mut rooks);
+        let moves = rook_attacks(sq, occ);
+        connected += BitBoard::count(moves & rooks);
+    }
+
+    score += connected as Score * CONNECTED_ROOK;
 
     score
 }
@@ -384,7 +428,8 @@ fn eval_pawns(
     }
 
     // Pawns controlling centre of the board
-    let num_pawns_behind_center = BitBoard::count(my_pawns & pawn_caps(SMALL_CENTER, side.opp())) as Score;
+    let num_pawns_behind_center =
+        BitBoard::count(my_pawns & pawn_caps(SMALL_CENTER, side.opp())) as Score;
     score -= num_pawns_behind_center * 20;
 
     // Pawn mobility

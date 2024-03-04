@@ -64,6 +64,13 @@ impl Player {
         }
     }
 
+    pub const fn rank_8(&self) -> u64 {
+        match self {
+            Player::White => BitBoard::RANK_8,
+            Player::Black => BitBoard::RANK_1,
+        }
+    }
+
     pub const fn castle_king_sq(&self) -> Square {
         match self {
             Player::White => 6,
