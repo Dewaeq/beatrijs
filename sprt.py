@@ -8,7 +8,7 @@ parser.add_argument("--hash", type=int, help="Table size in mb")
 parser.add_argument("--threads", type=int, default=6, help="number of threads cutechess-cli can use")
 
 args = parser.parse_args()
-book_path = ""
+book_path = "./book.bin"
 engines = ["", ""]
 
 # Compile current build
@@ -30,13 +30,9 @@ os.system("cd tmp &&"
 "cargo build --release")
 
 if os.name == "nt":
-    book_path = 'D:/Quinten/Downloads/openings/baronbook30/baron30.bin'
-
     os.system("copy target\\release\\beatrijs.exe tmp\\beatrijs-new.exe")
     os.system("copy tmp\\beatrijs\\target\\release\\beatrijs.exe tmp\\beatrijs-master.exe")
 else:
-    book_path = '/home/dewaeq/Downloads/baronbook30/baron30.bin'
-
     os.system("cp target/release/beatrijs tmp/beatrijs-new")
     os.system("cp tmp/target/release/beatrijs tmp/beatrijs-master")
 
