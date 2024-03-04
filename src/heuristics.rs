@@ -146,6 +146,10 @@ impl Heuristics {
         let (src, dest) = BitMove::to_squares(m);
         if !BitMove::is_tactical(m) {
             self.get_history(board.turn, src as usize, dest as usize)
+                // TODO: further sprt testing, current result:
+                // Elo difference: -5.7 +/- 11.7, LOS: 17.2 %, DrawRatio: 43.6 %
+                // SPRT: llr -2.98 (-101.1%), lbound -2.94, ubound 2.94 - H0 was accepted
+                // + 2 * self.get_continuation(board, m)
         } else {
             let piece = board.piece(src);
             let captured = if BitMove::is_ep(m) {
@@ -158,7 +162,6 @@ impl Heuristics {
                 board.piece_type(dest)
             };
 
-            // self.get_capture(piece, dest as usize, captured) + 2 * self.get_continuation(board, m)
             self.get_capture(piece, dest as usize, captured)
         }
     }

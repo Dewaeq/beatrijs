@@ -2,10 +2,13 @@ use crate::{
     bitboard::BitBoard,
     board::Board,
     defs::{
-        Piece, PieceType, Player, Score, Square, BLACK_BISHOP, BLACK_KNIGHT, BLACK_PAWN, BLACK_QUEEN, BLACK_ROOK, CASTLE_KING_FILES, CASTLE_QUEEN_FILES, CENTER_SQUARES, DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE, SMALL_CENTER, WHITE_BISHOP, WHITE_KNIGHT, WHITE_PAWN, WHITE_QUEEN, WHITE_ROOK
+        Piece, PieceType, Player, Score, Square, BLACK_BISHOP, BLACK_KNIGHT, BLACK_PAWN,
+        BLACK_QUEEN, BLACK_ROOK, CASTLE_KING_FILES, CASTLE_QUEEN_FILES, CENTER_SQUARES,
+        DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE, SMALL_CENTER,
+        WHITE_BISHOP, WHITE_KNIGHT, WHITE_PAWN, WHITE_QUEEN, WHITE_ROOK,
     },
     gen::{
-        attack::{attacks, king_attacks},
+        attack::{attacks, king_attacks, knight_attacks, rook_attacks},
         pesto::{EG_TABLE, MG_TABLE},
         tables::{CENTER_DISTANCE, DISTANCE, ISOLATED, KING_ZONE, PASSED, SHIELDING_PAWNS},
     },
@@ -19,6 +22,11 @@ const KNIGHT_PAIR_PENALTY: Score = -8;
 const ROOK_PAIR_PENALTY: Score = -22;
 const KNIGHT_PAWN_ADJUSTMENT: [Score; 9] = [-20, -16, -12, -8, -4, 0, 4, 8, 12];
 const ROOK_PAWN_ADJUSTMENT: [Score; 9] = [15, 12, 9, 6, 3, 0, -3, -6, -9];
+const SUPPORTED_KNIGHT: Score = 10;
+const OUTPOST_KNIGHT: Score = 25;
+const CONNECTED_KNIGHT: Score = 8;
+const CONNECTED_ROOK: Score = 17;
+const ROOK_ON_SEVENTH: Score = 11;
 
 const SHIELD_MISSING: [i32; 4] = [-2, -23, -38, -55];
 const SHIELD_MISSING_ON_OPEN_FILE: [i32; 4] = [-8, -10, -37, -66];
@@ -67,9 +75,6 @@ pub fn evaluate(board: &Board) -> Score {
 
     // Score is from white's perspective
     let mut total_score = 0;
-    let mut mg = [0; 2];
-    let mut eg = [0; 2];
-
     let mut piece_material = [0; 2];
     let mut pawn_material = [0; 2];
 
@@ -99,7 +104,7 @@ pub fn evaluate(board: &Board) -> Score {
         sq += 1;
     }
 
-    mopup_eval(board, &mut eg);
+    mopup_eval(board, &mut eval);
     king_pawn_shield(board, &mut eval);
     adjust_material(board, &mut eval);
 
@@ -130,11 +135,19 @@ pub fn evaluate(board: &Board) -> Score {
     if eval.att_count[0] < 2 || board.num_pieces(WHITE_QUEEN) == 0 {
         eval.att_weight[0] = 0;
     }
+
     if eval.att_count[1] < 2 || board.num_pieces(BLACK_QUEEN) == 0 {
         eval.att_weight[1] = 0;
     }
+
     total_score += SAFETY_TABLE[eval.att_weight[0] as usize];
     total_score -= SAFETY_TABLE[eval.att_weight[1] as usize];
+
+    let w_king_sq = board.king_square(Player::White);
+    let b_king_sq = board.king_square(Player::Black);
+
+    let w_king_bb = BitBoard::from_sq(w_king_sq);
+    let b_king_bb = BitBoard::from_sq(b_king_sq);
 
     // Control of space on the player's side of the board
     let total_non_pawn = piece_material[0] + piece_material[1];
@@ -146,6 +159,9 @@ pub fn evaluate(board: &Board) -> Score {
 
     total_score += eval_bishops(board, Player::White);
     total_score -= eval_bishops(board, Player::Black);
+
+    total_score += eval_rooks(board, Player::White, b_king_bb);
+    total_score -= eval_rooks(board, Player::Black, w_king_bb);
 
     let (stronger, weaker) = if total_score > 0 {
         (Player::White.as_usize(), Player::Black.as_usize())
@@ -190,7 +206,7 @@ pub fn evaluate(board: &Board) -> Score {
 }
 
 #[inline(always)]
-fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
+fn mopup_eval(board: &Board, eval: &mut Evaluation) {
     // Don't apply mop-up when there are still pawns on the board
     if board.piece_bb(PieceType::Pawn) != 0 {
         return;
@@ -200,7 +216,7 @@ fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
     // require at least a rook
     let turn = board.turn.as_usize();
     let opp = 1 - turn;
-    let diff = eg[turn] - eg[opp];
+    let diff = eval.eg_material[turn] - eval.eg_material[opp];
     if diff < EG_VALUE[3] - 100 {
         return;
     }
@@ -212,7 +228,7 @@ fn mopup_eval(board: &Board, eg: &mut [Score; 2]) {
     let kings_dist = 1.6 * (14 - DISTANCE[king_sq][opp_king_sq]) as f32;
     let mopup = (center_dist + kings_dist) as Score;
 
-    eg[turn] += mopup;
+    eval.eg_mob[turn] += mopup;
 }
 
 fn pawn_score(board: &Board, attacked_by: &mut AttackedBy) -> Score {
@@ -433,17 +449,30 @@ fn eval_knights(board: &Board, side: Player, attacked_by: &AttackedBy) -> Score 
 
     while supported != 0 {
         let sq = BitBoard::pop_lsb(&mut supported);
+        score += SUPPORTED_KNIGHT;
         // Check if this is an outpost knight, i.e. it can't be attacked by a pawn on the neighbouring files
         if PASSED[side.as_usize()][sq as usize] & opp_pawns & !BitBoard::file_bb(sq) == 0 {
-            score += 25;
+            score += OUTPOST_KNIGHT;
         }
     }
+
+    let mut connected = 0;
+    let mut att_bb = 0;
+
+    while knights != 0 {
+        let sq = BitBoard::pop_lsb(&mut knights);
+        let moves = knight_attacks(sq);
+        connected += BitBoard::count(moves & knights);
+    }
+
+    score += BitBoard::count(att_bb & knights) as Score * CONNECTED_KNIGHT;
 
     score
 }
 
 fn eval_bishops(board: &Board, side: Player) -> Score {
     let my_pawns = board.player_piece_bb(side, PieceType::Pawn);
+    let opp_pawns = board.player_piece_bb(side.opp(), PieceType::Pawn);
     let mut score = 0;
 
     let mut bishops = board.player_piece_bb(side, PieceType::Bishop);
@@ -452,11 +481,39 @@ fn eval_bishops(board: &Board, side: Player) -> Score {
     }
 
     if bishops & DARK_SQUARES != 0 {
-        score -= (BitBoard::count(my_pawns & DARK_SQUARES) * 5) as Score;
+        score -= (BitBoard::count(my_pawns & DARK_SQUARES) * 3) as Score;
+        score -= (BitBoard::count(opp_pawns & DARK_SQUARES) * 5) as Score;
     }
     if bishops & LIGHT_SQUARES != 0 {
-        score -= (BitBoard::count(my_pawns & LIGHT_SQUARES) * 5) as Score;
+        score -= (BitBoard::count(my_pawns & LIGHT_SQUARES) * 3) as Score;
+        score -= (BitBoard::count(opp_pawns & LIGHT_SQUARES) * 5) as Score;
     }
+
+    score
+}
+
+fn eval_rooks(board: &Board, side: Player, opp_king_bb: u64) -> Score {
+    let mut score = 0;
+
+    let occ = board.occ_bb();
+    let opp_pawns = board.player_piece_bb(side.opp(), PieceType::Pawn);
+    let mut rooks = board.player_piece_bb(side, PieceType::Rook);
+
+    // Rooks on seventh rank are only valuable if they cut of the king
+    // or can goble up some pawns
+    if opp_king_bb & side.rank_8() != 0 || opp_pawns & side.rank_7() != 0 {
+        score += BitBoard::count(rooks & side.rank_7()) as Score * ROOK_ON_SEVENTH;
+    }
+
+    // Connected rooks
+    let mut connected = 0;
+    while BitBoard::more_than_one(rooks) {
+        let sq = BitBoard::pop_lsb(&mut rooks);
+        let moves = rook_attacks(sq, occ);
+        connected += BitBoard::count(moves & rooks);
+    }
+
+    score += connected as Score * CONNECTED_ROOK;
 
     score
 }
