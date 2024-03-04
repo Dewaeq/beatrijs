@@ -124,9 +124,7 @@ fn score_move(m: u16, params: &MovegenParams) -> Score {
     } else if m == params.heuristics.killers[params.board.pos.ply][1] {
         KILLER_2_BONUS
     } else {
-        params
-            .heuristics
-            .get_history(params.board.turn, src as usize, dest as usize)
+        params.heuristics.get_heuristic(params.board, m)
     }
 }
 
