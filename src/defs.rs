@@ -12,6 +12,7 @@ pub const NUM_SQUARES: usize = 64;
 pub type Square = i8;
 pub type Depth = i16;
 pub type Score = i32;
+pub type TTScore = i16;
 
 pub const DIRS: [i8; 8] = [8, 1, -8, -1, 9, -7, -9, 7];
 

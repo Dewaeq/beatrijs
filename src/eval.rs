@@ -28,8 +28,8 @@ const CONNECTED_KNIGHT: Score = 8;
 const CONNECTED_ROOK: Score = 17;
 const ROOK_ON_SEVENTH: Score = 11;
 
-const SHIELD_MISSING: [i32; 4] = [-2, -23, -38, -55];
-const SHIELD_MISSING_ON_OPEN_FILE: [i32; 4] = [-8, -10, -37, -66];
+const SHIELD_MISSING: [Score; 4] = [-2, -23, -38, -55];
+const SHIELD_MISSING_ON_OPEN_FILE: [Score; 4] = [-8, -10, -37, -66];
 
 const SAFE_MASK: [u64; 2] = [
     (BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F)
@@ -54,7 +54,7 @@ pub const SAFETY_TABLE: [Score; 100] = [
 
 #[derive(Default)]
 pub struct Evaluation {
-    phase: i32,
+    phase: Score,
     mg_material: [Score; 2],
     eg_material: [Score; 2],
     mg_mob: [Score; 2],

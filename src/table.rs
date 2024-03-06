@@ -2,7 +2,7 @@ use std::cell::SyncUnsafeCell;
 
 use crate::{
     board::Board,
-    defs::Score,
+    defs::{Depth, Score, TTScore},
     movegen::is_legal_move,
     search::{INFINITY, IS_MATE},
 };
@@ -180,10 +180,10 @@ impl TWrapper {
         let mut entry = unsafe { (*self.inner.get()).get(key) };
 
         if entry.key == key {
-            if entry.score > IS_MATE {
-                entry.score -= ply_from_root as Score;
-            } else if entry.score < -IS_MATE {
-                entry.score += ply_from_root as Score;
+            if entry.score() > IS_MATE {
+                entry.score -= ply_from_root as TTScore;
+            } else if entry.score() < -IS_MATE {
+                entry.score += ply_from_root as TTScore;
             }
 
             return (true, entry);
@@ -193,10 +193,10 @@ impl TWrapper {
     }
 
     pub fn store(&self, mut entry: HashEntry, ply_from_root: usize) {
-        if entry.score > IS_MATE {
-            entry.score += ply_from_root as Score;
-        } else if entry.score < -IS_MATE {
-            entry.score -= ply_from_root as Score;
+        if entry.score() > IS_MATE {
+            entry.score += ply_from_root as TTScore;
+        } else if entry.score() < -IS_MATE {
+            entry.score -= ply_from_root as TTScore;
         }
 
         unsafe {
@@ -221,7 +221,7 @@ impl TWrapper {
         unsafe { (*self.inner.get()).best_move(key) }
     }
 
-    pub fn extract_pv(&self, board: &mut Board, depth: i16) -> Vec<u16> {
+    pub fn extract_pv(&self, board: &mut Board, depth: Depth) -> Vec<u16> {
         unsafe { (*self.inner.get()).extract_pv(board, depth as u8) }
     }
 
@@ -247,8 +247,8 @@ pub struct HashEntry {
     pub key: u64,
     pub depth: u8,
     pub m: u16,
-    pub score: Score,
-    pub static_eval: Score,
+    score: TTScore,
+    static_eval: TTScore,
     pub bound: Bound,
 }
 
@@ -268,7 +268,7 @@ impl Default for HashEntry {
 impl HashEntry {
     pub fn new(
         key: u64,
-        depth: i16,
+        depth: Depth,
         m: u16,
         score: Score,
         static_eval: Score,
@@ -278,8 +278,8 @@ impl HashEntry {
             key,
             depth: depth as u8,
             m,
-            score,
-            static_eval,
+            score: score as TTScore,
+            static_eval: static_eval as TTScore,
             bound: hash_flag,
         }
     }
@@ -290,5 +290,13 @@ impl HashEntry {
 
     pub const fn has_move(&self) -> bool {
         self.m != 0
+    }
+
+    pub const fn score(&self) -> Score {
+        self.score as Score
+    }
+
+    pub const fn static_eval(&self) -> Score {
+        self.static_eval as Score
     }
 }
