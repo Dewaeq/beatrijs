@@ -1,11 +1,10 @@
 use crate::{
     bitboard::BitBoard,
     board::Board,
-    defs::pieces::*,
     defs::{
-        Piece, PieceType, Player, Score, Square, CASTLE_KING_FILES, CASTLE_QUEEN_FILES,
-        CENTER_SQUARES, DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, PASSED_PAWN_SCORE,
-        SMALL_CENTER,
+        pieces::*, Piece, PieceType, Player, Score, Square, CASTLE_KING_FILES, CASTLE_QUEEN_FILES,
+        CENTER_SQUARES, DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, NUM_PIECES, NUM_SIDES,
+        PASSED_PAWN_SCORE, SMALL_CENTER,
     },
     gen::{
         attack::{attacks, king_attacks, knight_attacks, rook_attacks},
@@ -64,13 +63,30 @@ pub struct Evaluation {
     att_count: [Score; 2],
     att_weight: [Score; 2],
     king_shield: [Score; 2],
+    king_sq: [Square; 2],
+    king_bb: [u64; 2],
     adjust_material: [Score; 2],
     blockages: [Score; 2],
     positional_themes: [Score; 2],
+    num_pieces: [usize; NUM_SIDES * NUM_PIECES],
+}
+
+impl Evaluation {
+    fn set_king_data(&mut self, board: &Board) {
+        self.king_bb[0] = board.player_piece_bb(Player::White, PieceType::King);
+        self.king_bb[1] = board.player_piece_bb(Player::Black, PieceType::King);
+        self.king_sq[0] = BitBoard::bit_scan_forward(self.king_bb[0]);
+        self.king_sq[1] = BitBoard::bit_scan_forward(self.king_bb[1]);
+    }
+
+    fn num_pieces(&self, piece: Piece) -> usize {
+        unsafe { *self.num_pieces.get_unchecked(piece.as_usize()) }
+    }
 }
 
 pub fn evaluate(board: &Board) -> Score {
     let mut eval = Evaluation::default();
+    eval.set_king_data(board);
     let mut attacked_by = AttackedBy::new();
 
     // Score is from white's perspective
@@ -99,6 +115,7 @@ pub fn evaluate(board: &Board) -> Score {
             piece_material[idx] += MG_VALUE[piece.t.as_usize()];
         }
 
+        eval.num_pieces[pc_index] += 1;
         eval.phase += GAME_PHASE_INC[piece.t.as_usize()];
 
         sq += 1;
@@ -132,27 +149,21 @@ pub fn evaluate(board: &Board) -> Score {
 
     // King safety:
     // Safety doesn't matter if we don't have enough pieces to actually attack
-    if eval.att_count[0] < 2 || board.num_pieces(WHITE_QUEEN) == 0 {
+    if eval.att_count[0] < 2 || eval.num_pieces(WHITE_QUEEN) == 0 {
         eval.att_weight[0] = 0;
     }
 
-    if eval.att_count[1] < 2 || board.num_pieces(BLACK_QUEEN) == 0 {
+    if eval.att_count[1] < 2 || eval.num_pieces(BLACK_QUEEN) == 0 {
         eval.att_weight[1] = 0;
     }
 
     total_score += SAFETY_TABLE[eval.att_weight[0] as usize];
     total_score -= SAFETY_TABLE[eval.att_weight[1] as usize];
 
-    let w_king_sq = board.king_square(Player::White);
-    let b_king_sq = board.king_square(Player::Black);
-
-    let w_king_bb = BitBoard::from_sq(w_king_sq);
-    let b_king_bb = BitBoard::from_sq(b_king_sq);
-
     // Control of space on the player's side of the board
     let total_non_pawn = piece_material[0] + piece_material[1];
-    total_score += eval_space(&board, Player::White, &attacked_by, total_non_pawn);
-    total_score -= eval_space(&board, Player::Black, &attacked_by, total_non_pawn);
+    total_score += eval_space(&board, Player::White, &attacked_by, total_non_pawn, &eval);
+    total_score -= eval_space(&board, Player::Black, &attacked_by, total_non_pawn, &eval);
 
     total_score += eval_knights(board, Player::White, &attacked_by);
     total_score -= eval_knights(board, Player::Black, &attacked_by);
@@ -160,8 +171,8 @@ pub fn evaluate(board: &Board) -> Score {
     total_score += eval_bishops(board, Player::White);
     total_score -= eval_bishops(board, Player::Black);
 
-    total_score += eval_rooks(board, Player::White, b_king_bb);
-    total_score -= eval_rooks(board, Player::Black, w_king_bb);
+    total_score += eval_rooks(board, Player::White, &eval);
+    total_score -= eval_rooks(board, Player::Black, &eval);
 
     let (stronger, weaker) = if total_score > 0 {
         (Player::White.as_usize(), Player::Black.as_usize())
@@ -221,8 +232,8 @@ fn mopup_eval(board: &Board, eval: &mut Evaluation) {
         return;
     }
 
-    let king_sq = board.cur_king_square() as usize;
-    let opp_king_sq = board.king_square(board.turn.opp()) as usize;
+    let king_sq = eval.king_sq[board.turn.as_usize()] as usize;
+    let opp_king_sq = eval.king_sq[board.turn.opp().as_usize()] as usize;
 
     let center_dist = 4.7 * CENTER_DISTANCE[opp_king_sq] as f32;
     let kings_dist = 1.6 * (14 - DISTANCE[king_sq][opp_king_sq]) as f32;
@@ -263,33 +274,33 @@ fn pawn_score(board: &Board, attacked_by: &mut AttackedBy) -> Score {
 }
 
 fn adjust_material(board: &Board, eval: &mut Evaluation) {
-    if board.num_pieces(WHITE_BISHOP) > 1 {
+    if eval.num_pieces(WHITE_BISHOP) > 1 {
         eval.adjust_material[0] += BISHOP_PAIR_BONUS;
     }
-    if board.num_pieces(BLACK_BISHOP) > 1 {
+    if eval.num_pieces(BLACK_BISHOP) > 1 {
         eval.adjust_material[1] += BISHOP_PAIR_BONUS;
     }
-    if board.num_pieces(WHITE_KNIGHT) > 1 {
+    if eval.num_pieces(WHITE_KNIGHT) > 1 {
         eval.adjust_material[0] += KNIGHT_PAIR_PENALTY;
     }
-    if board.num_pieces(BLACK_KNIGHT) > 1 {
+    if eval.num_pieces(BLACK_KNIGHT) > 1 {
         eval.adjust_material[1] += KNIGHT_PAIR_PENALTY;
     }
-    //if board.num_pieces(WHITE_ROOK) > 1 {
+    //if eval.num_pieces(WHITE_ROOK) > 1 {
     //eval.adjust_material[0] += ROOK_PAIR_PENALTY;
     //}
-    //if board.num_pieces(BLACK_ROOK) > 1 {
+    //if eval.num_pieces(BLACK_ROOK) > 1 {
     //eval.adjust_material[1] += ROOK_PAIR_PENALTY;
     //}
 
-    eval.adjust_material[0] += KNIGHT_PAWN_ADJUSTMENT[board.num_pieces(WHITE_PAWN)]
-        * (board.num_pieces(WHITE_KNIGHT) as Score);
-    eval.adjust_material[1] += KNIGHT_PAWN_ADJUSTMENT[board.num_pieces(BLACK_PAWN)]
-        * (board.num_pieces(BLACK_KNIGHT) as Score);
-    eval.adjust_material[0] += ROOK_PAWN_ADJUSTMENT[board.num_pieces(WHITE_PAWN)]
-        * (board.num_pieces(WHITE_ROOK) as Score);
-    eval.adjust_material[1] += ROOK_PAWN_ADJUSTMENT[board.num_pieces(BLACK_PAWN)]
-        * (board.num_pieces(BLACK_ROOK) as Score);
+    eval.adjust_material[0] += KNIGHT_PAWN_ADJUSTMENT[eval.num_pieces(WHITE_PAWN)]
+        * (eval.num_pieces(WHITE_KNIGHT) as Score);
+    eval.adjust_material[1] += KNIGHT_PAWN_ADJUSTMENT[eval.num_pieces(BLACK_PAWN)]
+        * (eval.num_pieces(BLACK_KNIGHT) as Score);
+    eval.adjust_material[0] +=
+        ROOK_PAWN_ADJUSTMENT[eval.num_pieces(WHITE_PAWN)] * (eval.num_pieces(WHITE_ROOK) as Score);
+    eval.adjust_material[1] +=
+        ROOK_PAWN_ADJUSTMENT[eval.num_pieces(BLACK_PAWN)] * (eval.num_pieces(BLACK_ROOK) as Score);
 }
 
 // Structural evaluation of a piece, from white's perspective
@@ -304,7 +315,7 @@ fn mobility(
     let occ = board.occ_bb();
     let my_bb = board.player_bb(piece.c);
     let opp_bb = occ & !my_bb;
-    let opp_king_sq = board.king_square(piece.c.opp());
+    let opp_king_sq = eval.king_sq[piece.c.opp().as_usize()];
     let opp_king_zone = KING_ZONE[piece.c.opp().as_usize()][opp_king_sq as usize];
 
     let moves = attacks(piece.t, sq, occ, piece.c);
@@ -357,8 +368,8 @@ fn king_pawn_shield(board: &Board, eval: &mut Evaluation) {
     let w_pawns = board.player_piece_bb(Player::White, PieceType::Pawn);
     let b_pawns = board.player_piece_bb(Player::Black, PieceType::Pawn);
 
-    let w_king_sq = board.king_square(Player::White);
-    let b_king_sq = board.king_square(Player::Black);
+    let w_king_sq = eval.king_sq[0];
+    let b_king_sq = eval.king_sq[1];
 
     // punish king on open or semi-open file
     if (w_pawns | b_pawns) & BitBoard::file_bb(w_king_sq) == 0 {
@@ -412,11 +423,12 @@ const fn missing_shield_pawns(
 
 /// Reward the control of space on our side of the board
 #[inline(always)]
-const fn eval_space(
+fn eval_space(
     board: &Board,
     side: Player,
     attacked_by: &AttackedBy,
     non_pawn_material: Score,
+    eval: &Evaluation,
 ) -> Score {
     // Space isn't important if there aren't pieces to control it, so return early
     if non_pawn_material < 11551 {
@@ -435,8 +447,10 @@ const fn eval_space(
 
     let bonus = BitBoard::count(safe) + BitBoard::count(behind & safe & !attacked_by.side(opp));
     // Increase space evaluation weight in positions with many minor pieces
-    let weight =
-        BitBoard::count(board.piece_bb(PieceType::Knight) | board.piece_bb(PieceType::Bishop));
+    let weight = (eval.num_pieces(WHITE_BISHOP)
+        + eval.num_pieces(BLACK_BISHOP)
+        + eval.num_pieces(WHITE_KNIGHT)
+        + eval.num_pieces(BLACK_KNIGHT)) as u32;
 
     (bonus * weight * weight / 16) as Score
 }
@@ -493,9 +507,10 @@ fn eval_bishops(board: &Board, side: Player) -> Score {
     score
 }
 
-fn eval_rooks(board: &Board, side: Player, opp_king_bb: u64) -> Score {
+fn eval_rooks(board: &Board, side: Player, eval: &Evaluation) -> Score {
     let mut score = 0;
 
+    let opp_king_bb = eval.king_bb[side.opp().as_usize()];
     let occ = board.occ_bb();
     let opp_pawns = board.player_piece_bb(side.opp(), PieceType::Pawn);
     let mut rooks = board.player_piece_bb(side, PieceType::Rook);
