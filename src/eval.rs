@@ -395,6 +395,7 @@ const fn missing_shield_pawns(
     while pawn_shield != 0 {
         let sq = BitBoard::bit_scan_forward(pawn_shield);
         let file_bb = BitBoard::file_bb(sq);
+
         if pawn_shield & pawns & file_bb == 0 {
             pawns_missing += 1;
 
@@ -531,10 +532,7 @@ fn eval_pawns(
 
     // Defended pawns
     let mut supported = my_pawns & my_pawn_attacks;
-    while supported != 0 {
-        let sq = BitBoard::pop_lsb(&mut supported);
-        score += 5;
-    }
+    score += (BitBoard::count(supported) * 5) as Score;
 
     // Pawns controlling centre of the board
     let num_pawns_behind_center =
