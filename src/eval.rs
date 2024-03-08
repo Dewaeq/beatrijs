@@ -506,6 +506,9 @@ fn eval_rooks(board: &Board, side: Player, opp_king_bb: u64) -> Score {
         score += BitBoard::count(rooks & side.rank_7()) as Score * ROOK_ON_SEVENTH;
     }
 
+    // Align an attack on enemy king
+    score += (BitBoard::count(rooks & file_fill(opp_king_bb)) * 11) as Score;
+
     // Connected rooks
     let mut connected = 0;
     while BitBoard::more_than_one(rooks) {
