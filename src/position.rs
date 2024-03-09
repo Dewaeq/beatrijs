@@ -1,4 +1,4 @@
-use crate::defs::{Castling, Piece, PieceType, Square, NUM_PIECES, NUM_SIDES};
+use crate::defs::{Castling, Piece, PieceType, Score, Square, NUM_PIECES, NUM_SIDES};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Position {
@@ -33,6 +33,13 @@ pub struct Position {
     /// `PIECE_NONE` if none
     pub captured_piece: PieceType,
     pub last_move: Option<(u16, Piece)>,
+
+    /// Date used for evaluation
+    pub mg_score: [Score; 2],
+    pub eg_score: [Score; 2],
+    pub piece_material: [Score; 2],
+    pub phase: i32,
+    pub num_pieces: [u8; NUM_PIECES * NUM_SIDES],
 }
 
 impl Position {
@@ -50,6 +57,12 @@ impl Position {
             check_squares: [0; NUM_PIECES],
             captured_piece: PieceType::None,
             last_move: None,
+
+            mg_score: [0; 2],
+            eg_score: [0; 2],
+            piece_material: [0; 2],
+            phase: 0,
+            num_pieces: [0; 12],
         }
     }
 }
