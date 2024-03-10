@@ -184,14 +184,15 @@ impl Searcher {
             return 0;
         }
 
+        let in_check = self.board.in_check();
         let ply = self.board.pos.ply;
+
         if ply >= MAX_STACK_SIZE {
-            return evaluate(&self.board);
+            return if in_check { 0 } else { evaluate(&self.board) };
         }
 
         let is_root = ply == 0;
         let is_pv = beta - alpha > 1;
-        let in_check = self.board.in_check();
 
         // Mate distance pruning
         if !is_root {
@@ -547,6 +548,11 @@ impl Searcher {
             return 8 - (self.num_nodes & 7) as Score;
         }
 
+        let in_check = self.board.in_check();
+        if self.board.pos.ply >= MAX_STACK_SIZE {
+            return if in_check { 0 } else { evaluate(&self.board) };
+        }
+
         let mut tt_move = 0;
 
         let (tt_hit, entry) = self.table.probe(self.board.key(), self.board.pos.ply);
@@ -562,8 +568,6 @@ impl Searcher {
         if self.board.pos.ply > self.sel_depth {
             self.sel_depth = self.board.pos.ply;
         }
-
-        let in_check = self.board.in_check();
 
         // Stand pat
         let eval = if tt_hit && entry.static_eval != -INFINITY {
