@@ -8,9 +8,11 @@ use crate::{
         FEN_START_STRING, LIGHT_SQUARES, MAX_MOVES, MG_VALUE, NUM_PIECES, NUM_SIDES, NUM_SQUARES,
         WHITE_IDX,
     },
+    eval::GAME_PHASE_INC,
     gen::{
         attack::{attacks, bishop_attacks, knight_attacks, pawn_attacks, rook_attacks},
         between::between,
+        pesto::{EG_TABLE, MG_TABLE},
     },
     history::History,
     movegen::{attackers_to, smallest_attacker},
@@ -156,7 +158,7 @@ impl Board {
             return rook_attacks(rook_dest, occ) & opp_king_bb != 0;
         }
 
-        return false;
+        false
     }
 
     pub const fn can_ep(&self) -> bool {
@@ -208,6 +210,10 @@ impl Board {
         self.player_piece_bb(side, PieceType::Bishop) != 0
             || self.player_piece_bb(side, PieceType::Rook) != 0
             || self.player_piece_bb(side, PieceType::Queen) != 0
+    }
+
+    pub fn num_pieces(&self, piece: Piece) -> usize {
+        unsafe { *self.pos.num_pieces.get_unchecked(piece.as_usize()) as usize }
     }
 
     pub const fn blockers(&self, side: Player) -> u64 {
@@ -678,7 +684,18 @@ impl Board {
     pub fn add_piece(&mut self, side: Player, piece: PieceType, sq: Square) {
         assert!(piece != PieceType::None);
 
+        let idx = side.as_usize() * 6 + piece.as_usize();
+
         self.pos.key ^= Zobrist::piece(side, piece, sq);
+        self.pos.num_pieces[idx] += 1;
+        self.pos.mg_score[side.as_usize()] += MG_TABLE[idx][sq as usize];
+        self.pos.eg_score[side.as_usize()] += EG_TABLE[idx][sq as usize];
+        self.pos.phase += GAME_PHASE_INC[piece.as_usize()];
+
+        if piece != PieceType::Pawn {
+            self.pos.piece_material[side.as_usize()] += piece.mg_value();
+        }
+
         unsafe {
             *self.pieces.get_unchecked_mut(sq as usize) = Piece::new(piece, side);
 
@@ -693,7 +710,17 @@ impl Board {
     pub fn remove_piece(&mut self, side: Player, piece: PieceType, sq: Square) {
         assert!(piece != PieceType::None);
 
+        let idx = side.as_usize() * 6 + piece.as_usize();
+
         self.pos.key ^= Zobrist::piece(side, piece, sq);
+        self.pos.num_pieces[idx] -= 1;
+        self.pos.mg_score[side.as_usize()] -= MG_TABLE[idx][sq as usize];
+        self.pos.eg_score[side.as_usize()] -= EG_TABLE[idx][sq as usize];
+        self.pos.phase -= GAME_PHASE_INC[piece.as_usize()];
+
+        if piece != PieceType::Pawn {
+            self.pos.piece_material[side.as_usize()] -= piece.mg_value();
+        }
 
         unsafe {
             *self.pieces.get_unchecked_mut(sq as usize) = Piece::NONE;

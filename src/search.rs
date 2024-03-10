@@ -258,7 +258,7 @@ impl Searcher {
         let static_eval = if in_check {
             -INFINITY
         } else if tt_hit {
-            entry.static_eval
+            entry.static_eval()
         } else {
             evaluate(&self.board)
         };
@@ -287,7 +287,7 @@ impl Searcher {
             && !in_check
             && depth >= 2
             && static_eval >= beta
-            && (!tt_hit || entry.bound == Bound::Lower || entry.score >= beta)
+            && (!tt_hit || entry.bound == Bound::Lower || entry.score() >= beta)
             && self.board.has_non_pawns(self.board.turn)
         {
             self.board.make_null_move();
@@ -570,8 +570,8 @@ impl Searcher {
         }
 
         // Stand pat
-        let eval = if tt_hit && entry.static_eval != -INFINITY {
-            entry.static_eval
+        let eval = if tt_hit && entry.static_eval() != -INFINITY {
+            entry.static_eval()
         } else {
             evaluate(&self.board)
         };
@@ -764,16 +764,16 @@ const fn table_cutoff(entry: HashEntry, depth: Depth, alpha: Score, beta: Score)
 
     match entry.bound {
         Bound::None => None,
-        Bound::Exact => Some(entry.score),
+        Bound::Exact => Some(entry.score()),
         Bound::Upper => {
-            if alpha >= entry.score {
+            if alpha >= entry.score() {
                 Some(alpha)
             } else {
                 None
             }
         }
         Bound::Lower => {
-            if beta <= entry.score {
+            if beta <= entry.score() {
                 Some(beta)
             } else {
                 None
@@ -787,7 +787,7 @@ const fn table_cutoff(entry: HashEntry, depth: Depth, alpha: Score, beta: Score)
 fn will_fail_low(entry: HashEntry, depth: Depth, alpha: Score) -> bool {
     entry.depth as Depth >= depth - 1
         && entry.bound == Bound::Upper
-        && entry.score + MG_VALUE[0] <= alpha
+        && entry.score() + MG_VALUE[0] <= alpha
 }
 
 fn lmr_reduction(
