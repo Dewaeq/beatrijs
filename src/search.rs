@@ -186,7 +186,7 @@ impl Searcher {
 
         let ply = self.board.pos.ply;
         if ply >= MAX_STACK_SIZE {
-            return evaluate(&self.board);
+            return evaluate(&self.board, &self.table);
         }
 
         let is_root = ply == 0;
@@ -259,7 +259,7 @@ impl Searcher {
         } else if tt_hit {
             entry.static_eval()
         } else {
-            evaluate(&self.board)
+            evaluate(&self.board, &self.table)
         };
 
         if !tt_hit && !in_check {
@@ -569,7 +569,7 @@ impl Searcher {
         let eval = if tt_hit && entry.static_eval() != -INFINITY {
             entry.static_eval()
         } else {
-            evaluate(&self.board)
+            evaluate(&self.board, &self.table)
         };
 
         if !tt_hit && !in_check {

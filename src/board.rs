@@ -38,6 +38,10 @@ impl Board {
         self.pos.key
     }
 
+    pub const fn pawn_key(&self) -> u64 {
+        self.pos.pawn_key
+    }
+
     pub const fn piece(&self, square: Square) -> Piece {
         assert!(square < 64);
         self.pieces[square as usize]
@@ -330,8 +334,6 @@ impl Board {
             let cap_pt = self.piece_type(dest);
             self.pos.captured_piece = cap_pt;
             self.remove_piece(opp, cap_pt, dest);
-
-            // target.pos.key ^= Zobrist::piece(opp, cap_pt, dest);
         }
 
         // EP capture
@@ -339,16 +341,13 @@ impl Board {
             if is_ep {
                 let ep_pawn_sq = self.pos.ep_square - self.turn.pawn_dir();
                 self.remove_piece(opp, PieceType::Pawn, ep_pawn_sq);
-                // target.pos.key ^= Zobrist::piece(opp, PieceType::Pawn, dest);
             }
 
-            // target.pos.key ^= Zobrist::ep(self.ep_file());
             self.clear_ep();
         }
 
         if flag == MoveFlag::DOUBLE_PAWN_PUSH {
             self.set_ep(dest - self.turn.pawn_dir());
-            // target.pos.key ^= Zobrist::ep(self.ep_file());
         }
 
         // Castling
@@ -366,19 +365,14 @@ impl Board {
 
             self.remove_piece(self.turn, PieceType::Rook, rook_sq);
             self.add_piece(self.turn, PieceType::Rook, rook_target_sq);
-
-            // target.pos.key ^= Zobrist::piece(self.turn, PieceType::Rook, rook_sq);
-            // target.pos.key ^= Zobrist::piece(self.turn, PieceType::Rook, rook_target_sq);
         }
 
         // Promotion
         if is_prom {
             let prom_type = BitMove::prom_type(flag);
             self.add_piece(self.turn, prom_type, dest);
-            // target.pos.key ^= Zobrist::piece(self.turn, prom_type, dest);
         } else {
             self.add_piece(self.turn, piece, dest);
-            // target.pos.key ^= Zobrist::piece(self.turn, piece_type, dest);
         }
 
         if self.pos.castling != old_castle {
@@ -392,7 +386,6 @@ impl Board {
         }
 
         self.pos.key ^= Zobrist::side();
-        // target.pos.key ^= Zobrist::piece(self.turn, piece_type, src);
 
         self.remove_piece(self.turn, piece, src);
         self.set_castling_from_move(m);
@@ -694,6 +687,8 @@ impl Board {
 
         if piece != PieceType::Pawn {
             self.pos.piece_material[side.as_usize()] += piece.mg_value();
+        } else {
+            self.pos.pawn_key ^= Zobrist::piece(side, piece, sq);
         }
 
         unsafe {
@@ -720,6 +715,8 @@ impl Board {
 
         if piece != PieceType::Pawn {
             self.pos.piece_material[side.as_usize()] -= piece.mg_value();
+        } else {
+            self.pos.pawn_key ^= Zobrist::piece(side, piece, sq);
         }
 
         unsafe {

@@ -129,7 +129,7 @@ impl Game {
     }
 
     fn parse_static(&self, commands: Vec<&str>) {
-        let eval = evaluate(&self.board);
+        let eval = evaluate(&self.board, &self.table);
         println!("{} cp", eval);
     }
 
@@ -156,11 +156,13 @@ impl Game {
         let hash_full = self.table.hash_full();
         let table_size = self.table.size_mb();
         let entry = self.table.probe(self.board.key(), self.board.pos.ply);
+        let pawn_entry = self.table.probe_pawn(self.board.pawn_key());
 
         println!("\n=================================\n");
         println!("Hash full: {}", hash_full);
         println!("Table size (mb): {}", table_size);
         println!("Current TT entry: {:?}", entry);
+        println!("Current pawn entry: {:?}", pawn_entry);
     }
 
     fn str_to_move(&mut self, move_str: &str) -> Option<u16> {

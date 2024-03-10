@@ -21,6 +21,7 @@ pub struct Position {
 
     /// Zobrist key
     pub key: u64,
+    pub pawn_key: u64,
     /// Bitboard of all the pieces giving check
     pub checkers_bb: u64,
     /// Per player, bitboard of all the pieces (both colors) blocking check on that player's king
@@ -50,6 +51,7 @@ impl Position {
             ply: 0,
             full_moves: 0,
             key: 0,
+            pawn_key: 0,
             ep_square: 64,
             checkers_bb: 0,
             king_blockers: [0; NUM_SIDES],

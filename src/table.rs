@@ -1,33 +1,16 @@
-use std::cell::SyncUnsafeCell;
+use std::{cell::SyncUnsafeCell, mem};
 
 use crate::{
     board::Board,
-    defs::{Depth, Score, TTScore},
+    defs::{Depth, Score, Square, TTScore},
     movegen::is_legal_move,
     search::{INFINITY, IS_MATE},
 };
 
 pub const TABLE_SIZE_MB: usize = 128;
+
 type TT = HashTable<HashEntry>;
-
-pub trait Table<T>
-where
-    T: Default + Copy,
-{
-    fn new(num_entries: usize) -> Self;
-
-    fn with_size(mb: usize) -> Self;
-
-    fn clear(&mut self);
-
-    fn probe(&self, key: u64) -> Option<T>;
-
-    fn store(&mut self, entry: T);
-
-    fn get(&self, key: u64) -> T;
-
-    fn get_mut(&mut self, key: u64) -> &mut T;
-}
+type PT = HashTable<PawnEntry>;
 
 pub struct HashTable<T>
 where
@@ -37,7 +20,7 @@ where
     pub size: usize,
 }
 
-impl Table<HashEntry> for HashTable<HashEntry> {
+impl HashTable<HashEntry> {
     fn new(num_entries: usize) -> Self {
         let entries = vec![HashEntry::default(); num_entries];
 
@@ -88,9 +71,7 @@ impl Table<HashEntry> for HashTable<HashEntry> {
     fn get_mut(&mut self, key: u64) -> &mut HashEntry {
         unsafe { self.entries.get_unchecked_mut(key as usize % self.size) }
     }
-}
 
-impl HashTable<HashEntry> {
     pub fn best_move(&self, key: u64) -> Option<u16> {
         let entry = self.get(key);
         if entry.valid() && entry.key == key && entry.has_move() {
@@ -156,19 +137,22 @@ unsafe impl Sync for TWrapper {}
 unsafe impl Send for TWrapper {}
 
 pub struct TWrapper {
-    pub inner: SyncUnsafeCell<TT>,
+    inner: SyncUnsafeCell<TT>,
+    inner_pawns: SyncUnsafeCell<PT>,
 }
 
 impl TWrapper {
     pub fn new() -> Self {
         TWrapper {
             inner: SyncUnsafeCell::new(TT::with_size(TABLE_SIZE_MB)),
+            inner_pawns: SyncUnsafeCell::new(PT::with_size(16)),
         }
     }
 
     pub fn with_size(mb: usize) -> Self {
         TWrapper {
             inner: SyncUnsafeCell::new(TT::with_size(mb)),
+            inner_pawns: SyncUnsafeCell::new(PT::with_size(16)),
         }
     }
 
@@ -231,6 +215,33 @@ impl TWrapper {
 
     pub fn size_mb(&self) -> usize {
         unsafe { (*self.inner.get()).size * std::mem::size_of::<HashEntry>() / (1024 * 1024) }
+    }
+
+    pub fn probe_pawn(&self, key: u64) -> Option<PawnEntry> {
+        unsafe { (*self.inner_pawns.get()).probe(key) }
+    }
+
+    pub fn store_pawn(
+        &self,
+        key: u64,
+        score: Score,
+        king_shield: Score,
+        king_sq: [Square; 2],
+        passers_span: [u64; 2],
+        w_attacks: u64,
+        b_attacks: u64,
+    ) {
+        unsafe {
+            (*self.inner_pawns.get()).store(
+                key,
+                score,
+                king_shield,
+                king_sq,
+                passers_span,
+                w_attacks,
+                b_attacks,
+            )
+        }
     }
 }
 
@@ -298,5 +309,78 @@ impl HashEntry {
 
     pub const fn static_eval(&self) -> Score {
         self.static_eval as Score
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+pub struct PawnEntry {
+    pub key: u64,
+    score: TTScore,
+    king_shield: TTScore,
+    pub king_sq: [Square; 2],
+    pub passers_span: [u64; 2],
+    pub w_attacks: u64,
+    pub b_attacks: u64,
+}
+
+impl PawnEntry {
+    pub fn score(&self) -> Score {
+        self.score as Score
+    }
+
+    pub fn king_shield(&self) -> Score {
+        self.king_shield as Score
+    }
+}
+
+impl HashTable<PawnEntry> {
+    pub fn new(num_entries: usize) -> Self {
+        let num_entries = num_entries.next_power_of_two();
+
+        Self {
+            entries: vec![PawnEntry::default(); num_entries],
+            size: num_entries,
+        }
+    }
+
+    pub fn with_size(mb: usize) -> Self {
+        let num_entries = mb * 1024 * 1024 / mem::size_of::<PawnEntry>();
+        Self::new(num_entries)
+    }
+
+    const fn index(&self, key: u64) -> usize {
+        ((self.size as u128 * key as u128) >> 64) as usize
+    }
+
+    pub fn store(
+        &mut self,
+        key: u64,
+        score: Score,
+        king_shield: Score,
+        king_sq: [Square; 2],
+        passers_span: [u64; 2],
+        w_attacks: u64,
+        b_attacks: u64,
+    ) {
+        let index = self.index(key);
+        let entry = unsafe { self.entries.get_unchecked_mut(index) };
+        entry.key = key;
+        entry.score = score as TTScore;
+        entry.king_shield = king_shield as TTScore;
+        entry.king_sq = king_sq;
+        entry.passers_span = passers_span;
+        entry.w_attacks = w_attacks;
+        entry.b_attacks = b_attacks;
+    }
+
+    pub fn probe(&self, key: u64) -> Option<PawnEntry> {
+        let index = self.index(key);
+        let entry = unsafe { *self.entries.get_unchecked(index) };
+
+        if entry.key == key {
+            Some(entry)
+        } else {
+            None
+        }
     }
 }
