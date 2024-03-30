@@ -74,7 +74,7 @@ impl BitBoard {
         lsb
     }
 
-    pub const fn more_than_one(bb: u64) -> bool {
+    pub const fn several(bb: u64) -> bool {
         if bb == 0 {
             false
         } else {

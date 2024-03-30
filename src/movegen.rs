@@ -370,7 +370,7 @@ fn generate_all_moves(gen_type: GenType, params: &MovegenParams, move_list: &mut
 
     // Don' t generate piece moves in double check
     if (gen_type != GenType::Evasions && gen_type != GenType::EvadingCaptures)
-        || !BitBoard::more_than_one(params.board.pos.checkers_bb)
+        || !BitBoard::several(params.board.pos.checkers_bb)
     {
         target_bb = match gen_type {
             GenType::Evasions => between(king_sq, checker_sq) | BitBoard::from_sq(checker_sq),

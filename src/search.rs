@@ -569,42 +569,42 @@ impl Searcher {
             self.sel_depth = self.board.pos.ply;
         }
 
-        // Stand pat
-        let eval = if tt_hit && entry.static_eval() != -INFINITY {
+        let static_eval = if tt_hit && entry.static_eval() != -INFINITY {
             entry.static_eval()
         } else {
             evaluate(&self.board)
         };
 
         if !tt_hit && !in_check {
-            self.table.store_eval(self.board.key(), eval);
+            self.table.store_eval(self.board.key(), static_eval);
         }
 
-        if eval >= beta {
-            return eval;
+        // Stand pat
+        if static_eval >= beta {
+            return static_eval;
         }
-        if eval > alpha {
-            alpha = eval;
+        if static_eval > alpha {
+            alpha = static_eval;
         }
 
         // delta pruning
-        let diff = alpha - eval - DELTA_PRUNING;
+        let diff = alpha - static_eval - DELTA_PRUNING;
         if diff > 0 && diff > max_gain(&self.board) {
-            return eval;
+            return static_eval;
         }
 
         let params = MovegenParams::new(&self.board, &self.heuristics, tt_move);
         let mut moves = MoveList::quiet(params);
 
         let mut legals = 0;
-        let mut best_score = eval;
+        let mut best_score = static_eval;
         let mut best_move = 0;
         let old_alpha = alpha;
 
         let futility_base = if self.board.in_check() {
             -INFINITY
         } else {
-            eval + 155
+            static_eval + 155
         };
 
         for i in 0..moves.size() {
@@ -643,14 +643,14 @@ impl Searcher {
             }
 
             // This move (likely) won't raise alpha
-            if !passes_delta(&self.board, m, eval, alpha) {
+            if !passes_delta(&self.board, m, static_eval, alpha) {
                 continue;
             }
 
             // if eval + SEE exceeds beta, return early, as the opponent should've
             // had a better option earlier
             let see = self.board.see_approximate(m);
-            if see + eval > beta {
+            if see + static_eval > beta {
                 best_score = see;
                 break;
             }
@@ -683,7 +683,7 @@ impl Searcher {
                 0,
                 best_move,
                 best_score,
-                eval,
+                static_eval,
                 if best_score >= beta {
                     Bound::Lower
                 } else if alpha != old_alpha {

@@ -475,7 +475,7 @@ fn eval_bishops(board: &Board, side: Player) -> Score {
     let mut score = 0;
 
     let mut bishops = board.player_piece_bb(side, PieceType::Bishop);
-    if BitBoard::more_than_one(bishops) {
+    if BitBoard::several(bishops) {
         score += BISHOP_PAIR_BONUS;
     }
 
@@ -511,7 +511,7 @@ fn eval_rooks(board: &Board, side: Player, eval: &Evaluation) -> Score {
 
     // Connected rooks
     let mut connected = 0;
-    while BitBoard::more_than_one(rooks) {
+    while BitBoard::several(rooks) {
         let sq = BitBoard::pop_lsb(&mut rooks);
         let moves = rook_attacks(sq, occ);
         connected += BitBoard::count(moves & rooks);

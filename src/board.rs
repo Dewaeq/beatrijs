@@ -233,7 +233,7 @@ impl Board {
             let sniper_sq = BitBoard::pop_lsb(&mut snipers);
             let b = between(sq, sniper_sq) & occ;
 
-            if b != 0 && !BitBoard::more_than_one(b) {
+            if b != 0 && !BitBoard::several(b) {
                 blockers |= b;
                 if b & us_bb != 0 {
                     pinners |= BitBoard::from_sq(sniper_sq);

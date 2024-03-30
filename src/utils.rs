@@ -171,7 +171,7 @@ const fn is_material_draw(board: &Board) -> bool {
     // KvN, KvNN and KvB are draws
     if (only_white_king || only_black_king)
         && ((num_knights <= 2 && bishops == 0)
-            || (num_knights == 0 && !BitBoard::more_than_one(bishops)))
+            || (num_knights == 0 && !BitBoard::several(bishops)))
     {
         return true;
     }
