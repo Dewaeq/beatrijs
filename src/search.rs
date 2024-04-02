@@ -126,10 +126,12 @@ impl Searcher {
             );
         }
 
-        let best_move = self
-            .table
-            .best_move(self.board.key())
-            .unwrap_or(self.best_root_move);
+        let best_move = if self.best_root_move != 0 {
+            self.best_root_move
+        } else {
+            self.table.best_move(self.board.key()).unwrap()
+        };
+
         println!("bestmove {}", BitMove::pretty_move(best_move));
     }
 
