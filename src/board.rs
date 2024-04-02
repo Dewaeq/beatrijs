@@ -1,12 +1,9 @@
-use std::cmp;
-
 use crate::{
     bitboard::BitBoard,
     bitmove::{BitMove, MoveFlag},
     defs::{
         Castling, Piece, PieceType, Player, Score, Square, BLACK_IDX, DARK_SQUARES,
-        FEN_START_STRING, LIGHT_SQUARES, MAX_MOVES, MG_VALUE, NUM_PIECES, NUM_SIDES, NUM_SQUARES,
-        WHITE_IDX,
+        FEN_START_STRING, LIGHT_SQUARES, NUM_PIECES, NUM_SIDES, NUM_SQUARES, WHITE_IDX,
     },
     eval::GAME_PHASE_INC,
     gen::{
@@ -15,9 +12,8 @@ use crate::{
         pesto::{EG_TABLE, MG_TABLE},
     },
     history::History,
-    movegen::{attackers_to, smallest_attacker},
+    movegen::attackers_to,
     position::Position,
-    search::MAX_STACK_SIZE,
     utils::{square_from_string, square_to_string},
     zobrist::Zobrist,
 };
@@ -58,11 +54,9 @@ impl Board {
     }
 
     pub const fn player_bb(&self, side: Player) -> u64 {
-        unsafe {
-            match side {
-                Player::White => self.side_bb[WHITE_IDX],
-                _ => self.side_bb[BLACK_IDX],
-            }
+        match side {
+            Player::White => self.side_bb[WHITE_IDX],
+            _ => self.side_bb[BLACK_IDX],
         }
     }
 
@@ -330,8 +324,6 @@ impl Board {
             let cap_pt = self.piece_type(dest);
             self.pos.captured_piece = cap_pt;
             self.remove_piece(opp, cap_pt, dest);
-
-            // target.pos.key ^= Zobrist::piece(opp, cap_pt, dest);
         }
 
         // EP capture
@@ -339,16 +331,13 @@ impl Board {
             if is_ep {
                 let ep_pawn_sq = self.pos.ep_square - self.turn.pawn_dir();
                 self.remove_piece(opp, PieceType::Pawn, ep_pawn_sq);
-                // target.pos.key ^= Zobrist::piece(opp, PieceType::Pawn, dest);
             }
 
-            // target.pos.key ^= Zobrist::ep(self.ep_file());
             self.clear_ep();
         }
 
         if flag == MoveFlag::DOUBLE_PAWN_PUSH {
             self.set_ep(dest - self.turn.pawn_dir());
-            // target.pos.key ^= Zobrist::ep(self.ep_file());
         }
 
         // Castling
@@ -366,19 +355,14 @@ impl Board {
 
             self.remove_piece(self.turn, PieceType::Rook, rook_sq);
             self.add_piece(self.turn, PieceType::Rook, rook_target_sq);
-
-            // target.pos.key ^= Zobrist::piece(self.turn, PieceType::Rook, rook_sq);
-            // target.pos.key ^= Zobrist::piece(self.turn, PieceType::Rook, rook_target_sq);
         }
 
         // Promotion
         if is_prom {
             let prom_type = BitMove::prom_type(flag);
             self.add_piece(self.turn, prom_type, dest);
-            // target.pos.key ^= Zobrist::piece(self.turn, prom_type, dest);
         } else {
             self.add_piece(self.turn, piece, dest);
-            // target.pos.key ^= Zobrist::piece(self.turn, piece_type, dest);
         }
 
         if self.pos.castling != old_castle {
@@ -392,7 +376,6 @@ impl Board {
         }
 
         self.pos.key ^= Zobrist::side();
-        // target.pos.key ^= Zobrist::piece(self.turn, piece_type, src);
 
         self.remove_piece(self.turn, piece, src);
         self.set_castling_from_move(m);
@@ -448,7 +431,7 @@ impl Board {
     }
 
     pub fn unmake_last_move(&mut self) {
-        if let Some((m, p)) = self.pos.last_move {
+        if let Some((m, _)) = self.pos.last_move {
             self.unmake_move(m);
         }
     }
@@ -470,30 +453,6 @@ impl Board {
     pub fn unmake_null_move(&mut self) {
         self.pos = self.history.pop();
         self.turn = self.turn.opp();
-    }
-
-    pub fn see_capture(&self, m: u16) -> Score {
-        if !BitMove::is_cap(m) {
-            return 0;
-        }
-
-        let captured = self.piece_type(BitMove::dest(m));
-        let mut new_board: Board = *self;
-        new_board.make_move(m);
-
-        MG_VALUE[captured.as_usize()] - new_board.see(BitMove::dest(m))
-    }
-
-    fn see(&mut self, dest: Square) -> Score {
-        let captured = self.piece_type(dest);
-        let (attacker, src) = smallest_attacker(self, dest, self.turn);
-
-        if attacker != PieceType::None {
-            self.move_piece_cheap(src, dest, attacker, captured);
-            cmp::max(0, MG_VALUE[captured.as_usize()] - self.see(dest))
-        } else {
-            0
-        }
     }
 
     pub fn see_approximate(&self, m: u16) -> Score {
@@ -631,19 +590,6 @@ impl Board {
         piece
     }
 
-    fn move_piece_cheap(
-        &mut self,
-        src: Square,
-        dest: Square,
-        piece: PieceType,
-        captured: PieceType,
-    ) {
-        self.remove_piece(self.turn, piece, src);
-        self.remove_piece(self.turn.opp(), captured, dest);
-        self.add_piece(self.turn, piece, dest);
-        self.turn = self.turn.opp();
-    }
-
     pub fn set_castling_from_move(&mut self, m: u16) {
         let src = BitMove::src(m);
         let dest = BitMove::dest(m);
@@ -737,7 +683,7 @@ impl Board {
 
         let mut b = self.clone();
         while !b.history.empty() {
-            let (m, p) = b.pos.last_move.unwrap();
+            let (m, _) = b.pos.last_move.unwrap();
             println!("{}", BitMove::pretty_move(m));
             if m == 0 {
                 b.unmake_null_move();
@@ -938,7 +884,7 @@ impl std::fmt::Debug for Board {
             write!(f, "{} ", square_to_string(checker_sq))?;
         }
         writeln!(f)?;
-        if let Some((m, p)) = self.pos.last_move {
+        if let Some((m, _)) = self.pos.last_move {
             writeln!(f, "Last move  : {}", BitMove::pretty_move(m))?;
         }
 

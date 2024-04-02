@@ -3,7 +3,6 @@ use crate::{
     defs::{Score, MAX_MOVES},
     heuristics::Heuristics,
     movegen::{generate_all, generate_legal, generate_quiet, MovegenParams},
-    search::{HistoryTable, Searcher},
 };
 
 #[derive(Clone, Copy)]

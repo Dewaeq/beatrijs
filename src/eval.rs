@@ -2,53 +2,25 @@ use crate::{
     bitboard::BitBoard,
     board::Board,
     defs::{
-        pieces::*, Piece, PieceType, Player, Score, Square, CASTLE_KING_FILES, CASTLE_QUEEN_FILES,
-        CENTER_SQUARES, DARK_SQUARES, EG_VALUE, LIGHT_SQUARES, MG_VALUE, NUM_PIECES, NUM_SIDES,
-        PASSED_PAWN_SCORE, SMALL_CENTER,
+        pieces::*, Piece, PieceType, Player, Score, Square, DARK_SQUARES, LIGHT_SQUARES,
+        SMALL_CENTER,
     },
     gen::{
-        attack::{attacks, king_attacks, knight_attacks, rook_attacks},
-        pesto::{EG_TABLE, MG_TABLE},
-        tables::{CENTER_DISTANCE, DISTANCE, ISOLATED, KING_ZONE, PASSED, SHIELDING_PAWNS},
+        attack::{attacks, knight_attacks, rook_attacks},
+        tables::{CENTER_DISTANCE, DISTANCE, KING_ZONE, PASSED, SHIELDING_PAWNS},
     },
     movegen::{pawn_caps, pawn_push},
+    params::*,
     utils::{east_one, file_fill, fill_down, fill_up, front_span, ranks_in_front_of, west_one},
 };
 
 pub const GAME_PHASE_INC: [Score; 6] = [0, 1, 1, 2, 4, 0];
-const BISHOP_PAIR_BONUS: Score = 23;
-const KNIGHT_PAIR_PENALTY: Score = -8;
-const ROOK_PAIR_PENALTY: Score = -22;
-const KNIGHT_PAWN_ADJUSTMENT: [Score; 9] = [-20, -16, -12, -8, -4, 0, 4, 8, 12];
-const ROOK_PAWN_ADJUSTMENT: [Score; 9] = [15, 12, 9, 6, 3, 0, -3, -6, -9];
-const SUPPORTED_KNIGHT: Score = 10;
-const OUTPOST_KNIGHT: Score = 25;
-const CONNECTED_KNIGHT: Score = 8;
-const CONNECTED_ROOK: Score = 17;
-const ROOK_ON_SEVENTH: Score = 11;
-
-const SHIELD_MISSING: [Score; 4] = [-2, -23, -38, -55];
-const SHIELD_MISSING_ON_OPEN_FILE: [Score; 4] = [-8, -10, -37, -66];
 
 const SAFE_MASK: [u64; 2] = [
     (BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F)
         & (BitBoard::RANK_2 | BitBoard::RANK_3 | BitBoard::RANK_4),
     (BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F)
         & (BitBoard::RANK_5 | BitBoard::RANK_6 | BitBoard::RANK_7),
-];
-
-#[rustfmt::skip]
-pub const SAFETY_TABLE: [Score; 100] = [
-    0,  0,   1,   2,   3,   5,   7,   9,  12,  15,
-    18,  22,  26,  30,  35,  39,  44,  50,  56,  62,
-    68,  75,  82,  85,  89,  97, 105, 113, 122, 131,
-    140, 150, 169, 180, 191, 202, 213, 225, 237, 248,
-    260, 272, 283, 295, 307, 319, 330, 342, 354, 366,
-    377, 389, 401, 412, 424, 436, 448, 459, 471, 483,
-    494, 500, 500, 500, 500, 500, 500, 500, 500, 500,
-    500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
-    500, 500, 500, 500, 500, 500, 500, 500, 500, 500,
-    500, 500, 500, 500, 500, 500, 500, 500, 500, 500
 ];
 
 #[derive(Default)]
@@ -95,9 +67,7 @@ pub fn evaluate(board: &Board) -> Score {
 
     total_score += pawn_score(board, &mut attacked_by);
 
-    let mut sq = 0;
     let mut piece_bb = board.occ_bb() & !board.piece_bb(PieceType::Pawn);
-
     while piece_bb != 0 {
         let sq = BitBoard::pop_lsb(&mut piece_bb);
         let piece = board.piece(sq);
@@ -146,8 +116,8 @@ pub fn evaluate(board: &Board) -> Score {
 
     // Control of space on the player's side of the board
     let total_non_pawn = piece_material[0] + piece_material[1];
-    total_score += eval_space(&board, Player::White, &attacked_by, total_non_pawn, &eval);
-    total_score -= eval_space(&board, Player::Black, &attacked_by, total_non_pawn, &eval);
+    total_score += eval_space(&board, Player::White, &attacked_by, total_non_pawn);
+    total_score -= eval_space(&board, Player::Black, &attacked_by, total_non_pawn);
 
     total_score += eval_knights(board, Player::White, &attacked_by);
     total_score -= eval_knights(board, Player::Black, &attacked_by);
@@ -412,7 +382,6 @@ fn eval_space(
     side: Player,
     attacked_by: &AttackedBy,
     non_pawn_material: Score,
-    eval: &Evaluation,
 ) -> Score {
     // Space isn't important if there aren't pieces to control it, so return early
     if non_pawn_material < 11551 {
@@ -456,15 +425,13 @@ fn eval_knights(board: &Board, side: Player, attacked_by: &AttackedBy) -> Score 
     }
 
     let mut connected = 0;
-    let mut att_bb = 0;
-
     while knights != 0 {
         let sq = BitBoard::pop_lsb(&mut knights);
         let moves = knight_attacks(sq);
         connected += BitBoard::count(moves & knights);
     }
 
-    score += BitBoard::count(att_bb & knights) as Score * CONNECTED_KNIGHT;
+    score += connected as Score * CONNECTED_KNIGHT;
 
     score
 }
@@ -474,7 +441,7 @@ fn eval_bishops(board: &Board, side: Player) -> Score {
     let opp_pawns = board.player_piece_bb(side.opp(), PieceType::Pawn);
     let mut score = 0;
 
-    let mut bishops = board.player_piece_bb(side, PieceType::Bishop);
+    let bishops = board.player_piece_bb(side, PieceType::Bishop);
     if BitBoard::several(bishops) {
         score += BISHOP_PAIR_BONUS;
     }
@@ -534,7 +501,7 @@ fn eval_pawns(
     let occ = board.occ_bb();
 
     // Defended pawns
-    let mut supported = my_pawns & my_pawn_attacks;
+    let supported = my_pawns & my_pawn_attacks;
     score += (BitBoard::count(supported) * 5) as Score;
 
     // Pawns controlling centre of the board

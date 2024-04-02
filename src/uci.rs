@@ -1,10 +1,10 @@
-use crate::defs::Depth;
-use crate::table::TWrapper;
 use std::sync::Arc;
-use std::{process::exit, sync::atomic::Ordering, thread::JoinHandle, time::Instant};
+use std::{process::exit, sync::atomic::Ordering, thread::JoinHandle};
 
+use crate::defs::Depth;
 use crate::search::MAX_STACK_SIZE;
-use crate::{bitmove::BitMove, board::Board, input::Game, search_info::SearchInfo};
+use crate::table::TWrapper;
+use crate::{board::Board, input::Game, search_info::SearchInfo};
 
 /// Gui to engine
 impl Game {
@@ -63,7 +63,7 @@ impl Game {
     pub fn go(&mut self, commands: Vec<&str>) {
         let mut info = SearchInfo::default();
 
-        for mut i in 0..commands.len() {
+        for i in 0..commands.len() {
             let command = commands[i];
             match command.to_lowercase().as_str() {
                 "infinite" => {
@@ -72,32 +72,26 @@ impl Game {
                 }
                 "depth" => {
                     info.depth = commands[i + 1].parse::<Depth>().unwrap();
-                    i += 1;
                 }
                 "movetime" => {
                     info.move_time = commands[i + 1].parse::<usize>().ok();
                     info.time_set = true;
-                    i += 1;
                 }
                 "wtime" => {
                     info.w_time = commands[i + 1].parse::<usize>().ok();
                     info.time_set = true;
-                    i += 1;
                 }
                 "btime" => {
                     info.b_time = commands[i + 1].parse::<usize>().ok();
                     info.time_set = true;
-                    i += 1;
                 }
                 "winc" => {
                     info.w_inc = commands[i + 1].parse::<usize>().ok();
                     info.time_set = true;
-                    i += 1;
                 }
                 "binc" => {
                     info.b_inc = commands[i + 1].parse::<usize>().ok();
                     info.time_set = true;
-                    i += 1;
                 }
                 _ => (),
             }
@@ -114,13 +108,5 @@ impl Game {
     pub fn quit(&mut self) {
         self.stop();
         exit(0);
-    }
-}
-
-/// Engine to Gui
-impl Game {
-    pub fn best_move(&self) {
-        let best_move = self.table.best_move(self.board.key());
-        println!("bestmove {}", BitMove::pretty_move(best_move.unwrap_or(0)));
     }
 }

@@ -1,6 +1,9 @@
 use std::time::{Duration, Instant};
 
-use crate::{defs::{Depth, Player}, search::MAX_STACK_SIZE};
+use crate::{
+    defs::{Depth, Player},
+    search::MAX_STACK_SIZE,
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct SearchInfo {
@@ -32,12 +35,6 @@ impl Default for SearchInfo {
 }
 
 impl SearchInfo {
-    pub fn with_depth(depth: Depth) -> Self {
-        let mut info = SearchInfo::default();
-        info.depth = depth;
-        info
-    }
-
     pub fn my_time(&self, side: Player) -> Option<usize> {
         match side {
             Player::White => self.w_time,

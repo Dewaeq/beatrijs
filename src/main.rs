@@ -25,6 +25,7 @@ mod tests;
 mod uci;
 mod utils;
 mod zobrist;
+mod params;
 
 use crate::input::Game;
 

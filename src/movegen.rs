@@ -12,7 +12,6 @@ use crate::{
     },
     heuristics::Heuristics,
     movelist::MoveList,
-    search::HistoryTable,
     utils::adjacent_files,
 };
 
@@ -88,8 +87,6 @@ fn add_move(m: u16, params: &MovegenParams, move_list: &mut MoveList) {
 }
 
 fn score_move(m: u16, params: &MovegenParams) -> Score {
-    let (src, dest) = (BitMove::src(m), BitMove::dest(m));
-
     if m == params.hash_move {
         HASH_BONUS
     } else if BitMove::is_prom(m) {

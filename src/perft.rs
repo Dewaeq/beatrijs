@@ -1,6 +1,4 @@
-use crate::{
-    bitmove::BitMove, board::Board, movegen::MovegenParams, movelist::MoveList,
-};
+use crate::{bitmove::BitMove, board::Board, movelist::MoveList};
 use std::time::Instant;
 
 #[derive(Debug)]
@@ -44,10 +42,7 @@ pub fn perft(board: &mut Board, depth: u8, print_info: bool) -> u64 {
     if print_info {
         println!("\n=================================\n");
         println!("Total time (ms):   {}", end.as_secs_f64() * 1000f64);
-        println!(
-            "Num moves      :   {}",
-            MoveList::simple(board).size()
-        );
+        println!("Num moves      :   {}", MoveList::simple(board).size());
         println!("Num nodes      :   {nodes}");
         println!(
             "Nodes/s        :   {}",
@@ -58,11 +53,7 @@ pub fn perft(board: &mut Board, depth: u8, print_info: bool) -> u64 {
     nodes
 }
 
-fn inner_perft_all(
-    board: &mut Board,
-    depth: u8,
-    perft: &mut PerftResult,
-) {
+fn inner_perft_all(board: &mut Board, depth: u8, perft: &mut PerftResult) {
     let moves = MoveList::simple(board);
 
     if depth == 0 {

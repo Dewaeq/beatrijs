@@ -1,4 +1,7 @@
+use std::ops::{Add, Mul, Sub};
+
 use crate::bitboard::BitBoard;
+use crate::params::MG_VALUE;
 
 pub const WHITE_IDX: usize = 0;
 pub const BLACK_IDX: usize = 1;
@@ -196,6 +199,46 @@ impl Dir {
     pub const N_DIRS: usize = 8;
 }
 
+#[derive(Debug)]
+pub struct Eval(i32, i32);
+
+#[macro_export]
+macro_rules! E {
+    ($mg: expr, $eg: expr) => {
+        Eval::new($mg, $eg)
+    };
+}
+
+impl Eval {
+    pub fn new(mg: i32, eg: i32) -> Self {
+        Eval(mg, eg)
+    }
+}
+
+impl Add for Eval {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        E!(self.0 + rhs.0, self.1 + rhs.1)
+    }
+}
+
+impl Sub for Eval {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        E!(self.0 - rhs.0, self.1 - rhs.1)
+    }
+}
+
+impl Mul<i32> for Eval {
+    type Output = Self;
+
+    fn mul(self, rhs: i32) -> Self::Output {
+        E!(self.0 * rhs, self.1 * rhs)
+    }
+}
+
 #[derive(PartialEq)]
 pub enum GenType {
     /// Captures and queen promotions
@@ -213,18 +256,6 @@ pub enum GenType {
     NonEvasions,
 }
 
-pub const MG_VALUE: [Score; NUM_PIECES] = [126, 781, 825, 1276, 2538, 0];
-pub const EG_VALUE: [Score; NUM_PIECES] = [208, 854, 915, 1380, 2682, 0];
-
-/// Passed pawn bonus score, indexed by rank
-pub const PASSED_PAWN_SCORE: [Score; 8] = [0, 5, 10, 20, 35, 60, 100, 200];
-
-pub const CASTLE_KING_FILES: u64 = BitBoard::FILE_F | BitBoard::FILE_G | BitBoard::FILE_H;
-pub const CASTLE_QUEEN_FILES: u64 = BitBoard::FILE_A | BitBoard::FILE_B | BitBoard::FILE_C;
-
-pub const CENTER_FILES: u64 =
-    BitBoard::FILE_C | BitBoard::FILE_D | BitBoard::FILE_E | BitBoard::FILE_F;
-pub const CENTER_SQUARES: u64 = (BitBoard::RANK_4 | BitBoard::RANK_5) & CENTER_FILES;
 pub const SMALL_CENTER: u64 =
     (BitBoard::RANK_4 | BitBoard::RANK_5) & (BitBoard::FILE_D | BitBoard::FILE_E);
 

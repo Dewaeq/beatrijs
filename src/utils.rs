@@ -7,8 +7,8 @@ use crate::{bitboard::BitBoard, defs::Square};
 pub fn square_from_string(str: &str) -> Square {
     assert!(str.len() == 2);
 
-    let file = (str.as_bytes()[0] - 97);
-    let rank = (str.as_bytes()[1] - 49);
+    let file = str.as_bytes()[0] - 97;
+    let rank = str.as_bytes()[1] - 49;
 
     (rank as Square) * 8 + (file as Square)
 }
@@ -74,7 +74,6 @@ pub fn print_search_info(
     num_nodes: u64,
     hash_full: usize,
     pv: &[u16],
-    turn: Player,
 ) {
     let score_str = if score.abs() == MATE {
         format!("mate",)

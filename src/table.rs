@@ -160,12 +160,6 @@ pub struct TWrapper {
 }
 
 impl TWrapper {
-    pub fn new() -> Self {
-        TWrapper {
-            inner: SyncUnsafeCell::new(TT::with_size(TABLE_SIZE_MB)),
-        }
-    }
-
     pub fn with_size(mb: usize) -> Self {
         TWrapper {
             inner: SyncUnsafeCell::new(TT::with_size(mb)),
@@ -208,12 +202,6 @@ impl TWrapper {
         unsafe {
             *(*self.inner.get()).get_mut(key) =
                 HashEntry::new(key, 0, 0, -INFINITY, eval, Bound::None);
-        }
-    }
-
-    pub fn delete(&self, key: u64) {
-        unsafe {
-            *(*self.inner.get()).get_mut(key) = HashEntry::default();
         }
     }
 

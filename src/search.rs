@@ -1,5 +1,5 @@
 use crate::bitmove::MoveFlag;
-use crate::defs::{Depth, PieceType, Score, MG_VALUE};
+use crate::defs::{Depth, PieceType, Score};
 use crate::eval::evaluate;
 use crate::gen::tables::LMR;
 use crate::heuristics::Heuristics;
@@ -16,11 +16,7 @@ pub const MAX_STACK_SIZE: usize = 100;
 pub const MATE: Score = 31_000;
 pub const IS_MATE: Score = MATE - 1000;
 
-pub type HistoryTable = [[[Score; 64]; 64]; 2];
-
 const DELTA_PRUNING: Score = 100;
-const STATIC_NULL_MOVE_DEPTH: Depth = 5;
-const STATIC_NULL_MOVE_MARGIN: Score = 120;
 
 pub struct Searcher {
     pub num_nodes: u64,
@@ -122,7 +118,6 @@ impl Searcher {
                 self.num_nodes,
                 0,
                 &pv,
-                self.board.turn,
             );
         }
 
@@ -146,7 +141,6 @@ impl Searcher {
             beta = INFINITY.min(score + delta);
         }
 
-        let mut research = 0;
         loop {
             if self.should_stop() {
                 return 0;
@@ -154,7 +148,7 @@ impl Searcher {
 
             let best_score = self.negamax(depth.max(1), alpha, beta, false);
 
-            if (best_score <= alpha) {
+            if best_score <= alpha {
                 beta = (alpha + beta) / 2;
                 alpha = (-INFINITY).max(alpha - delta);
                 depth = search_depth;
@@ -305,7 +299,7 @@ impl Searcher {
             }
         }
 
-        let improving = (!in_check && ply >= 2 && static_eval >= self.eval_history[ply - 2]);
+        let improving = !in_check && ply >= 2 && static_eval >= self.eval_history[ply - 2];
 
         // Reverse futility pruning
         if !is_pv
@@ -321,7 +315,7 @@ impl Searcher {
         if depth == 1
             && !in_check
             && !is_pv
-            && static_eval + MG_VALUE[3] < alpha
+            && static_eval + 1276 < alpha
             && alpha > -IS_MATE
             && beta < IS_MATE
         {
@@ -370,8 +364,6 @@ impl Searcher {
             let is_cap = BitMove::is_cap(m);
             let is_prom = BitMove::is_prom(m);
             let is_quiet = !is_cap && !is_prom;
-            let src = BitMove::src(m) as usize;
-            let dest = BitMove::dest(m) as usize;
             let history_score = self.heuristics.get_heuristic(&self.board, m);
 
             if !search_quiets && is_quiet {
@@ -393,9 +385,7 @@ impl Searcher {
                     }
                 } else {
                     // Futility pruning: parent node
-                    if !in_check
-                        && depth <= 8
-                        && (static_eval + MG_VALUE[1] + 30 * depth as Score <= alpha)
+                    if !in_check && depth <= 8 && (static_eval + 781 + 30 * depth as Score <= alpha)
                     {
                         search_quiets = false;
                         continue;
@@ -445,7 +435,7 @@ impl Searcher {
                 noisy.push(m, 0);
             }
 
-            let mut score = 0;
+            let mut score;
 
             // search pv move in a full window, at full depth
             if legals == 0 || depth <= 2 || !is_pv {
@@ -709,18 +699,18 @@ const fn max_gain(board: &Board) -> Score {
 
     let opp = board.player_bb(board.turn.opp());
     if opp & board.piece_bb(PieceType::Queen) != 0 {
-        score += MG_VALUE[PieceType::Queen.as_usize()];
+        score += PieceType::Queen.mg_value();
     } else if opp & board.piece_bb(PieceType::Rook) != 0 {
-        score += MG_VALUE[PieceType::Rook.as_usize()];
+        score += PieceType::Rook.mg_value();
     } else if opp & board.piece_bb(PieceType::Bishop) != 0 {
-        score += MG_VALUE[PieceType::Bishop.as_usize()];
+        score += PieceType::Bishop.mg_value();
     } else if opp & board.piece_bb(PieceType::Knight) != 0 {
-        score += MG_VALUE[PieceType::Knight.as_usize()];
+        score += PieceType::Knight.mg_value();
     }
 
     // Pawn about to promote
     if board.player_piece_bb(board.turn, PieceType::Pawn) & board.turn.rank_7() != 0 {
-        score += MG_VALUE[PieceType::Queen.as_usize()] - MG_VALUE[PieceType::Pawn.as_usize()];
+        score += PieceType::Queen.mg_value() - PieceType::Pawn.mg_value();
     }
 
     score
@@ -740,11 +730,11 @@ const fn passes_delta(board: &Board, m: u16, eval: Score, alpha: Score) -> bool 
     let captured = match BitMove::flag(m) {
         MoveFlag::CAPTURE => board.piece_type(BitMove::dest(m)),
         MoveFlag::EN_PASSANT => PieceType::Pawn,
-        /// if this move isn't a capture, then is must be a check, which we always want to search
+        // if this move isn't a capture, then is must be a check, which we always want to search
         _ => return true,
     };
 
-    eval + MG_VALUE[captured.as_usize()] + DELTA_PRUNING >= alpha
+    eval + captured.mg_value() + DELTA_PRUNING >= alpha
 }
 
 #[inline(always)]
@@ -787,9 +777,7 @@ const fn table_cutoff(entry: HashEntry, depth: Depth, alpha: Score, beta: Score)
 /// If the entry from one depth lower failed low and, even with an added margin, it
 /// still can't beat the current alpha, it will likely fail low again, so return early
 fn will_fail_low(entry: HashEntry, depth: Depth, alpha: Score) -> bool {
-    entry.depth as Depth >= depth - 1
-        && entry.bound == Bound::Upper
-        && entry.score() + MG_VALUE[0] <= alpha
+    entry.depth as Depth >= depth - 1 && entry.bound == Bound::Upper && entry.score() + 126 <= alpha
 }
 
 fn lmr_reduction(

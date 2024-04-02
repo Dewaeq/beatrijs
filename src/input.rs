@@ -1,10 +1,11 @@
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::{io, thread};
 
 use crate::defs::PieceType;
 use crate::eval::evaluate;
-use crate::movegen::MovegenParams;
+use crate::perft::perft_all;
 use crate::search_info::SearchInfo;
 use crate::table::{TWrapper, TABLE_SIZE_MB};
 use crate::utils::is_repetition;
@@ -12,7 +13,6 @@ use crate::{
     bitmove::BitMove, board::Board, movelist::MoveList, perft::perft, search::Searcher,
     tests::perft::test_perft, utils::square_from_string,
 };
-use std::sync::atomic::AtomicBool;
 
 pub struct Game {
     pub board: Board,
@@ -77,12 +77,14 @@ impl Game {
         // Custom commands
         else if base_command == "d" {
             println!("{:?}", self.board);
+        } else if base_command == "debug" {
+            self.board.debug();
         } else if base_command == "perft" {
             self.parse_perft(commands);
         } else if base_command == "test" {
             self.parse_test(commands);
         } else if base_command == "static" {
-            self.parse_static(commands);
+            self.parse_static();
         } else if base_command == "take" {
             self.board.unmake_last_move();
             println!("{:?}", self.board);
@@ -113,11 +115,15 @@ impl Game {
     }
 
     fn parse_perft(&mut self, commands: Vec<&str>) {
-        assert!(commands.len() == 3);
-        assert!(commands[1] == "depth");
+        assert!(commands.len() >= 3);
+        assert!(commands[1] == "depth" || commands[1] == "all");
 
-        let depth = commands[2].parse::<u8>().unwrap();
-        perft(&mut self.board, depth, true);
+        let depth = commands[commands.len() - 1].parse::<u8>().unwrap();
+        if commands.len() == 3 {
+            perft(&mut self.board, depth, true);
+        } else {
+            println!("{:?}", perft_all(&mut self.board, depth));
+        }
     }
 
     fn parse_test(&self, commands: Vec<&str>) {
@@ -128,7 +134,7 @@ impl Game {
         }
     }
 
-    fn parse_static(&self, commands: Vec<&str>) {
+    fn parse_static(&self) {
         let eval = evaluate(&self.board);
         println!("{} cp", eval);
     }
