@@ -60,7 +60,8 @@ impl BitMove {
 
     /// No capture, promotion, en passant or castle
     pub const fn is_normal(bitmove: u16) -> bool {
-        bitmove & 0b1110 == 0
+        let flag = BitMove::flag(bitmove);
+        flag & 0b1110 == 0
     }
 
     pub const fn prom_type(flag: u8) -> PieceType {
