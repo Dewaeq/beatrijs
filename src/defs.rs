@@ -203,7 +203,7 @@ impl Dir {
 pub struct Eval(i32, i32);
 
 #[macro_export]
-macro_rules! E {
+macro_rules! e {
     ($mg: expr, $eg: expr) => {
         Eval::new($mg, $eg)
     };
@@ -219,7 +219,7 @@ impl Add for Eval {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        E!(self.0 + rhs.0, self.1 + rhs.1)
+        e!(self.0 + rhs.0, self.1 + rhs.1)
     }
 }
 
@@ -227,7 +227,7 @@ impl Sub for Eval {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        E!(self.0 - rhs.0, self.1 - rhs.1)
+        e!(self.0 - rhs.0, self.1 - rhs.1)
     }
 }
 
@@ -235,7 +235,7 @@ impl Mul<i32> for Eval {
     type Output = Self;
 
     fn mul(self, rhs: i32) -> Self::Output {
-        E!(self.0 * rhs, self.1 * rhs)
+        e!(self.0 * rhs, self.1 * rhs)
     }
 }
 
