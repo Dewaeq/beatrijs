@@ -28,6 +28,7 @@ mod zobrist;
 mod params;
 
 use crate::input::Game;
+pub(crate) use defs::e;
 
 fn main() {
     Game::main_loop();

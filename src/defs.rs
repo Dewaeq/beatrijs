@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 use crate::bitboard::BitBoard;
 use crate::params::MG_VALUE;
@@ -199,19 +199,37 @@ impl Dir {
     pub const N_DIRS: usize = 8;
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Eval(i32, i32);
 
-#[macro_export]
+//#[macro_export]
 macro_rules! e {
+    ($score: expr) => {
+        Eval::new($score, $score)
+    };
+
     ($mg: expr, $eg: expr) => {
         Eval::new($mg, $eg)
     };
 }
 
+pub(crate) use e;
+
 impl Eval {
-    pub fn new(mg: i32, eg: i32) -> Self {
+    pub const fn new(mg: i32, eg: i32) -> Self {
         Eval(mg, eg)
+    }
+
+    pub const fn phased(&self, phase: i32) -> i32 {
+        (self.0 * phase + self.1 * (24 - phase)) / 24
+    }
+
+    pub const fn mg(&self) -> i32 {
+        self.0
+    }
+
+    pub const fn eg(&self) -> i32 {
+        self.1
     }
 }
 
@@ -223,11 +241,25 @@ impl Add for Eval {
     }
 }
 
+impl AddAssign for Eval {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+        self.1 += rhs.1;
+    }
+}
+
 impl Sub for Eval {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
         e!(self.0 - rhs.0, self.1 - rhs.1)
+    }
+}
+
+impl SubAssign for Eval {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 -= rhs.0;
+        self.1 -= rhs.1;
     }
 }
 
