@@ -46,6 +46,8 @@ bookdepth=4 proto=uci option.Hash={args.hash} \
 -games 2 -rounds 2500 -repeat 2 -maxmoves 200 \
 -sprt elo0=0 elo1=10 alpha=0.05 beta=0.05 \
 -concurrency {args.threads} \
+-draw movenumber=40 movecount=20 score=10 \
+-resign movecount=15 score=600 \
 -ratinginterval 10 \
 -recover \
 -pgnout tmp/sprt.pgn
