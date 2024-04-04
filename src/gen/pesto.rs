@@ -1,6 +1,6 @@
 use crate::{
-    defs::{Score, NUM_PIECES, NUM_SQUARES, Square},
-    params::{MG_VALUE, EG_VALUE},
+    defs::{Score, Square, NUM_PIECES, NUM_SQUARES},
+    params::PIECE_VALUE,
     psqt::{EG_PIECE_TABLE, MG_PIECE_TABLE},
     utils::mirror,
 };
@@ -15,8 +15,9 @@ const fn gen_mg_pesto() -> [[Score; NUM_SQUARES]; NUM_PIECES * 2] {
     while piece < NUM_PIECES {
         let mut sq = 0;
         while sq < 64 {
-            table[piece][sq] = MG_VALUE[piece] + MG_PIECE_TABLE[piece][mirror(sq as Square) as usize];
-            table[piece + 6][sq] = MG_VALUE[piece] + MG_PIECE_TABLE[piece][sq];
+            table[piece][sq] =
+                PIECE_VALUE[piece].mg() + MG_PIECE_TABLE[piece][mirror(sq as Square) as usize];
+            table[piece + 6][sq] = PIECE_VALUE[piece].mg() + MG_PIECE_TABLE[piece][sq];
 
             sq += 1;
         }
@@ -34,8 +35,9 @@ const fn gen_eg_pesto() -> [[Score; NUM_SQUARES]; NUM_PIECES * 2] {
     while piece < NUM_PIECES {
         let mut sq = 0;
         while sq < 64 {
-            table[piece][sq] = EG_VALUE[piece] + EG_PIECE_TABLE[piece][mirror(sq as Square) as usize];
-            table[piece + 6][sq] = EG_VALUE[piece] + EG_PIECE_TABLE[piece][sq];
+            table[piece][sq] =
+                PIECE_VALUE[piece].eg() + EG_PIECE_TABLE[piece][mirror(sq as Square) as usize];
+            table[piece + 6][sq] = PIECE_VALUE[piece].eg() + EG_PIECE_TABLE[piece][sq];
 
             sq += 1;
         }

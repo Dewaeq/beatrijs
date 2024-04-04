@@ -31,7 +31,7 @@ pub struct EvalInfo {
     mob: [Eval; 2],
     tropism: [Eval; 2],
     king_shield: [Eval; 2],
-    adjust_material: [Score; 2],
+    adjust_material: [Eval; 2],
     blockages: [Score; 2],
     positional_themes: [Score; 2],
     // Attack data
@@ -93,9 +93,9 @@ pub fn evaluate(board: &Board) -> Score {
     score += eval.king_shield[0] - eval.king_shield[1];
     score += eval.mob[0] - eval.mob[1];
     score += eval.tropism[0] - eval.tropism[1];
+    score += eval.adjust_material[0] - eval.adjust_material[1];
 
     let mut total_score = score.phased(eval.phase.min(24));
-    total_score += eval.adjust_material[0] - eval.adjust_material[1];
 
     // Tempo bonus
     if board.turn == Player::White {
@@ -178,7 +178,7 @@ fn mopup_eval(board: &Board, eval: &mut EvalInfo) {
     let us = board.turn.as_usize();
     let opp = 1 - us;
     let diff = eval.material[us].eg() - eval.material[opp].eg();
-    if diff < EG_VALUE[3] - 100 {
+    if diff < PieceType::Rook.eg_value() - 100 {
         return;
     }
 
@@ -292,14 +292,14 @@ fn king_pawn_shield(board: &Board, eval: &mut EvalInfo) {
 
     // punish king on open or semi-open file
     if (w_pawns | b_pawns) & BitBoard::file_bb(w_king_sq) == 0 {
-        eval.king_shield[0] += e!(KING_OPEN, 0);
+        eval.king_shield[0] += KING_OPEN;
     } else if w_pawns & BitBoard::file_bb(w_king_sq) == 0 {
-        eval.king_shield[0] += e!(KING_SEMI_OPEN, 0);
+        eval.king_shield[0] += KING_SEMI_OPEN;
     }
     if (w_pawns | b_pawns) & BitBoard::file_bb(b_king_sq) == 0 {
-        eval.king_shield[1] += e!(KING_OPEN, 0);
+        eval.king_shield[1] += KING_OPEN;
     } else if b_pawns & BitBoard::file_bb(b_king_sq) == 0 {
-        eval.king_shield[1] += e!(KING_SEMI_OPEN, 0);
+        eval.king_shield[1] += KING_SEMI_OPEN;
     }
 
     let w_pawn_shield = SHIELDING_PAWNS[0][w_king_sq as usize];
@@ -314,7 +314,7 @@ fn king_pawn_shield(board: &Board, eval: &mut EvalInfo) {
 /// # Arguments
 ///
 /// * `king_front_span` - All the squares in front of the king
-const fn missing_shield_pawns(
+fn missing_shield_pawns(
     mut pawn_shield: u64,
     pawns: u64,
     opp_pawns: u64,
@@ -337,7 +337,7 @@ const fn missing_shield_pawns(
         pawn_shield &= !file_bb;
     }
 
-    e!(SHIELD_MISSING[pawns_missing] + SHIELD_MISSING_ON_OPEN_FILE[pawns_open_file_missing], 0)
+    SHIELD_MISSING[pawns_missing] + SHIELD_MISSING_ON_OPEN_FILE[pawns_open_file_missing]
 }
 
 /// Reward the control of space on our side of the board
@@ -372,7 +372,7 @@ fn eval_space(board: &Board, side: Player, eval: &EvalInfo, non_pawn_material: S
 fn eval_knights(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
     let us = side.as_usize();
     let opp = 1 - us;
-    let mut score = 0;
+    let mut score = e!(0);
 
     let opp_pawns = eval.pawns[opp];
     let mut knights = board.player_piece_bb(side, PieceType::Knight);
@@ -394,9 +394,9 @@ fn eval_knights(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
         connected += BitBoard::count(moves & knights);
     }
 
-    score += connected as Score * CONNECTED_KNIGHT;
+    score += CONNECTED_KNIGHT * connected as Score;
 
-    e!(score)
+    score
 }
 
 fn eval_bishops(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
@@ -404,27 +404,27 @@ fn eval_bishops(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
     let opp = 1 - us;
     let my_pawns = eval.pawns[us];
     let opp_pawns = eval.pawns[opp];
-    let mut score = 0;
+    let mut score = e!(0);
 
     let bishops = board.player_piece_bb(side, PieceType::Bishop);
 
     if bishops & DARK_SQUARES != 0 {
-        score += BitBoard::count(my_pawns & DARK_SQUARES) as Score * BISHOP_PAWN_COLOR;
-        score += BitBoard::count(opp_pawns & DARK_SQUARES) as Score * BISHOP_OPP_PAWN_COLOR;
+        score += BISHOP_PAWN_COLOR * BitBoard::count(my_pawns & DARK_SQUARES) as Score;
+        score += BISHOP_OPP_PAWN_COLOR * BitBoard::count(opp_pawns & DARK_SQUARES) as Score;
     }
     if bishops & LIGHT_SQUARES != 0 {
-        score += BitBoard::count(my_pawns & LIGHT_SQUARES) as Score * BISHOP_PAWN_COLOR;
-        score += BitBoard::count(opp_pawns & LIGHT_SQUARES) as Score * BISHOP_OPP_PAWN_COLOR;
+        score += BISHOP_PAWN_COLOR * BitBoard::count(my_pawns & LIGHT_SQUARES) as Score;
+        score += BISHOP_OPP_PAWN_COLOR * BitBoard::count(opp_pawns & LIGHT_SQUARES) as Score;
     }
 
-    e!(score)
+    score
 }
 
 fn eval_rooks(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
     let us = side.as_usize();
     let opp = 1 - us;
 
-    let mut score = 0;
+    let mut score = e!(0);
 
     let opp_king_bb = eval.king_bb[opp];
     let opp_king_file = BitBoard::file_bb(eval.king_sq[opp]);
@@ -435,11 +435,11 @@ fn eval_rooks(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
     // Rooks on seventh rank are only valuable if they cut of the king
     // or can goble up some pawns
     if opp_king_bb & side.rank_8() != 0 || opp_pawns & side.rank_7() != 0 {
-        score += BitBoard::count(rooks & side.rank_7()) as Score * ROOK_ON_SEVENTH;
+        score += ROOK_ON_SEVENTH * BitBoard::count(rooks & side.rank_7()) as Score;
     }
 
     // Align an attack on enemy king
-    score += BitBoard::count(rooks & opp_king_file) as Score * ROOK_KING_ALIGNED;
+    score += ROOK_KING_ALIGNED * BitBoard::count(rooks & opp_king_file) as Score;
 
     // Connected rooks
     let mut connected = 0;
@@ -449,13 +449,13 @@ fn eval_rooks(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
         connected += BitBoard::count(moves & rooks);
     }
 
-    score += connected as Score * CONNECTED_ROOK;
+    score += CONNECTED_ROOK * connected as Score;
 
-    e!(score)
+    score
 }
 
 fn eval_pawns(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
-    let mut score = 0;
+    let mut score = e!(0);
     let occ = board.occ_bb();
     let us = side.as_usize();
     let opp = 1 - us;
@@ -467,21 +467,21 @@ fn eval_pawns(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
 
     // Defended pawns
     let supported = my_pawns & my_pawn_attacks;
-    score += BitBoard::count(supported) as Score * PAWN_DEFENDED;
+    score += PAWN_DEFENDED * BitBoard::count(supported) as Score;
 
     // Pawns controlling centre of the board
     let num_pawns_behind_center =
         BitBoard::count(my_pawns & pawn_caps(SMALL_CENTER, side.opp())) as Score;
-    score += num_pawns_behind_center * PAWN_BEHIND_CENTER;
+    score += PAWN_BEHIND_CENTER * num_pawns_behind_center;
 
     // Pawn mobility
     let attacks = pawn_caps(my_pawns & !side.rank_7(), side);
     let pushes = pawn_push(my_pawns, side) & !occ;
     let double_pushes = pawn_push(pushes & side.rank_3(), side);
 
-    score += BitBoard::count(attacks) as Score * PAWN_ATTACK;
-    score += BitBoard::count(pushes) as Score * PAWN_PUSH;
-    score += BitBoard::count(double_pushes) as Score * PAWN_DOUBLE_PUSH;
+    score += PAWN_ATTACK * BitBoard::count(attacks) as Score;
+    score += PAWN_PUSH * BitBoard::count(pushes) as Score;
+    score += PAWN_DOUBLE_PUSH * BitBoard::count(double_pushes) as Score;
 
     // Doubled and isolated pawns
     let my_front_span = front_span(side, my_pawns);
@@ -489,8 +489,8 @@ fn eval_pawns(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
     let num_isolated =
         BitBoard::count(file_fill(my_pawns) & !west_one(my_pawns) & !east_one(my_pawns)) as Score;
 
-    score += num_doubled * DOUBLED_PAWN;
-    score += num_isolated * ISOLATED_PAWN;
+    score += DOUBLED_PAWN * num_doubled;
+    score += ISOLATED_PAWN * num_isolated;
 
     // Backward pawns, see https://www.chessprogramming.org/Backward_Pawns_(Bitboards)#Telestop_Weakness
     let my_attack_spans = fill_up(side, my_pawn_attacks);
@@ -498,7 +498,7 @@ fn eval_pawns(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
     let my_backward_area = fill_down(side, stops);
     let num_backward = BitBoard::count(my_backward_area & my_pawns) as Score;
 
-    score += num_backward * BACKWARD_PAWN;
+    score += BACKWARD_PAWN * num_backward;
 
     // Passed pawns
     let mut opp_front_spans = front_span(side.opp(), opp_pawns);
@@ -511,8 +511,8 @@ fn eval_pawns(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
         BitBoard::count(board.player_piece_bb(side.opp(), PieceType::Rook) & behind_passers)
             as Score;
 
-    score += num_my_rooks_behind_passers * ROOK_BEHIND_PASSER;
-    score += num_opp_rooks_behind_passers * OPP_ROOK_BEHIND_PASSER;
+    score += ROOK_BEHIND_PASSER * num_my_rooks_behind_passers;
+    score += OPP_ROOK_BEHIND_PASSER * num_opp_rooks_behind_passers;
 
     while passers != 0 {
         let sq = BitBoard::pop_lsb(&mut passers);
@@ -523,5 +523,5 @@ fn eval_pawns(board: &Board, side: Player, eval: &EvalInfo) -> Eval {
         score += PASSED_PAWN_SCORE[rel_rank];
     }
 
-    e!(score)
+    score
 }

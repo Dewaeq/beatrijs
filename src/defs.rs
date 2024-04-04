@@ -1,7 +1,7 @@
 use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 use crate::bitboard::BitBoard;
-use crate::params::MG_VALUE;
+use crate::params::PIECE_VALUE;
 
 pub const WHITE_IDX: usize = 0;
 pub const BLACK_IDX: usize = 1;
@@ -169,14 +169,14 @@ impl PieceType {
     pub const fn mg_value(&self) -> Score {
         match self {
             PieceType::None => 0,
-            _ => MG_VALUE[self.as_usize()],
+            _ => PIECE_VALUE[self.as_usize()].mg(),
         }
     }
 
     pub const fn eg_value(&self) -> Score {
         match self {
             PieceType::None => 0,
-            _ => MG_VALUE[self.as_usize()],
+            _ => PIECE_VALUE[self.as_usize()].eg(),
         }
     }
 }

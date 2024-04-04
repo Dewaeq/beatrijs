@@ -15,6 +15,7 @@ mod input;
 mod movegen;
 mod movelist;
 mod order;
+mod params;
 mod perft;
 mod position;
 mod psqt;
@@ -25,7 +26,6 @@ mod tests;
 mod uci;
 mod utils;
 mod zobrist;
-mod params;
 
 use crate::input::Game;
 pub(crate) use defs::e;
