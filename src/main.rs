@@ -3,6 +3,7 @@
 #![feature(sync_unsafe_cell)]
 #![feature(const_fn_floating_point_arithmetic)]
 
+mod bench;
 mod bitboard;
 mod bitmove;
 mod board;
@@ -26,8 +27,15 @@ mod uci;
 mod utils;
 mod zobrist;
 
+use std::env;
+
 use crate::input::Game;
 
 fn main() {
-    Game::main_loop();
+    let mut args = std::env::args();
+    if args.nth(1) == Some("bench".to_string()) {
+        bench::run();
+    } else {
+        Game::main_loop();
+    }
 }
