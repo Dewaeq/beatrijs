@@ -11,7 +11,7 @@ parser.add_argument("--branch", type=str, default="master",
                     help="git branch to test against")
 
 args = parser.parse_args()
-book_path = "./book.bin"
+book_path = "./books/baron30.bin"
 
 # Compile current build
 os.system("cargo build --release")
