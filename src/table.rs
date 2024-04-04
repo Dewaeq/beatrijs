@@ -118,7 +118,7 @@ impl HashTable<HashEntry> {
             }
 
             pv.push(pv_move);
-            board.make_move(pv_move);
+            board.make_move(pv_move, true);
             m = self.best_move(board.key());
             i += 1;
         }

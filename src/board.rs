@@ -248,7 +248,7 @@ impl Board {
 /// Setter methods
 impl Board {
     /// Calculate checkers, pinners and pinned pieces
-    pub fn set_check_info(&mut self) {
+    pub fn set_check_info(&mut self, find_checkers: bool) {
         let opp = self.turn.opp();
         let occ = self.occ_bb();
         let us_bb = self.cur_player_bb();
@@ -256,7 +256,11 @@ impl Board {
         let king_sq = self.cur_king_square();
         let opp_king_sq = self.king_square(opp);
 
-        self.pos.checkers_bb = attackers_to(self, king_sq, occ) & opp_bb;
+        self.pos.checkers_bb = if find_checkers {
+            attackers_to(self, king_sq, occ) & opp_bb
+        } else {
+            0
+        };
 
         let (w_pieces, b_pieces, w_king_sq, b_king_sq) = match self.turn {
             Player::White => (us_bb, opp_bb, king_sq, opp_king_sq),
@@ -302,7 +306,7 @@ impl Board {
         }
     }
 
-    pub fn make_move(&mut self, m: u16) {
+    pub fn make_move(&mut self, m: u16, find_checkers: bool) {
         let src = BitMove::src(m);
         let dest = BitMove::dest(m);
         let flag = BitMove::flag(m);
@@ -399,7 +403,7 @@ impl Board {
         self.pos.ply += 1;
         self.pos.full_moves += self.turn.as_usize();
         self.turn = self.turn.opp();
-        self.set_check_info();
+        self.set_check_info(find_checkers);
     }
 
     pub fn unmake_move(&mut self, m: u16) {
@@ -464,7 +468,7 @@ impl Board {
         if self.can_ep() {
             self.clear_ep();
         }
-        self.set_check_info();
+        self.set_check_info(true);
     }
 
     pub fn unmake_null_move(&mut self) {
@@ -479,7 +483,7 @@ impl Board {
 
         let captured = self.piece_type(BitMove::dest(m));
         let mut new_board: Board = *self;
-        new_board.make_move(m);
+        new_board.make_move(m, false);
 
         MG_VALUE[captured.as_usize()] - new_board.see(BitMove::dest(m))
     }
@@ -859,7 +863,7 @@ impl Board {
             file += 1;
         }
 
-        board.set_check_info();
+        board.set_check_info(true);
         board.pos.key ^= Zobrist::castle(board.pos.castling);
 
         if board.turn == Player::Black {

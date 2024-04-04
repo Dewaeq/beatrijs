@@ -437,7 +437,7 @@ impl Searcher {
                 );
             }
 
-            self.board.make_move(m);
+            self.board.make_move(m, gives_check);
 
             if is_quiet {
                 quiets.push(m, 0);
@@ -661,7 +661,7 @@ impl Searcher {
                 continue;
             }
 
-            self.board.make_move(m);
+            self.board.make_move(m, gives_check);
             let score = -self.quiescence(-beta, -alpha);
             self.board.unmake_move(m);
 

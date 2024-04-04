@@ -90,7 +90,7 @@ fn inner_perft_all(
                 }
             }
 
-            board.make_move(m);
+            board.make_move(m, true);
             inner_perft_all(board, depth - 1, perft);
             board.unmake_move(m);
         }
@@ -107,7 +107,7 @@ fn inner_perft(root: bool, board: &mut Board, depth: u8) -> u64 {
     }
 
     for m in moves {
-        board.make_move(m);
+        board.make_move(m, true);
 
         let add = if depth == 2 {
             MoveList::simple(board).size() as u64
