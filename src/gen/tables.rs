@@ -19,8 +19,6 @@ pub const PASSED: [[u64; NUM_SQUARES]; NUM_SIDES] = [gen_white_passed(), gen_bla
 pub const SHIELDING_PAWNS: [[u64; NUM_SQUARES]; NUM_SIDES] =
     [gen_white_shielding(), gen_black_shielding()];
 
-pub const LMR: [[f32; 64]; 32] = gen_lmr();
-
 pub const KING_ZONE: [[u64; NUM_SQUARES]; NUM_SIDES] =
     [gen_white_king_zone(), gen_black_king_zone()];
 
@@ -174,30 +172,6 @@ const fn gen_black_shielding() -> [u64; NUM_SQUARES] {
         table[sq as usize] = shield;
 
         sq -= 1;
-    }
-
-    table
-}
-
-include!(concat!(env!("OUT_DIR"), "/logarithms.rs"));
-const fn gen_lmr() -> [[f32; 64]; 32] {
-    let mut table = [[0f32; 64]; 32];
-
-    let mut depth = 3;
-    while depth < 32 {
-        let mut move_count = 0;
-        while move_count < 64 {
-            let d_ln = LN[depth];
-            let m_ln = LN[move_count];
-
-            let reduction =
-                0.8422840719846748 * m_ln * d_ln - 0.4 * m_ln - 0.22572624883839026 * d_ln + 1.2;
-            if reduction >= 0f32 {
-                table[depth][move_count] = reduction;
-            }
-            move_count += 1;
-        }
-        depth += 1;
     }
 
     table

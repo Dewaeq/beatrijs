@@ -3,6 +3,7 @@ use std::{env, fs::File, io::Write, path::Path};
 
 fn main() -> std::io::Result<()> {
     write_randoms()?;
+    write_reductions()?;
     write_logarithms()
 }
 
@@ -40,6 +41,32 @@ fn write_randoms() -> std::io::Result<()> {
     writeln!(f, "const SIDE: u64 = {:?};", rng.u64(..))?;
     writeln!(f, "const CASTLE: [u64; 16] = {:?};", castle)?;
     writeln!(f, "const EP: [u64; 8] = {:?};", ep)
+}
+
+fn write_reductions() -> std::io::Result<()> {
+    let mut f = create_output_file("reductions.rs");
+
+    let mut table = [[0f32; 64]; 32];
+
+    let mut depth = 3;
+    while depth < 32 {
+        let mut move_count = 1;
+        while move_count < 64 {
+            let d_ln = (depth as f32).ln();
+            let m_ln = (move_count as f32).ln();
+
+            let reduction = 0.84 * m_ln * d_ln - 0.4 * m_ln - 0.23 * d_ln + 1.2;
+            if reduction >= 0f32 {
+                table[depth][move_count] = reduction;
+            }
+
+            table[depth][move_count] = reduction;
+            move_count += 1;
+        }
+        depth += 1;
+    }
+
+    writeln!(f, "const LMR: [[f32; 64]; 32] = {:?};", table)
 }
 
 fn write_logarithms() -> std::io::Result<()> {

@@ -1,7 +1,6 @@
 use crate::bitmove::MoveFlag;
 use crate::defs::{Depth, PieceType, Score};
 use crate::eval::evaluate;
-use crate::gen::tables::LMR;
 use crate::heuristics::Heuristics;
 use crate::movegen::{is_legal_move, MovegenParams, HASH_BONUS};
 use crate::search_info::SearchInfo;
@@ -10,6 +9,9 @@ use crate::utils::{is_draw, print_search_info};
 use crate::{bitmove::BitMove, board::Board, movelist::MoveList, order::pick_next_move};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+// Late Move Reductions are precompiled in this file
+include!(concat!(env!("OUT_DIR"), "/reductions.rs"));
 
 pub const INFINITY: Score = 32_000;
 pub const MAX_STACK_SIZE: usize = 100;
