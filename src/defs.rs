@@ -12,6 +12,8 @@ pub const NUM_PIECES: usize = 6;
 pub const NUM_SIDES: usize = 2;
 pub const NUM_SQUARES: usize = 64;
 
+pub const PHASE_MAX: i32 = 24;
+
 pub type Square = i8;
 pub type Depth = i16;
 pub type Score = i32;
@@ -221,7 +223,7 @@ impl Eval {
     }
 
     pub const fn phased(&self, phase: i32) -> i32 {
-        (self.0 * phase + self.1 * (24 - phase)) / 24
+        (self.0 * phase + self.1 * (PHASE_MAX - phase)) / PHASE_MAX
     }
 
     pub const fn mg(&self) -> i32 {

@@ -2,8 +2,7 @@ use crate::{
     bitboard::BitBoard,
     board::Board,
     defs::{
-        e, pieces::*, Eval, Piece, PieceType, Player, Score, Square, DARK_SQUARES, LIGHT_SQUARES,
-        SMALL_CENTER,
+        e, pieces::*, Eval, Piece, PieceType, Player, Score, Square, DARK_SQUARES, LIGHT_SQUARES, PHASE_MAX, SMALL_CENTER
     },
     gen::{
         attack::{attacks, knight_attacks, rook_attacks},
@@ -95,7 +94,7 @@ pub fn evaluate(board: &Board) -> Score {
     score += eval.tropism[0] - eval.tropism[1];
     score += eval.adjust_material[0] - eval.adjust_material[1];
 
-    let mut total_score = score.phased(eval.phase.min(24));
+    let mut total_score = score.phased(eval.phase.min(PHASE_MAX));
 
     // Tempo bonus
     if board.turn == Player::White {
