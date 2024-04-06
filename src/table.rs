@@ -1,4 +1,4 @@
-use std::cell::SyncUnsafeCell;
+use std::cell::UnsafeCell;
 
 use crate::{
     board::Board,
@@ -156,13 +156,13 @@ unsafe impl Sync for TWrapper {}
 unsafe impl Send for TWrapper {}
 
 pub struct TWrapper {
-    pub inner: SyncUnsafeCell<TT>,
+    pub inner: UnsafeCell<TT>,
 }
 
 impl TWrapper {
     pub fn with_size(mb: usize) -> Self {
         TWrapper {
-            inner: SyncUnsafeCell::new(TT::with_size(mb)),
+            inner: UnsafeCell::new(TT::with_size(mb)),
         }
     }
 
