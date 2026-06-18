@@ -1,7 +1,7 @@
 #![allow(unused)]
-#![feature(const_slice_index)]
+// #![feature(const_slice_index)]
 #![feature(sync_unsafe_cell)]
-#![feature(const_fn_floating_point_arithmetic)]
+// #![feature(const_fn_floating_point_arithmetic)]
 
 mod bench;
 mod bitboard;
