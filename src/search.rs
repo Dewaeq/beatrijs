@@ -178,7 +178,7 @@ impl Searcher {
     ) -> Score {
         assert!(alpha < beta);
 
-        if self.num_nodes & 4096 == 0 {
+        if self.num_nodes & 4095 == 0 {
             self.checkup();
         }
 
