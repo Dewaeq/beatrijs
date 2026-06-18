@@ -5,10 +5,12 @@ import argparse
 
 parser = argparse.ArgumentParser(prog="Beatrijs SPRT test suite")
 parser.add_argument("--hash", type=int, default=128, help="Table size in mb")
-parser.add_argument("--threads", type=int, default=6,
-                    help="number of threads cutechess-cli can use")
-parser.add_argument("--branch", type=str, default="master",
-                    help="git branch to test against")
+parser.add_argument(
+    "--threads", type=int, default=6, help="number of threads cutechess-cli can use"
+)
+parser.add_argument(
+    "--branch", type=str, default="master", help="git branch to test against"
+)
 
 args = parser.parse_args()
 book_path = "./books/baron30.bin"
@@ -24,18 +26,19 @@ else:
     os.system("mkdir tmp")
 
 # Complile master build
-os.system("cd tmp &&"
-          f"git clone -b {args.branch} https://github.com/dewaeq/beatrijs &&"
-          "cd beatrijs &&"
-          "cargo build --release")
+os.system(
+    "cd tmp &&"
+    f"git clone -b {args.branch} https://github.com/dewaeq/beatrijs &&"
+    "cd beatrijs &&"
+    "cargo build --release"
+)
 
 if os.name == "nt":
     os.system("copy target\\release\\beatrijs.exe tmp\\beatrijs-new.exe")
-    os.system(
-        "copy tmp\\beatrijs\\target\\release\\beatrijs.exe tmp\\beatrijs-old.exe")
+    os.system("copy tmp\\beatrijs\\target\\release\\beatrijs.exe tmp\\beatrijs-old.exe")
 else:
     os.system("cp target/release/beatrijs tmp/beatrijs-new")
-    os.system("cp tmp/target/release/beatrijs tmp/beatrijs-old")
+    os.system("cp tmp/beatrijs/target/release/beatrijs tmp/beatrijs-old")
 
 os.system(f"""
 cutechess-cli \

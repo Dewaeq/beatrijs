@@ -63,7 +63,8 @@ impl Game {
     pub fn go(&mut self, commands: Vec<&str>) {
         let mut info = SearchInfo::default();
 
-        for mut i in 0..commands.len() {
+        let mut i = 0;
+        while i < commands.len() {
             let command = commands[i];
             match command.to_lowercase().as_str() {
                 "infinite" => {
@@ -101,6 +102,8 @@ impl Game {
                 }
                 _ => (),
             }
+
+            i+=1;
         }
 
         self.start_search(info);

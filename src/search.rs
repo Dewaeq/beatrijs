@@ -260,15 +260,9 @@ impl Searcher {
 
         let static_eval = if in_check {
             -INFINITY
-        } else if tt_hit {
-            entry.static_eval()
         } else {
             evaluate(&self.board)
         };
-
-        if !tt_hit && !in_check {
-            self.table.store_eval(self.board.key(), static_eval);
-        }
 
         self.eval_history[ply] = static_eval;
 
@@ -523,7 +517,6 @@ impl Searcher {
                 depth,
                 best_move,
                 best_score,
-                static_eval,
                 if best_score >= beta {
                     Bound::Lower
                 } else if alpha != old_alpha {
@@ -573,15 +566,11 @@ impl Searcher {
             self.sel_depth = self.board.pos.ply;
         }
 
-        let static_eval = if tt_hit && entry.static_eval() != -INFINITY {
-            entry.static_eval()
+        let static_eval = if in_check {
+            -INFINITY
         } else {
             evaluate(&self.board)
         };
-
-        if !tt_hit && !in_check {
-            self.table.store_eval(self.board.key(), static_eval);
-        }
 
         // Stand pat
         if static_eval >= beta {
@@ -593,7 +582,7 @@ impl Searcher {
 
         // delta pruning
         let diff = alpha - static_eval - DELTA_PRUNING;
-        if diff > 0 && diff > max_gain(&self.board) {
+        if !in_check && diff > 0 && diff > max_gain(&self.board) {
             return static_eval;
         }
 
@@ -605,7 +594,7 @@ impl Searcher {
         let mut best_move = 0;
         let old_alpha = alpha;
 
-        let futility_base = if self.board.in_check() {
+        let futility_base = if in_check {
             -INFINITY
         } else {
             static_eval + 155
@@ -683,7 +672,6 @@ impl Searcher {
                 0,
                 best_move,
                 best_score,
-                static_eval,
                 if best_score >= beta {
                     Bound::Lower
                 } else if alpha != old_alpha {

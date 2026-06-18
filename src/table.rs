@@ -208,8 +208,7 @@ impl TWrapper {
 
     pub fn store_eval(&self, key: u64, eval: Score) {
         unsafe {
-            *(*self.inner.get()).get_mut(key) =
-                HashEntry::new(key, 0, 0, -INFINITY, eval, Bound::None);
+            *(*self.inner.get()).get_mut(key) = HashEntry::new(key, 0, 0, -INFINITY, Bound::None);
         }
     }
 
@@ -250,7 +249,6 @@ pub struct HashEntry {
     pub depth: u8,
     pub m: u16,
     score: TTScore,
-    static_eval: TTScore,
     pub bound: Bound,
 }
 
@@ -261,27 +259,18 @@ impl Default for HashEntry {
             depth: 0,
             m: 0,
             score: 0,
-            static_eval: 0,
             bound: Bound::Exact,
         }
     }
 }
 
 impl HashEntry {
-    pub fn new(
-        key: u64,
-        depth: Depth,
-        m: u16,
-        score: Score,
-        static_eval: Score,
-        hash_flag: Bound,
-    ) -> Self {
+    pub fn new(key: u64, depth: Depth, m: u16, score: Score, hash_flag: Bound) -> Self {
         HashEntry {
             key,
             depth: depth as u8,
             m,
             score: score as TTScore,
-            static_eval: static_eval as TTScore,
             bound: hash_flag,
         }
     }
@@ -296,9 +285,5 @@ impl HashEntry {
 
     pub const fn score(&self) -> Score {
         self.score as Score
-    }
-
-    pub const fn static_eval(&self) -> Score {
-        self.static_eval as Score
     }
 }
