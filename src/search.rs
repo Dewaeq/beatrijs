@@ -310,7 +310,7 @@ impl Searcher {
         // Reverse futility pruning
         if !is_pv
             && !in_check
-            && depth < 9
+            && depth < 6
             && static_eval - 214 * (depth as Score - improving as Score) >= beta
             && static_eval < 10_000
         {
@@ -388,13 +388,13 @@ impl Searcher {
                     }
 
                     // Futility pruning
-                    if depth <= 8 && move_score < -50 * (depth * depth) as Score && !gives_check {
+                    if depth <= 6 && move_score < -50 * (depth * depth) as Score && !gives_check {
                         continue;
                     }
                 } else {
                     // Futility pruning: parent node
                     if !in_check
-                        && depth <= 8
+                        && depth <= 6
                         && (static_eval + MG_VALUE[1] + 30 * depth as Score <= alpha)
                     {
                         search_quiets = false;
@@ -417,7 +417,7 @@ impl Searcher {
                     }
 
                     // SEE pruning
-                    if depth <= 8 && !self.board.see_ge(m, -21 * (depth * depth) as Score) {
+                    if depth <= 6 && !self.board.see_ge(m, -21 * (depth * depth) as Score) {
                         continue;
                     }
                 }
@@ -623,11 +623,7 @@ impl Searcher {
             legals += 1;
 
             // Futility pruning
-            if !gives_check && futility_base > -INFINITY && !is_prom {
-                if legals > 2 {
-                    continue;
-                }
-
+            if !gives_check && futility_base > -INFINITY && !is_prom && legals > 4 {
                 let dest = BitMove::dest(m);
                 // We can safely do this, as this move isn't a promotion and it doesn't give check,
                 // so it must be a capture
