@@ -534,7 +534,7 @@ fn eval_pawns(
 
     // Defended pawns
     let mut supported = my_pawns & my_pawn_attacks;
-    score += (BitBoard::count(supported) * 5) as Score;
+    score += (BitBoard::count(supported) * 2) as Score;
 
     // Pawns controlling centre of the board
     let num_pawns_behind_center =
