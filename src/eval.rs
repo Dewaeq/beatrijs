@@ -456,7 +456,6 @@ fn eval_knights(board: &Board, side: Player, attacked_by: &AttackedBy) -> Score 
     }
 
     let mut connected = 0;
-    let mut att_bb = 0;
 
     while knights != 0 {
         let sq = BitBoard::pop_lsb(&mut knights);
@@ -464,7 +463,7 @@ fn eval_knights(board: &Board, side: Player, attacked_by: &AttackedBy) -> Score 
         connected += BitBoard::count(moves & knights);
     }
 
-    score += BitBoard::count(att_bb & knights) as Score * CONNECTED_KNIGHT;
+    score += connected as Score * CONNECTED_KNIGHT;
 
     score
 }
