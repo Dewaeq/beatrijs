@@ -449,7 +449,7 @@ impl Searcher {
             let mut score = 0;
 
             // search pv move in a full window, at full depth
-            if legals == 0 || depth <= 2 || !is_pv {
+            if legals == 1 || depth <= 2 || !is_pv {
                 score = -self.negamax(depth - 1 - reduction, -beta, -alpha, true);
 
                 if reduction > 0 && score > alpha {
@@ -470,7 +470,8 @@ impl Searcher {
             }
 
             if is_root {
-                self.root_moves.set_score(i, score);
+                moves.set_score(i, score);
+                self.root_moves = moves;
             }
 
             if score > alpha {
