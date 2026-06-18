@@ -465,7 +465,7 @@ pub fn generate_legal(params: &MovegenParams, move_list: &mut MoveList) {
     }
 }
 
-pub fn generate_quiet(params: &MovegenParams, move_list: &mut MoveList) {
+pub fn generate_tactical(params: &MovegenParams, move_list: &mut MoveList) {
     if params.board.in_check() {
         generate_all_moves(GenType::EvadingCaptures, params, move_list);
     } else {

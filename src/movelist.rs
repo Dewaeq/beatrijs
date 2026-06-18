@@ -2,7 +2,7 @@ use crate::{
     board::Board,
     defs::{Score, MAX_MOVES},
     heuristics::Heuristics,
-    movegen::{generate_all, generate_legal, generate_quiet, MovegenParams},
+    movegen::{generate_all, generate_legal, generate_tactical, MovegenParams},
     search::{HistoryTable, Searcher},
 };
 
@@ -45,9 +45,9 @@ impl MoveList {
         move_list
     }
 
-    pub fn quiet(params: MovegenParams) -> Self {
+    pub fn tactical(params: MovegenParams) -> Self {
         let mut move_list = MoveList::new();
-        generate_quiet(&params, &mut move_list);
+        generate_tactical(&params, &mut move_list);
         move_list
     }
 

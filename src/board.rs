@@ -385,9 +385,6 @@ impl Board {
             // target.pos.key ^= Zobrist::piece(self.turn, piece_type, dest);
         }
 
-        if self.pos.castling != old_castle {
-            self.pos.key ^= Zobrist::castle(self.pos.castling);
-        }
 
         if piece == PieceType::Pawn || is_cap {
             self.pos.half_move_count = 0;
@@ -400,6 +397,10 @@ impl Board {
 
         self.remove_piece(self.turn, piece, src);
         self.set_castling_from_move(m);
+        if self.pos.castling != old_castle {
+            self.pos.key ^= Zobrist::castle(old_castle) ^ Zobrist::castle(self.pos.castling);
+        }
+
         self.pos.ply += 1;
         self.pos.full_moves += self.turn.as_usize();
         self.turn = self.turn.opp();

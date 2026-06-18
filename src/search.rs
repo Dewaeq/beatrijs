@@ -160,7 +160,8 @@ impl Searcher {
                 depth = search_depth;
             } else if best_score >= beta {
                 beta = INFINITY.min(beta + delta);
-                depth -= (best_score.abs() <= IS_MATE) as Depth;
+                // research at full depth for unexpected good move
+                depth -= search_depth;
             } else {
                 return best_score;
             }
@@ -538,7 +539,7 @@ impl Searcher {
     }
 
     fn quiescence(&mut self, mut alpha: Score, beta: Score) -> Score {
-        if self.num_nodes & 4096 == 0 {
+        if self.num_nodes & 4095 == 0 {
             self.checkup();
         }
 
@@ -596,7 +597,7 @@ impl Searcher {
         }
 
         let params = MovegenParams::new(&self.board, &self.heuristics, tt_move);
-        let mut moves = MoveList::quiet(params);
+        let mut moves = MoveList::tactical(params);
 
         let mut legals = 0;
         let mut best_score = static_eval;

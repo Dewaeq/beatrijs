@@ -45,6 +45,13 @@ impl SearchInfo {
         }
     }
 
+    pub fn my_inc(&self, side: Player) -> Option<usize> {
+        match side {
+            Player::White => self.w_inc,
+            Player::Black => self.b_inc,
+        }
+    }
+
     pub fn has_time(&self) -> bool {
         if !self.time_set {
             true
@@ -61,7 +68,8 @@ impl SearchInfo {
                 Duration::from_millis(move_time as u64)
             } else {
                 let my_time = self.my_time(side).unwrap();
-                Duration::from_millis((my_time / 30) as u64)
+                let my_inc = self.my_inc(side).unwrap_or(0);
+                Duration::from_millis((my_time / 30 + my_inc / 2) as u64)
             };
             self.stop_time = Instant::now() + search_time;
         }

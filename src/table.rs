@@ -68,7 +68,9 @@ impl Table<HashEntry> for HashTable<HashEntry> {
 
     fn store(&mut self, entry: HashEntry) {
         let prev = self.get_mut(entry.key);
-        *prev = entry;
+        if !prev.valid() || entry.depth >= prev.depth {
+            *prev = entry;
+        }
 
         // TODO: add aging to table entries,
         // the method below is very inefficient, especially in endgames

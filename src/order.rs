@@ -1,7 +1,7 @@
-use crate::movelist::MoveList;
+use crate::{defs::Score, movelist::MoveList};
 
 pub fn pick_next_move(move_list: &mut MoveList, move_num: usize) {
-    let mut best_score = 0;
+    let mut best_score = Score::MIN;
     let mut best_index = move_num;
 
     for index in move_num..move_list.size() {
