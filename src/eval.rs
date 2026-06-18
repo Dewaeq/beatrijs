@@ -141,8 +141,8 @@ pub fn evaluate(board: &Board) -> Score {
         eval.att_weight[1] = 0;
     }
 
-    total_score += SAFETY_TABLE[eval.att_weight[0].max(99) as usize];
-    total_score -= SAFETY_TABLE[eval.att_weight[1].max(99) as usize];
+    total_score += SAFETY_TABLE[eval.att_weight[0].min(99) as usize];
+    total_score -= SAFETY_TABLE[eval.att_weight[1].min(99) as usize];
 
     // Control of space on the player's side of the board
     let total_non_pawn = piece_material[0] + piece_material[1];
