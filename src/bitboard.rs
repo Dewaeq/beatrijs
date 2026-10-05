@@ -93,19 +93,8 @@ impl BitBoard {
     /// Get the index of the least significant bit.
     ///
     /// returns 64 if the provided bitboard is empty.
-    ///
-    /// See <https://www.chessprogramming.org/BitScan#With_separated_LS1B>
     pub const fn bit_scan_forward(bb: u64) -> Square {
-        if bb == 0 {
-            return 64;
-        }
-
-        let index = ((bb ^ (bb - 1)) * DEBRUIJN_64) >> 58;
-        // This isn't necessary, because 'index' is 6 bits, so it can't exceed 63,
-        // but this assert aids the compiler (I think)
-        assert!(index < 64);
-
-        INDEX_64[index as usize]
+        bb.trailing_zeros() as _
     }
 
     /// Get the index of the most significant bit.
