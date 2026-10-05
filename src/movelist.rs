@@ -5,6 +5,11 @@ use crate::{
     movegen::{generate_all, generate_legal, generate_tactical, MovegenParams},
     search::{HistoryTable, Searcher},
 };
+use std::cell::RefCell;
+
+thread_local! {
+    static MOCK_HEURISTICS:  RefCell<Heuristics> = RefCell::new(Heuristics::new());
+}
 
 #[derive(Clone, Copy)]
 pub struct MoveList {
@@ -39,9 +44,11 @@ impl MoveList {
 
     pub fn simple(board: &Board) -> Self {
         let mut move_list = MoveList::new();
-        let heuristics = Heuristics::new();
-        let params = MovegenParams::new(board, &heuristics, 0);
-        generate_legal(&params, &mut move_list);
+        MOCK_HEURISTICS.with_borrow(|h| {
+            let params = MovegenParams::new(board, &h, 0);
+            generate_legal(&params, &mut move_list);
+        });
+
         move_list
     }
 
