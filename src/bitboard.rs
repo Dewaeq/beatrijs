@@ -120,14 +120,8 @@ impl BitBoard {
         INDEX_64[index as usize]
     }
 
-    pub const fn count(mut bb: u64) -> u32 {
-        let mut count = 0;
-        while bb != 0 {
-            bb &= bb - 1;
-            count += 1;
-        }
-
-        count
+    pub const fn count(bb: u64) -> u32 {
+        bb.count_ones()
     }
 
     #[allow(dead_code)]
