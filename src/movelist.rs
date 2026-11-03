@@ -52,9 +52,9 @@ impl MoveList {
         move_list
     }
 
-    pub fn tactical(params: MovegenParams) -> Self {
+    pub fn tactical(params: MovegenParams, with_checks: bool) -> Self {
         let mut move_list = MoveList::new();
-        generate_tactical(&params, &mut move_list);
+        generate_tactical(&params, &mut move_list, with_checks);
         move_list
     }
 

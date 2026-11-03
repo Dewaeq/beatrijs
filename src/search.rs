@@ -216,7 +216,7 @@ impl Searcher {
         }
 
         if depth <= 0 && !in_check {
-            let score = self.quiescence(alpha, beta);
+            let score = self.quiescence(0, alpha, beta);
             return score;
         }
 
@@ -326,7 +326,7 @@ impl Searcher {
         // Razoring
         if !is_pv && !in_check && tt_move == 0 && do_null && depth <= 3 {
             if static_eval + 300 + (depth as Score - 1) * 60 < alpha {
-                return self.quiescence(alpha, beta);
+                return self.quiescence(0, alpha, beta);
             }
         }
 
@@ -532,7 +532,7 @@ impl Searcher {
         best_score
     }
 
-    fn quiescence(&mut self, mut alpha: Score, beta: Score) -> Score {
+    fn quiescence(&mut self, depth: Depth, mut alpha: Score, beta: Score) -> Score {
         if self.num_nodes & 4095 == 0 {
             self.checkup();
         }
@@ -587,7 +587,13 @@ impl Searcher {
         }
 
         let params = MovegenParams::new(&self.board, &self.heuristics, tt_move);
-        let mut moves = MoveList::tactical(params);
+        // When in check, search every evasion: there's no stand pat to fall back on
+        let mut moves = if in_check {
+            MoveList::all(params)
+        } else {
+            // Only look at quiet checks on the first ply, or check/evasion chains explode
+            MoveList::tactical(params, depth == 0)
+        };
 
         let mut legals = 0;
         let mut best_score = static_eval;
@@ -632,24 +638,24 @@ impl Searcher {
             }
 
             // This move (likely) won't raise alpha
-            if !passes_delta(&self.board, m, static_eval, alpha) {
+            if !in_check && !passes_delta(&self.board, m, static_eval, alpha) {
                 continue;
             }
 
             // if eval + SEE exceeds beta, return early, as the opponent should've
             // had a better option earlier
             let see = self.board.see_approximate(m);
-            if see + static_eval > beta {
+            if !in_check && see + static_eval > beta {
                 best_score = see;
                 break;
             }
 
-            if !self.board.see_ge(m, 0) {
+            if !in_check && !self.board.see_ge(m, 0) {
                 continue;
             }
 
             self.board.make_move(m, gives_check);
-            let score = -self.quiescence(-beta, -alpha);
+            let score = -self.quiescence(depth - 1, -beta, -alpha);
             self.board.unmake_move(m);
 
             if score > best_score {
@@ -664,6 +670,10 @@ impl Searcher {
             if score >= beta {
                 break;
             }
+        }
+
+        if in_check && legals == 0 {
+            return -MATE + self.board.pos.ply as Score;
         }
 
         if !self.should_stop() {
