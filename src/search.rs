@@ -161,7 +161,7 @@ impl Searcher {
             } else if best_score >= beta {
                 beta = INFINITY.min(beta + delta);
                 // research at full depth for unexpected good move
-                depth -= search_depth;
+                depth -= 1;
             } else {
                 return best_score;
             }
