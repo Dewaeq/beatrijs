@@ -2,7 +2,7 @@ use crate::{
     board::Board,
     defs::{Score, MAX_MOVES},
     heuristics::Heuristics,
-    movegen::{generate_all, generate_legal, generate_tactical, MovegenParams},
+    movegen::{generate_all, generate_tactical, MovegenParams},
     search::{HistoryTable, Searcher},
 };
 use std::cell::RefCell;
@@ -36,17 +36,11 @@ impl MoveList {
         move_list
     }
 
-    pub fn legal(params: MovegenParams) -> Self {
-        let mut move_list = MoveList::new();
-        generate_legal(&params, &mut move_list);
-        move_list
-    }
-
     pub fn simple(board: &Board) -> Self {
         let mut move_list = MoveList::new();
         MOCK_HEURISTICS.with_borrow(|h| {
             let params = MovegenParams::new(board, &h, 0);
-            generate_legal(&params, &mut move_list);
+            generate_all(&params, &mut move_list);
         });
 
         move_list

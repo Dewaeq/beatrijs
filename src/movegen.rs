@@ -9,6 +9,7 @@ use crate::{
         },
         between::between,
         eval::MVV_LVA,
+        ray::line,
     },
     heuristics::Heuristics,
     movelist::MoveList,
@@ -29,6 +30,9 @@ pub struct MovegenParams<'a> {
     board: &'a Board,
     heuristics: &'a Heuristics,
     hash_move: u16,
+    /// Pieces of the side to move that are pinned to their king
+    pinned: u64,
+    king_sq: Square,
 }
 
 impl<'a> MovegenParams<'a> {
@@ -37,6 +41,8 @@ impl<'a> MovegenParams<'a> {
             board,
             heuristics,
             hash_move,
+            pinned: board.blockers(board.turn) & board.cur_player_bb(),
+            king_sq: board.cur_king_square(),
         }
     }
 }
@@ -85,6 +91,12 @@ fn make_moves(
 fn add_move(m: u16, params: &MovegenParams, move_list: &mut MoveList) {
     let score = score_move(m, params);
     move_list.push(m, score);
+}
+
+/// A pinned piece can only move along the line between its king and itself
+#[inline]
+fn pin_allows(params: &MovegenParams, src: Square, dest: Square) -> bool {
+    !BitBoard::contains(params.pinned, src) || BitBoard::triple_aligned(src, dest, params.king_sq)
 }
 
 fn score_move(m: u16, params: &MovegenParams) -> Score {
@@ -241,6 +253,9 @@ fn gen_pawn_moves(
         while m1 != 0 {
             let dest = BitBoard::pop_lsb(&mut m1);
             let src = dest - pawn_dir;
+            if !pin_allows(params, src, dest) {
+                continue;
+            }
             let flag = MoveFlag::QUIET;
 
             let m = BitMove::from_flag(src, dest, flag);
@@ -249,6 +264,9 @@ fn gen_pawn_moves(
         while m2 != 0 {
             let dest = BitBoard::pop_lsb(&mut m2);
             let src = dest - pawn_dir - pawn_dir;
+            if !pin_allows(params, src, dest) {
+                continue;
+            }
             let flag = MoveFlag::DOUBLE_PAWN_PUSH;
 
             let m = BitMove::from_flag(src, dest, flag);
@@ -270,16 +288,24 @@ fn gen_pawn_moves(
 
         while m1 != 0 {
             let dest = BitBoard::pop_lsb(&mut m1);
+            let src = dest - pawn_dir - 1;
+            if !pin_allows(params, src, dest) {
+                continue;
+            }
             let flag = MoveFlag::CAPTURE;
 
-            let m = BitMove::from_flag(dest - pawn_dir - 1, dest, flag);
+            let m = BitMove::from_flag(src, dest, flag);
             add_move(m, params, move_list);
         }
         while m2 != 0 {
             let dest = BitBoard::pop_lsb(&mut m2);
+            let src = dest - pawn_dir + 1;
+            if !pin_allows(params, src, dest) {
+                continue;
+            }
             let flag = MoveFlag::CAPTURE;
 
-            let m = BitMove::from_flag(dest - pawn_dir + 1, dest, flag);
+            let m = BitMove::from_flag(src, dest, flag);
             add_move(m, params, move_list);
         }
 
@@ -291,6 +317,9 @@ fn gen_pawn_moves(
 
             while m3 != 0 {
                 let src = BitBoard::pop_lsb(&mut m3);
+                if !is_legal_ep(params.board, src) {
+                    continue;
+                }
                 let flag = MoveFlag::EN_PASSANT;
 
                 let m = BitMove::from_flag(src, params.board.pos.ep_square, flag);
@@ -317,19 +346,25 @@ fn gen_pawn_moves(
         while m1 != 0 {
             let dest = BitBoard::pop_lsb(&mut m1);
             let src = dest - pawn_dir;
-            make_promotions(params, src, dest, gen_type, false, move_list);
+            if pin_allows(params, src, dest) {
+                make_promotions(params, src, dest, gen_type, false, move_list);
+            }
         }
 
         while m2 != 0 {
             let dest = BitBoard::pop_lsb(&mut m2);
             let src = dest - pawn_dir - 1;
-            make_promotions(params, src, dest, gen_type, true, move_list);
+            if pin_allows(params, src, dest) {
+                make_promotions(params, src, dest, gen_type, true, move_list);
+            }
         }
 
         while m3 != 0 {
             let dest = BitBoard::pop_lsb(&mut m3);
             let src = dest - pawn_dir + 1;
-            make_promotions(params, src, dest, gen_type, true, move_list);
+            if pin_allows(params, src, dest) {
+                make_promotions(params, src, dest, gen_type, true, move_list);
+            }
         }
     }
 }
@@ -348,6 +383,9 @@ fn gen_piece_moves(
     while piece_bb != 0 {
         let sq = BitBoard::pop_lsb(&mut piece_bb);
         let mut bb = attacks(piece, sq, params.board.occ_bb(), params.board.turn) & target;
+        if BitBoard::contains(params.pinned, sq) {
+            bb &= line(params.king_sq, sq);
+        }
 
         if checks {
             // Moving a blocker also causes check
@@ -363,7 +401,7 @@ fn gen_piece_moves(
 }
 
 fn generate_all_moves(gen_type: GenType, params: &MovegenParams, move_list: &mut MoveList) {
-    let king_sq = params.board.cur_king_square();
+    let king_sq = params.king_sq;
     let checker_sq = BitBoard::bit_scan_forward(params.board.pos.checkers_bb);
     let checks = gen_type == GenType::QuietChecks;
     let mut target_bb = BitBoard::EMPTY;
@@ -405,8 +443,13 @@ fn generate_all_moves(gen_type: GenType, params: &MovegenParams, move_list: &mut
         }
 
         let opp_bb = params.board.player_bb(params.board.turn.opp());
+        // The king itself doesn't block sliders, so it can't step away along their line
+        let occ_no_king = params.board.occ_bb() ^ BitBoard::from_sq(king_sq);
         while bb != 0 {
             let dest = BitBoard::pop_lsb(&mut bb);
+            if is_square_attacked(params.board, dest, opp_bb, occ_no_king) {
+                continue;
+            }
             if BitBoard::contains(opp_bb, dest) {
                 let m = BitMove::from_flag(king_sq, dest, MoveFlag::CAPTURE);
                 add_move(m, params, move_list);
@@ -425,6 +468,8 @@ fn generate_all_moves(gen_type: GenType, params: &MovegenParams, move_list: &mut
             if params.board.can_castle_king(params.board.turn)
                 && !BitBoard::contains(occ, king_sq + 1)
                 && !BitBoard::contains(occ, king_sq + 2)
+                && !is_square_attacked(params.board, king_sq + 1, opp_bb, occ)
+                && !is_square_attacked(params.board, king_sq + 2, opp_bb, occ)
             {
                 let m = BitMove::from_flag(king_sq, king_sq + 2, MoveFlag::CASTLE_KING);
                 add_move(m, params, move_list);
@@ -433,6 +478,8 @@ fn generate_all_moves(gen_type: GenType, params: &MovegenParams, move_list: &mut
                 && !BitBoard::contains(occ, king_sq - 1)
                 && !BitBoard::contains(occ, king_sq - 2)
                 && !BitBoard::contains(occ, king_sq - 3)
+                && !is_square_attacked(params.board, king_sq - 1, opp_bb, occ)
+                && !is_square_attacked(params.board, king_sq - 2, opp_bb, occ)
             {
                 let m = BitMove::from_flag(king_sq, king_sq - 2, MoveFlag::CASTLE_QUEEN);
                 add_move(m, params, move_list);
@@ -449,22 +496,6 @@ pub fn generate_all(params: &MovegenParams, move_list: &mut MoveList) {
     }
 }
 
-/// Wrapper around [`generate_all`]
-pub fn generate_legal(params: &MovegenParams, move_list: &mut MoveList) {
-    let mut pseudo = MoveList::new();
-    generate_all(params, &mut pseudo);
-
-    let mut i = 0;
-    while i < pseudo.size() {
-        let (m, score) = pseudo.get_all(i);
-        if is_legal_move(params.board, m) {
-            move_list.push(m, score);
-        }
-
-        i += 1;
-    }
-}
-
 pub fn generate_tactical(params: &MovegenParams, move_list: &mut MoveList, with_checks: bool) {
     if params.board.in_check() {
         generate_all_moves(GenType::EvadingCaptures, params, move_list);
@@ -474,6 +505,20 @@ pub fn generate_tactical(params: &MovegenParams, move_list: &mut MoveList, with_
             generate_all_moves(GenType::QuietChecks, params, move_list);
         }
     }
+}
+
+/// Whether the en passant capture by the pawn on `src` leaves the king safe
+pub const fn is_legal_ep(board: &Board, src: Square) -> bool {
+    let king_sq = board.cur_king_square();
+    let dest = board.pos.ep_square;
+    let cap_sq = dest - board.turn.pawn_dir();
+    let occ = board.occ_bb() ^ BitBoard::from_sq(src) ^ BitBoard::from_sq(cap_sq)
+        | BitBoard::from_sq(dest);
+    let bishop_like_bb = board.player_piece_like_bb(board.turn.opp(), PieceType::Bishop);
+    let rook_like_bb = board.player_piece_like_bb(board.turn.opp(), PieceType::Rook);
+
+    bishop_attacks(king_sq, occ) & bishop_like_bb == 0
+        && rook_attacks(king_sq, occ) & rook_like_bb == 0
 }
 
 pub const fn is_legal_move(board: &Board, m: u16) -> bool {
@@ -514,16 +559,7 @@ pub const fn is_legal_move(board: &Board, m: u16) -> bool {
     }
 
     match flag {
-        MoveFlag::EN_PASSANT => {
-            let cap_sq = board.pos.ep_square - board.turn.pawn_dir();
-            let occ = board.occ_bb() ^ BitBoard::from_sq(src) ^ BitBoard::from_sq(cap_sq)
-                | BitBoard::from_sq(dest);
-            let bishop_like_bb = board.player_piece_like_bb(board.turn.opp(), PieceType::Bishop);
-            let rook_like_bb = board.player_piece_like_bb(board.turn.opp(), PieceType::Rook);
-
-            bishop_attacks(king_sq, occ) & bishop_like_bb == 0
-                && rook_attacks(king_sq, occ) & rook_like_bb == 0
-        }
+        MoveFlag::EN_PASSANT => is_legal_ep(board, src),
         _ => !BitBoard::contains(blockers, src) || BitBoard::triple_aligned(src, dest, king_sq),
     }
 }

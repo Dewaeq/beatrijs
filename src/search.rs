@@ -3,7 +3,7 @@ use crate::defs::{Depth, PieceType, Score, MG_VALUE};
 use crate::eval::evaluate;
 use crate::gen::tables::LMR;
 use crate::heuristics::Heuristics;
-use crate::movegen::{is_legal_move, MovegenParams, HASH_BONUS};
+use crate::movegen::{MovegenParams, HASH_BONUS};
 use crate::search_info::SearchInfo;
 use crate::table::{Bound, HashEntry, TWrapper};
 use crate::utils::{is_draw, print_search_info};
@@ -356,10 +356,6 @@ impl Searcher {
             pick_next_move(&mut moves, i);
             let (m, move_score) = moves.get_all(i);
 
-            if !is_legal_move(&self.board, m) {
-                continue;
-            }
-
             legals += 1;
 
             let is_cap = BitMove::is_cap(m);
@@ -609,10 +605,6 @@ impl Searcher {
         for i in 0..moves.size() {
             pick_next_move(&mut moves, i);
             let m = moves.get(i);
-
-            if !is_legal_move(&self.board, m) {
-                continue;
-            }
 
             let is_prom = BitMove::is_prom(m);
             let gives_check = self.board.gives_check(m);
