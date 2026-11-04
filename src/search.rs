@@ -646,7 +646,7 @@ impl Searcher {
             // had a better option earlier
             let see = self.board.see_approximate(m);
             if !in_check && see + static_eval > beta {
-                best_score = see;
+                best_score = see + static_eval;
                 break;
             }
 
