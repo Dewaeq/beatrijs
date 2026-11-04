@@ -1,7 +1,7 @@
 use crate::{
     bitboard::BitBoard,
     defs::{Dir, Square, DIRS},
-    utils::{b_max, b_min, coord_from_square, is_in_board},
+    utils::{b_min, coord_from_square},
 };
 
 pub const RAY: [[u64; 64]; Dir::N_DIRS] = gen_rays();
@@ -48,45 +48,38 @@ const fn gen_rays() -> [[u64; 64]; Dir::N_DIRS] {
     ray
 }
 
+/// All squares on the line through `src` (itself included) that runs along `offset`
 const fn get_line_bb(src: Square, offset: Square) -> u64 {
+    let (dx, dy) = match offset {
+        8 => (0, 1),
+        -8 => (0, -1),
+        1 => (1, 0),
+        -1 => (-1, 0),
+        9 => (1, 1),
+        -9 => (-1, -1),
+        7 => (-1, 1),
+        -7 => (1, -1),
+        _ => panic!(),
+    };
+
+    let (x, y) = coord_from_square(src);
     let mut result = 0;
 
-    let mut i = 1;
-    loop {
-        // Conversion to i16, wouldn't compile otherwise because of a possible overflow
-        let dest = ((src as i16) + (i as i16) * (offset as i16)) as Square;
-        let (x, y) = coord_from_square(src);
-        let (t_x, t_y) = coord_from_square(dest);
+    // Walk both ways from `src`, stopping at the board edge
+    let mut sign = -1;
+    while sign <= 1 {
+        let mut i = 0;
+        loop {
+            let t_x = x + sign * i * dx;
+            let t_y = y + sign * i * dy;
+            if t_x < 0 || t_x > 7 || t_y < 0 || t_y > 7 {
+                break;
+            }
 
-        let x_dis = (x - t_x).abs();
-        let y_dis = (y - t_y).abs();
-        let move_dist = b_max(x_dis, y_dis);
-
-        if move_dist == i && is_in_board(dest) {
-            result |= BitBoard::from_sq(dest);
-        } else {
-            break;
+            result |= BitBoard::from_sq(t_y * 8 + t_x);
+            i += 1;
         }
-        i += 1;
-    }
-
-    i = 0;
-    loop {
-        // Conversion to i16, wouldn't compile otherwise because of a possible overflow
-        let dest = ((src as i16) - (i as i16) * (offset as i16)) as Square;
-        let (x, y) = coord_from_square(src);
-        let (t_x, t_y) = coord_from_square(dest);
-
-        let x_dis = (x - t_x).abs();
-        let y_dis = (y - t_y).abs();
-        let move_dist = b_max(x_dis, y_dis);
-
-        if move_dist == i && is_in_board(dest) {
-            result |= BitBoard::from_sq(dest);
-        } else {
-            break;
-        }
-        i += 1;
+        sign += 2;
     }
 
     result
@@ -177,4 +170,35 @@ const fn gen_sq_to_edge() -> [[Square; 64]; Dir::N_DIRS] {
     }
 
     sq_to_edge
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `line(a, b)` must hold exactly the squares collinear with `a` and `b`
+    #[test]
+    fn line_only_contains_aligned_squares() {
+        for a in 0..64 {
+            for b in 0..64 {
+                let (ax, ay) = coord_from_square(a);
+                let (bx, by) = coord_from_square(b);
+                let (dx, dy) = (bx - ax, by - ay);
+                let aligned = a != b && (dx == 0 || dy == 0 || dx.abs() == dy.abs());
+
+                let mut expected = 0;
+                if aligned {
+                    for c in 0..64 {
+                        let (cx, cy) = coord_from_square(c);
+                        // cross product is zero when c lies on the line through a and b
+                        if (cx - ax) * dy == (cy - ay) * dx {
+                            expected |= BitBoard::from_sq(c);
+                        }
+                    }
+                }
+
+                assert_eq!(line(a, b), expected, "line({a}, {b})");
+            }
+        }
+    }
 }
